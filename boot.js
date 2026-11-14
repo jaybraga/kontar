@@ -38,13 +38,13 @@
   }
   function login(sb, note) {
     shell().innerHTML = `<div class="w"><span class="lg"></span><h1>Entrar.</h1><p>${esc(note || 'Seus dados ficam salvos e só você vê.')}</p>
-      <form id="kbF" autocomplete="on"><input id="kbE" type="email" name="email" placeholder="E-mail" autocomplete="username" required>
+      <form id="kbF" autocomplete="on"><input id="kbE" type="text" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" name="email" placeholder="E-mail ou usuário" autocomplete="username" required>
       <input id="kbP" type="password" name="password" placeholder="Senha" autocomplete="current-password" required>
       <button id="kbB" type="submit">Entrar</button><div class="err" id="kbX"></div><span class="lk" id="kbR">Esqueci a senha</span></form></div>`;
     const f = document.getElementById('kbF'), b = document.getElementById('kbB'), x = document.getElementById('kbX');
     f.onsubmit = async e => { e.preventDefault(); b.disabled = true; x.textContent = '';
-      const r = await sb.auth.signInWithPassword({ email: document.getElementById('kbE').value.trim(), password: document.getElementById('kbP').value });
-      if (r.error) { b.disabled = false; x.textContent = /Invalid login/i.test(r.error.message) ? 'E-mail ou senha não conferem.' : r.error.message; return; }
+      const r = await sb.auth.signInWithPassword({ email: (v => /@/.test(v) ? v : v.toLowerCase() + '@kontar.app')(document.getElementById('kbE').value.trim()), password: document.getElementById('kbP').value });
+      if (r.error) { b.disabled = false; x.textContent = /Invalid login/i.test(r.error.message) ? 'E-mail/usuário ou senha não conferem.' : r.error.message; return; }
       start(sb, r.data.user); };
     document.getElementById('kbR').onclick = async () => { const em = document.getElementById('kbE').value.trim(); if (!em) { x.textContent = 'Escreva seu e-mail primeiro.'; return; }
       const r = await sb.auth.resetPasswordForEmail(em, { redirectTo: location.origin + location.pathname }); x.style.color = r.error ? '#FF6A5C' : '#6AFF2A'; x.textContent = r.error ? r.error.message : 'Mandamos um link pro seu e-mail. Vale por 30 min.'; };

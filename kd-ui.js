@@ -12,6 +12,8 @@
   KD.norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   KD.signedInt = v => (v < 0 ? '−' : '') + int(Math.abs(v));
   KD.daysLeftLbl = () => { const T = KD.today, n = new Date(T.getFullYear(), T.getMonth() + 1, 0).getDate() - T.getDate(); return n === 0 ? 'último dia do mês' : n + (n === 1 ? ' dia até o fim do mês' : ' dias até o fim do mês'); };
+  KD.isDemo = () => !!(KD.user && KD.user.email === 'teste@kontar.app');
+  const DEMO_MSG = 'Esta é a conta de demonstração: isso fica travado para todo mundo poder testar.';
   KD.since = () => new Date((KD.user && KD.user.created_at) || Date.now());
   KD.kList = () => [...new Set(KD.M.rows.map(r => r.k))].filter(k => k && k !== '—');
   KD.lastAte = P => { let best = null, bi = -1; P.forEach(p => { const q = p.ate.split('/'), i = (2000 + +q[1]) * 12 + MES.indexOf(q[0]); if (i > bi) { bi = i; best = p.ate; } }); return best || '—'; };
@@ -178,11 +180,11 @@
       o.ac_ss_knob = st.sess24 ? '49px' : '3px'; o.ac_ss_inkA = st.sess24 ? '#9A9AA3' : '#000'; o.ac_ss_inkB = st.sess24 ? '#000' : '#9A9AA3';
       o.ac_ss_lbl = 'Duração da sessão'; o.ac_ss_word = st.sess24 ? '24 horas' : 'Sem limite';
       o.ac_ss_txt = st.sess24 ? 'Por segurança, o Kontar pede seu login de novo a cada 24 horas, mesmo que você não saia.' : 'Você fica conectado neste aparelho até sair por conta própria. Indicado para um computador só seu.';
-      o.ac_togSs = () => comp.setState(x => ({ sess24: x.sess24 ? false : Date.now() }));
+      o.ac_togSs = () => KD.isDemo() ? A({ pwMsg: DEMO_MSG, pwErr: true }) : comp.setState(x => ({ sess24: x.sess24 ? false : Date.now() }));
     }
     o.ac_doExp = () => { KD.exportCsv(); comp.setState(x => ({ ac: Object.assign({}, x.ac, { exp: true }) })); };
     o.ac_save = ((orig) => () => { orig(); setTimeout(() => KD.saveAccount(comp.state.ac), 0); })(o.ac_save);
-    o.ac_delGo = ((orig) => () => { const ok = comp.state.ac.delTxt.trim().toUpperCase() === 'EXCLUIR'; orig(); if (ok) KD.deleteAccount(); })(o.ac_delGo);
+    o.ac_delGo = ((orig) => () => { if (KD.isDemo()) return comp.setState(x => ({ ac: Object.assign({}, x.ac, { delTxt: '', pwMsg: DEMO_MSG, pwErr: true }) })); const ok = comp.state.ac.delTxt.trim().toUpperCase() === 'EXCLUIR'; orig(); if (ok) KD.deleteAccount(); })(o.ac_delGo);
     /* Extrato: busca */
     o.xfQ = st.xf.q || ''; o.xfSetQ = e => { const v = e.target.value; comp.setState(x => ({ xf: Object.assign({}, x.xf, { q: v }) })); };
     o.xfAny = o.xfAny || !!st.xf.q; o.xfClear = ((orig) => () => { orig(); comp.setState(x => ({ xf: Object.assign({}, x.xf, { q: '' }) })); })(o.xfClear);
@@ -246,7 +248,7 @@
     sb().from('user_prefs').upsert({ user_id: uid(), prefs: P, updated_at: new Date().toISOString() }, { onConflict: 'user_id' }).then(r => r && r.error && console.error('[kontar] preferências', r.error)); };
   KD.saveAccount = async ac => {
     try { ck(await sb().from('profiles').upsert({ user_id: uid(), nome_exibicao: ac.n0 }, { onConflict: 'user_id' }));
-      if (ac.e0 && ac.e0 !== KD.user.email) ck(await sb().auth.updateUser({ email: ac.e0 }, { emailRedirectTo: location.origin + location.pathname })); } catch (e) { console.error('[kontar] conta', e); } };
+      if (!KD.isDemo() && ac.e0 && ac.e0 !== KD.user.email) ck(await sb().auth.updateUser({ email: ac.e0 }, { emailRedirectTo: location.origin + location.pathname })); } catch (e) { console.error('[kontar] conta', e); } };
   KD.saveAvatar = async blob => { try { const path = uid() + '/avatar.jpg';
     ck(await sb().storage.from('avatars').upload(path, blob, { upsert: true, contentType: 'image/jpeg' }));
     ck(await sb().from('profiles').upsert({ user_id: uid(), avatar_url: path }, { onConflict: 'user_id' })); } catch (e) { console.error('[kontar] foto', e); } };
@@ -256,6 +258,7 @@
   KD.changePassword = async comp => {
     const A = p => comp.setState(x => ({ ac: Object.assign({}, x.ac, p) })), ac = comp.state.ac, S = sb();
     if (ac.pwBusy) return;
+    if (KD.isDemo()) return A({ pwMsg: DEMO_MSG, pwErr: true });
     if ((ac.pw1 || '').length < 8) return A({ pwMsg: 'Use pelo menos 8 caracteres.', pwErr: true });
     if (ac.pw1 !== ac.pw2) return A({ pwMsg: 'As duas senhas não conferem.', pwErr: true });
     A({ pwBusy: true, pwMsg: '', pwErr: false });
