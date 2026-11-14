@@ -20,6 +20,27 @@
   KD.accLogo = () => { const o = {}; KD.M.accs.forEach(a => { const b = KD.colorOf(a.nome, '', '') && (KD.BANK[a.nome] ? a.nome : null); o[a.nome] = /Mercado Pago/.test(a.nome) ? 'Mercado Pago' : /Nubank/.test(a.nome) ? 'Nubank' : /Itaú/.test(a.nome) ? 'Itaú' : /C6/.test(a.nome) ? 'C6' : b || a.nome; }); return o; };
   KD.alert = k => (KD._C && KD._C.NOTIFS.find(n => n.home === k && n.kind === 'block' && (k !== 'a1' || n.card))) || {};
 
+
+  /* ---------------- rotas: a página atual vive no endereço (#/extrato), voltar/avançar e reload funcionam ---------------- */
+  const SLUG = { home: '', extrato: 'extrato', metas: 'metas', categorias: 'categorias', cartoes: 'cartoes', estab: 'estabelecimentos', config: 'preferencias', conta: 'conta', ajuda: 'ajuda' };
+  const REV = Object.fromEntries(Object.entries(SLUG).filter(e => e[1]).map(e => [e[1], e[0]]));
+  KD.pageFromHash = () => { const h = String(location.hash || '').replace(/^#\/?/, '').split(/[?&/]/)[0].toLowerCase(); return h === '' ? 'home' : (REV[h] || null); };
+  KD.urlFor = pg => location.pathname + location.search + (SLUG[pg] ? '#/' + SLUG[pg] : '');
+  KD.routeStart = c => {
+    KD._lastPage = c.state.page;
+    try { history.replaceState({ kpg: c.state.page }, '', KD.urlFor(c.state.page)); } catch (e) {}
+    if (c.state.page !== 'home') setTimeout(() => { try { c.pgSeq(c.state.page); } catch (e) {} }, 140);
+    window.addEventListener('popstate', () => {
+      const pg = KD.pageFromHash() || 'home', go = n => { const k = KD.comp; if (!k || pg === k.state.page) return; if (k._fading && n < 12) return setTimeout(() => go(n + 1), 120); KD._popTo = pg; k.goPage(pg); };
+      go(0);
+    });
+  };
+  KD.routeSync = c => {
+    const pg = c.state.page; if (pg === KD._lastPage) return; KD._lastPage = pg;
+    if (KD._popTo === pg) { KD._popTo = null; return; }
+    try { history.pushState({ kpg: pg }, '', KD.urlFor(pg)); } catch (e) {}
+  };
+
   /* ---------------- install ---------------- */
   KD.install = function (C) {
     const M = KD.M; KD._C = C;
@@ -31,8 +52,17 @@
     C.NOTIFS = KD.notifs();
     C.EXP.lanc.nav = '';
     const did = C.prototype.componentDidMount, dup = C.prototype.componentDidUpdate;
-    C.prototype.componentDidMount = function () { KD.comp = this; KD.snap(this.state); return did && did.apply(this, arguments); };
-    C.prototype.componentDidUpdate = function () { try { KD.sync(this); } catch (e) { console.error('[kontar] sync', e); } return dup && dup.apply(this, arguments); };
+    C.prototype.componentDidMount = function () {
+      KD.comp = this; KD.snap(this.state);
+      const r = did && did.apply(this, arguments);
+      KD.routeStart(this); KD.sessGuard();
+      return r;
+    };
+    C.prototype.componentDidUpdate = function () {
+      try { KD.sync(this); } catch (e) { console.error('[kontar] sync', e); }
+      try { KD.routeSync(this); } catch (e) { console.error('[kontar] rota', e); }
+      return dup && dup.apply(this, arguments);
+    };
     KD._applied = null;
   };
   KD.metas = () => KD.M.goals.map(g => {
@@ -125,7 +155,28 @@
     o.ac_ses = (o.ac_ses || []).map(x => Object.assign(x, { meta: x.meta.replace(/^ · /, '') }));
     o.hasConn = false;
     o.ac_hasOthers = true; o.ac_endAll = () => KD.signOutOthers();
-    o.ac_togTfa = () => {}; o.ac_tfaWord = 'Em breve'; o.ac_tfaTxt = 'Ainda não disponível nesta versão.';
+    { /* Conta: nome em duas linhas, pílulas do topo, senha, toggles de segurança */
+      const ac = st.ac, A = p => comp.setState(x => ({ ac: Object.assign({}, x.ac, p) }));
+      const nmv = (ac.n0 || '').trim(), sp = nmv.split(/\s+/).filter(Boolean), l1 = sp[0] || '', l2 = sp.slice(1).join(' ');
+      const Lm = Math.max(l1.length, l2.length, 3), ln = l2 ? 2 : 1, fs = Math.max(56, Math.min(ln === 2 ? 118 : 172, Math.floor(600 / (Lm * 0.53))));
+      o.ac_nm1 = l1; o.ac_nm2 = l2; o.ac_nameFs = fs + 'px'; o.ac_nameB = Math.round(-fs * 0.13) + 'px'; o.ac_heroH = Math.max(210, Math.round(fs * 0.86 * ln + 56)) + 'px';
+      o.ac_name0 = l1; o.ac_ini = (l1.charAt(0) || 'J').toUpperCase();
+      o.ac_countLbl = M.accs.length + (M.accs.length === 1 ? ' conta' : ' contas'); o.ac_chipTfa = M.cards.length + (M.cards.length === 1 ? ' cartão' : ' cartões'); o.ac_chipBd = '#3A3A40'; o.ac_chipInk = '#B4B4BC';
+      o.ac_inName = e => A({ name: e.target.value.slice(0, 60) }); o.ac_inEmail = e => A({ email: e.target.value.slice(0, 80) });
+      o.ac_pw1 = ac.pw1 || ''; o.ac_pw2 = ac.pw2 || ''; o.ac_pwCodeV = ac.pwCodeV || ''; o.ac_pwCode = ac.pwStep === 1;
+      o.ac_inPw1 = e => A({ pw1: e.target.value.slice(0, 72), pwMsg: '' }); o.ac_inPw2 = e => A({ pw2: e.target.value.slice(0, 72), pwMsg: '' });
+      o.ac_inPwCode = e => A({ pwCodeV: e.target.value.replace(/\D/g, '').slice(0, 8) });
+      o.ac_pwMsg = ac.pwMsg || 'Mínimo 8 caracteres.'; o.ac_pwMsgC = ac.pwMsg ? (ac.pwErr ? '#FF6A5C' : '#6AFF2A') : '#7C7C85';
+      o.ac_pwBtn = ac.pwBusy ? 'Aguarde…' : ac.pwStep === 1 ? 'Confirmar código' : 'Salvar senha'; o.ac_pwO = (ac.pwBusy || !ac.pw1) ? '.4' : '1';
+      o.ac_pwGo = () => KD.changePassword(comp);
+      const sw = (p, on) => { o[p + '_track'] = on ? '#5B3DF5' : '#26262B'; o[p + '_knob'] = on ? '31px' : '3px'; };
+      sw('ac_pm', !!st.pwMail); o.ac_pm_lbl = 'Trocar senha'; o.ac_pm_word = st.pwMail ? 'Com e-mail' : 'Direto';
+      o.ac_pm_txt = st.pwMail ? 'Pede um código enviado ao seu e-mail antes de salvar uma senha nova.' : 'Salva a senha nova na hora, sem confirmar por e-mail.';
+      o.ac_togPm = () => comp.setState(x => ({ pwMail: !x.pwMail, ac: Object.assign({}, x.ac, { pwStep: 0, pwMsg: '', pwCodeV: '' }) }));
+      sw('ac_ss', !!st.sess24); o.ac_ss_lbl = 'Sessão'; o.ac_ss_word = st.sess24 ? '24 horas' : 'Sem limite';
+      o.ac_ss_txt = st.sess24 ? 'Você precisa entrar de novo a cada 24 horas.' : 'Você continua conectado até sair.';
+      o.ac_togSs = () => comp.setState(x => ({ sess24: x.sess24 ? false : Date.now() }));
+    }
     o.ac_doExp = () => { KD.exportCsv(); comp.setState(x => ({ ac: Object.assign({}, x.ac, { exp: true }) })); };
     o.ac_save = ((orig) => () => { orig(); setTimeout(() => KD.saveAccount(comp.state.ac), 0); })(o.ac_save);
     o.ac_delGo = ((orig) => () => { const ok = comp.state.ac.delTxt.trim().toUpperCase() === 'EXCLUIR'; orig(); if (ok) KD.deleteAccount(); })(o.ac_delGo);
@@ -136,8 +187,8 @@
   };
 
   /* ---------------- gravação ---------------- */
-  const TRACK = ['cats', 'alt', 'eov', 'tet', 'cor', 'ico', 'custom', 'cOv', 'cDel', 'nCards', 'mU', 'nRead', 'alerts', 'atyp', 'ms', 'fc', 'anim', 'sv', 'lay', 'dord', 'nm', 'wd', 'exl'];
-  const PREF = { nRead: 'nRead', alerts: 'alerts', atyp: 'atyp', ms: 'ms', fc: 'fc', anim: 'anim', sv: 'sv', lay: 'lay', dord: 'dord', nm: 'nm', wd: 'wd', exl: 'exl' };
+  const TRACK = ['cats', 'alt', 'eov', 'tet', 'cor', 'ico', 'custom', 'cOv', 'cDel', 'nCards', 'mU', 'nRead', 'alerts', 'atyp', 'ms', 'fc', 'anim', 'sv', 'lay', 'dord', 'nm', 'wd', 'exl', 'pwMail', 'sess24'];
+  const PREF = { nRead: 'nRead', alerts: 'alerts', atyp: 'atyp', ms: 'ms', fc: 'fc', anim: 'anim', sv: 'sv', lay: 'lay', dord: 'dord', nm: 'nm', wd: 'wd', exl: 'exl', pwMail: 'pwMail', sess24: 'sess24' };
   KD.snap = st => { KD._snap = {}; TRACK.forEach(k => { KD._snap[k] = JSON.stringify(st[k]); }); };
   const changedKeys = (a, b) => { a = a || {}; b = b || {}; return [...new Set(Object.keys(a).concat(Object.keys(b)))].filter(k => JSON.stringify(a[k]) !== JSON.stringify(b[k])); };
   let prefT = null, dataQ = Promise.resolve(), dataDirty = false;
@@ -198,6 +249,29 @@
     ck(await sb().from('profiles').upsert({ user_id: uid(), avatar_url: path }, { onConflict: 'user_id' })); } catch (e) { console.error('[kontar] foto', e); } };
   KD.smallImage = src => new Promise(res => { if (/^data:/.test(src) || /^https?:/.test(src)) return res(src); const im = new Image(); im.onload = () => { const s = 128, cv = document.createElement('canvas'); cv.width = cv.height = s; const g = cv.getContext('2d'), k = Math.min(s / im.width, s / im.height); g.drawImage(im, (s - im.width * k) / 2, (s - im.height * k) / 2, im.width * k, im.height * k); res(cv.toDataURL('image/png')); }; im.onerror = () => res(null); im.src = src; });
   KD.sendReset = () => sb().auth.resetPasswordForEmail(KD.user.email, { redirectTo: location.origin + location.pathname });
+
+  KD.changePassword = async comp => {
+    const A = p => comp.setState(x => ({ ac: Object.assign({}, x.ac, p) })), ac = comp.state.ac, S = sb();
+    if (ac.pwBusy) return;
+    if ((ac.pw1 || '').length < 8) return A({ pwMsg: 'Use pelo menos 8 caracteres.', pwErr: true });
+    if (ac.pw1 !== ac.pw2) return A({ pwMsg: 'As duas senhas não conferem.', pwErr: true });
+    A({ pwBusy: true, pwMsg: '', pwErr: false });
+    const askCode = async txt => { ck(await S.auth.reauthenticate()); A({ pwBusy: false, pwStep: 1, pwMsg: txt, pwErr: false }); };
+    try {
+      if (comp.state.pwMail && ac.pwStep !== 1) return await askCode('Mandamos um código de 6 dígitos para o seu e-mail.');
+      const body = { password: ac.pw1 }; if (ac.pwStep === 1) body.nonce = (ac.pwCodeV || '').trim();
+      const r = await S.auth.updateUser(body);
+      if (r.error) { if (/reauth/i.test(r.error.message || '') && ac.pwStep !== 1) return await askCode('Por segurança, mandamos um código de 6 dígitos para o seu e-mail.'); throw r.error; }
+      A({ pwBusy: false, pwStep: 0, pw1: '', pw2: '', pwCodeV: '', pwMsg: 'Senha trocada.', pwErr: false });
+    } catch (e) { A({ pwBusy: false, pwMsg: /nonce|token|expired|invalid/i.test(e.message || '') ? 'Código inválido ou vencido.' : (e.message || 'Não deu pra trocar a senha.'), pwErr: true }); }
+  };
+  /* sessão de 24h (opcional): vale a partir do último login ou do momento em que o toggle foi ligado */
+  KD.sessGuard = () => {
+    clearInterval(KD._sg);
+    const chk = () => { try { const t = KD.comp && KD.comp.state.sess24; if (!t) return; const last = Date.parse((KD.user && KD.user.last_sign_in_at) || '') || 0, since = Math.max(last, Number(t) || 0);
+      if (since && Date.now() - since > 864e5) KD.signOut().then(() => location.reload()); } catch (e) {} };
+    chk(); KD._sg = setInterval(chk, 300000);
+  };
   KD.signOut = () => sb().auth.signOut();
   KD.signOutOthers = () => sb().auth.signOut({ scope: 'others' });
   KD.relogin = () => location.reload();

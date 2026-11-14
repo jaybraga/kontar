@@ -322,16 +322,18 @@
   KD.initState = function (st) {
     const M = KD.M, P = M.prefs;
     st.mes = M.CUR;
+    { const pg = KD.pageFromHash && KD.pageFromHash(); if (pg) st.page = pg; }
     st.pk = Object.assign({}, st.pk, { y: Math.floor(M.CUR / 12) });
     /* cores/ícones: só o que difere do padrão vira "mudança" (mantém o Restaurar) */
     const cor = {}, ico = {};
     Object.values(M.catById).forEach(c => { const def = CAT_DEF[c.nome]; if (!def || (c.cor && c.cor.toUpperCase() !== def.toUpperCase())) cor[c.nome] = (c.cor || '#78788A').toUpperCase(); if (c.icone && ICON_KEYS.includes(c.icone) && c.icone !== c.nome) ico[c.nome] = c.icone; });
     st.cor = cor; st.ico = ico; st.custom = M.custom.slice();
     st.alt = Object.fromEntries(M.est.map(e => [e.nome, e.alterna]));
+    st.pwMail = P.pwMail === true; st.sess24 = P.sess24 || false;
     st.nRead = P.nRead || {}; st.alerts = P.alerts !== false; st.atyp = P.atyp !== false;
     if (P.ms) st.ms = P.ms; if (P.fc) st.fc = P.fc;
     const name = (M.profile && M.profile.nome_exibicao) || (KD.user.email || '').split('@')[0];
-    const nm = name.charAt(0).toUpperCase() + name.slice(1);
+    const nm = /\s/.test(name) ? name : name.charAt(0).toUpperCase() + name.slice(1);
     st.ac = Object.assign({}, st.ac, { name: nm, n0: nm, email: KD.user.email, e0: KD.user.email, ses: [{ id: 'cur', dev: KD.device(), loc: '', when: 'agora', cur: true }] });
     if (M.profile && M.profile.avatar_url) st.foto = KD.avatarUrl || '';
     return st;
