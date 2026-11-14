@@ -165,7 +165,7 @@
       const fs1 = Math.min(172, Math.floor(avail / (Math.max(nmv.length, 3) * 0.53))), one = !l2 || fs1 >= 84;
       const Lm = Math.max(l1.length, l2.length, 3), ln = one ? 1 : 2, fs = one ? Math.max(56, fs1) : Math.max(56, Math.min(118, Math.floor(avail / (Lm * 0.53))));
       o.ac_nm1 = one ? nmv : l1; o.ac_nm2 = one ? '' : l2; o.ac_nm2on = !one; o.ac_nameFs = fs + 'px'; o.ac_nameB = Math.round(-fs * 0.08) + 'px'; o.ac_heroH = Math.max(210, Math.round(fs * 0.86 * ln + 56)) + 'px';
-      o.ac_name0 = l1; o.ac_ini = (l1.charAt(0) || 'J').toUpperCase();
+      o.ac_nmFull = nmv || l1; o.ac_name0 = l1; o.ac_ini = (l1.charAt(0) || 'J').toUpperCase();
       o.ac_countLbl = M.accs.length + (M.accs.length === 1 ? ' conta' : ' contas'); o.ac_chipTfa = M.cards.length + (M.cards.length === 1 ? ' cartão' : ' cartões'); o.ac_chipBd = '#3A3A40'; o.ac_chipInk = '#B4B4BC';
       o.ac_inName = e => A({ name: e.target.value.slice(0, 60) }); o.ac_inEmail = e => A({ email: e.target.value.slice(0, 80) });
       o.ac_pw1 = ac.pw1 || ''; o.ac_pw2 = ac.pw2 || ''; o.ac_pwCodeV = ac.pwCodeV || ''; o.ac_pwCode = ac.pwStep === 1;
