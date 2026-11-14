@@ -158,23 +158,26 @@
     { /* Conta: nome em duas linhas, pílulas do topo, senha, toggles de segurança */
       const ac = st.ac, A = p => comp.setState(x => ({ ac: Object.assign({}, x.ac, p) }));
       const nmv = (ac.n0 || '').trim(), sp = nmv.split(/\s+/).filter(Boolean), l1 = sp[0] || '', l2 = sp.slice(1).join(' ');
-      const Lm = Math.max(l1.length, l2.length, 3), ln = l2 ? 2 : 1, fs = Math.max(56, Math.min(ln === 2 ? 118 : 172, Math.floor(600 / (Lm * 0.53))));
-      o.ac_nm1 = l1; o.ac_nm2 = l2; o.ac_nameFs = fs + 'px'; o.ac_nameB = Math.round(-fs * 0.13) + 'px'; o.ac_heroH = Math.max(210, Math.round(fs * 0.86 * ln + 56)) + 'px';
+      /* nome: uma linha se couber (≥84px de corpo); senão quebra entre nome e sobrenome */
+      const fullW = st.vw / st.vh >= 2 && st.wd !== 'full' ? Math.round(st.vw * 0.75) : st.vw, avail = Math.max(240, Math.min(fullW - 48, 1000) - 380 - 8);
+      const fs1 = Math.min(172, Math.floor(avail / (Math.max(nmv.length, 3) * 0.53))), one = !l2 || fs1 >= 84;
+      const Lm = Math.max(l1.length, l2.length, 3), ln = one ? 1 : 2, fs = one ? Math.max(56, fs1) : Math.max(56, Math.min(118, Math.floor(avail / (Lm * 0.53))));
+      o.ac_nm1 = one ? nmv : l1; o.ac_nm2 = one ? '' : l2; o.ac_nm2on = !one; o.ac_nameFs = fs + 'px'; o.ac_nameB = Math.round(-fs * 0.08) + 'px'; o.ac_heroH = Math.max(210, Math.round(fs * 0.86 * ln + 56)) + 'px';
       o.ac_name0 = l1; o.ac_ini = (l1.charAt(0) || 'J').toUpperCase();
       o.ac_countLbl = M.accs.length + (M.accs.length === 1 ? ' conta' : ' contas'); o.ac_chipTfa = M.cards.length + (M.cards.length === 1 ? ' cartão' : ' cartões'); o.ac_chipBd = '#3A3A40'; o.ac_chipInk = '#B4B4BC';
       o.ac_inName = e => A({ name: e.target.value.slice(0, 60) }); o.ac_inEmail = e => A({ email: e.target.value.slice(0, 80) });
       o.ac_pw1 = ac.pw1 || ''; o.ac_pw2 = ac.pw2 || ''; o.ac_pwCodeV = ac.pwCodeV || ''; o.ac_pwCode = ac.pwStep === 1;
       o.ac_inPw1 = e => A({ pw1: e.target.value.slice(0, 72), pwMsg: '' }); o.ac_inPw2 = e => A({ pw2: e.target.value.slice(0, 72), pwMsg: '' });
       o.ac_inPwCode = e => A({ pwCodeV: e.target.value.replace(/\D/g, '').slice(0, 8) });
-      o.ac_pwMsg = ac.pwMsg || 'Mínimo 8 caracteres.'; o.ac_pwMsgC = ac.pwMsg ? (ac.pwErr ? '#FF6A5C' : '#6AFF2A') : '#7C7C85';
+      o.ac_pwMsg = ac.pwMsg || ''; o.ac_pwMsgC = ac.pwErr ? '#FF6A5C' : '#6AFF2A';
+      { const pw = ac.pw1 || '', cls = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter(r => r.test(pw)).length, pts = (pw.length >= 8) + (pw.length >= 12) + cls, lv = !pw ? 0 : pw.length < 8 || pts <= 3 ? 1 : pts <= 5 ? 2 : 3;
+        o.ac_pwPct = ['0%', '33.3%', '66.6%', '100%'][lv]; o.ac_pwCol = ['#26262B', '#FF4436', '#F5B83D', '#00E08A'][lv]; o.ac_pwLbl = ['', 'Fraca', 'Média', 'Forte'][lv]; }
       o.ac_pwBtn = ac.pwBusy ? 'Aguarde…' : ac.pwStep === 1 ? 'Confirmar código' : 'Salvar senha'; o.ac_pwO = (ac.pwBusy || !ac.pw1) ? '.4' : '1';
       o.ac_pwGo = () => KD.changePassword(comp);
       const sw = (p, on) => { o[p + '_track'] = on ? '#5B3DF5' : '#26262B'; o[p + '_knob'] = on ? '31px' : '3px'; };
-      sw('ac_pm', !!st.pwMail); o.ac_pm_lbl = 'Trocar senha'; o.ac_pm_word = st.pwMail ? 'Com e-mail' : 'Direto';
-      o.ac_pm_txt = st.pwMail ? 'Pede um código enviado ao seu e-mail antes de salvar uma senha nova.' : 'Salva a senha nova na hora, sem confirmar por e-mail.';
-      o.ac_togPm = () => comp.setState(x => ({ pwMail: !x.pwMail, ac: Object.assign({}, x.ac, { pwStep: 0, pwMsg: '', pwCodeV: '' }) }));
-      sw('ac_ss', !!st.sess24); o.ac_ss_lbl = 'Sessão'; o.ac_ss_word = st.sess24 ? '24 horas' : 'Sem limite';
-      o.ac_ss_txt = st.sess24 ? 'Você precisa entrar de novo a cada 24 horas.' : 'Você continua conectado até sair.';
+      o.ac_ss_knob = st.sess24 ? '49px' : '3px'; o.ac_ss_inkA = st.sess24 ? '#9A9AA3' : '#000'; o.ac_ss_inkB = st.sess24 ? '#000' : '#9A9AA3';
+      o.ac_ss_lbl = 'Duração da sessão'; o.ac_ss_word = st.sess24 ? '24 horas' : 'Sem limite';
+      o.ac_ss_txt = st.sess24 ? 'Por segurança, o Kontar pede seu login de novo a cada 24 horas, mesmo que você não saia.' : 'Você fica conectado neste aparelho até sair por conta própria. Indicado para um computador só seu.';
       o.ac_togSs = () => comp.setState(x => ({ sess24: x.sess24 ? false : Date.now() }));
     }
     o.ac_doExp = () => { KD.exportCsv(); comp.setState(x => ({ ac: Object.assign({}, x.ac, { exp: true }) })); };
@@ -258,7 +261,7 @@
     A({ pwBusy: true, pwMsg: '', pwErr: false });
     const askCode = async txt => { ck(await S.auth.reauthenticate()); A({ pwBusy: false, pwStep: 1, pwMsg: txt, pwErr: false }); };
     try {
-      if (comp.state.pwMail && ac.pwStep !== 1) return await askCode('Mandamos um código de 6 dígitos para o seu e-mail.');
+      if (ac.pwStep !== 1) return await askCode('Mandamos um código de 6 dígitos para o seu e-mail.');
       const body = { password: ac.pw1 }; if (ac.pwStep === 1) body.nonce = (ac.pwCodeV || '').trim();
       const r = await S.auth.updateUser(body);
       if (r.error) { if (/reauth/i.test(r.error.message || '') && ac.pwStep !== 1) return await askCode('Por segurança, mandamos um código de 6 dígitos para o seu e-mail.'); throw r.error; }
