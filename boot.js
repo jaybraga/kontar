@@ -1,93 +1,556 @@
-/* Kontar · entrada: login, carregamento e partida do protótipo.
-   A tela de login reaproveita a composição da tela "Você saiu." do protótipo 08
-   (quadrado roxo, título 84px, texto cinza, botão osso). O carregamento é a mesma
-   composição, só com o quadrado e uma linha de texto. */
+/* Kontar · entrada: Carregando (7), Erro (8), Login (5), Sessão encerrada (3), Nova senha (6) e Onboarding (9).
+   Fonte visual: canvas "Kontar 09b…09g". O CSS de cada tela é o do canvas, só que prefixado por #kboot/#kload em tempo de execução (scope()),
+   então não vaza pro app. Este arquivo é montado por /build.py a partir de src/boot/*.js — não edite app/boot.js à mão. */
 (function () {
   'use strict';
   const CFG = window.KONTAR_CONFIG || {};
-  const css = `
-  #kboot{position:fixed;inset:0;z-index:2147483000;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;transition:opacity .42s cubic-bezier(0,0,.2,1)}
-  #kboot .w{display:flex;flex-direction:column;align-items:flex-start;width:420px;max-width:calc(100vw - 32px);animation:kbIn .6s cubic-bezier(.65,0,.35,1) both}
-  #kboot .lg{width:44px;height:44px;border-radius:14px;background:#5B3DF5;display:block}
-  #kboot .lg.p{animation:kbPulse 1.6s cubic-bezier(.65,0,.35,1) infinite}
-  #kboot h1{margin:28px 0 0;font-size:84px;font-weight:700;letter-spacing:-0.065em;line-height:.85}
-  #kboot p{margin:16px 0 0;font-size:15px;color:#9A9AA3;line-height:1.45}
-  #kboot form{margin-top:28px;display:flex;flex-direction:column;gap:10px;width:100%}
-  #kboot input{height:46px;box-sizing:border-box;padding:0 20px;border-radius:9999px;border:1px solid #3A3A40;background:#000;color:#fff;font:inherit;font-size:15px;outline:0;transition:border-color .25s ease}
-  #kboot input:focus{border-color:#F2F0EB}
-  #kboot button{margin-top:8px;align-self:flex-start;height:46px;display:inline-flex;align-items:center;padding:0 24px;border-radius:9999px;border:0;background:#F2F0EB;color:#000;font:inherit;font-size:14.5px;font-weight:700;cursor:pointer;transition:filter .25s ease}
-  #kboot button:hover{filter:brightness(.92)} #kboot button[disabled]{opacity:.5;cursor:default}
-  #kboot .err{margin-top:12px;font-size:13.5px;color:#FF6A5C;min-height:18px}
-  #kboot .lk{margin-top:14px;font-size:13px;color:#9A9AA3;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
-  #kboot .lk:hover{color:#fff}
-  @keyframes kbIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-  @keyframes kbPulse{0%,100%{opacity:1}50%{opacity:.35}}
-  @media (max-width:520px){#kboot h1{font-size:64px}}
-  @media (prefers-reduced-motion:reduce){#kboot .w,#kboot .lg.p{animation:none}}`;
-  let root;
+  const EXP = 'kontar-sessao-vencida';
+  const reduce = () => matchMedia('(prefers-reduced-motion:reduce)').matches;
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const toEmail = v => /@/.test(v) ? v : v.toLowerCase() + '@kontar.app';
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }, del(k) { try { localStorage.removeItem(k); } catch (e) {} } };
+  const local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname), qs = k => local && new URLSearchParams(location.search).get(k);
+
+  /* ---- CSS do canvas → prefixado (sem Shadow DOM: o filtro "goo" e o @property precisam do escopo do documento) ---- */
+  const PROPS = [];
+  function scope(css, S) {
+    let out = '', i = 0; const n = css.length;
+    while (i < n) {
+      const m = css.slice(i).match(/^(\s|\/\*[\s\S]*?\*\/)*/); i += m[0].length; if (i >= n) break;
+      const b = css.indexOf('{', i), head = css.slice(i, b).trim(); let d = 1, j = b + 1;
+      while (j < n && d) { const c = css[j]; if (c === '{') d++; else if (c === '}') d--; j++; }
+      const body = css.slice(b + 1, j - 1); i = j;
+      if (/^@(media|supports)/.test(head)) out += head + '{' + scope(body, S) + '}';
+      else if (/^@(keyframes|font-face)/.test(head)) out += head + '{' + body + '}';
+      else if (/^@property/.test(head)) PROPS.push(head + '{' + body + '}');
+      else out += head.split(',').map(s => { s = s.trim(); return /^(html|body|:root)$/.test(s) ? S : S + ' ' + s.replace(/^(html|body)\s+/, ''); }).join(',') + '{' + body + '}';
+    }
+    return out;
+  }
+  function injectProps() { if (!PROPS.length || document.getElementById('kb-props')) return; const s = document.createElement('style'); s.id = 'kb-props'; s.textContent = PROPS.join(''); document.head.appendChild(s); }
+
+  const GOO = '<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="goo" x="-20%" y="-50%" width="140%" height="200%" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="6" result="b"/><feColorMatrix in="b" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 34 -15"/></filter></svg>';
+  const ARROW = (c, w) => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="' + c + '" stroke-width="' + (w || 2.2) + '" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>';
+  const LQ = (id, label) => '<button class="lq" id="' + id + '" type="submit"><span class="shp glow" aria-hidden="true"><span class="pill"></span><span class="dot"></span></span><span class="shp g" aria-hidden="true"><span class="pill"></span><span class="dot"></span></span><span class="shp d" aria-hidden="true"><span class="pill"></span><span class="dot"></span></span><span class="lb">' + label + '</span><span class="arr" aria-hidden="true">' + ARROW('#fff') + '</span></button>';
+
+  /* ---- #kboot: uma tela por vez ---- */
+  let root, styleEl;
+  const css0 = '#kboot{position:fixed;inset:0;z-index:2147483000;overflow:auto;background:#000;color:#fff;font-family:\'Helvetica Neue\',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;transition:opacity .5s ease}';
   function shell() {
-    if (root) return root;
-    const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+    if (root && root.isConnected) return root;
+    const st = document.createElement('style'); st.textContent = css0; document.head.appendChild(st);
+    styleEl = document.createElement('style'); document.head.appendChild(styleEl);
     root = document.createElement('div'); root.id = 'kboot'; document.body.appendChild(root); return root;
   }
-  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-  function loading(msg) { shell().innerHTML = `<div class="w"><span class="lg p"></span><p style="margin-top:28px">${esc(msg || 'Carregando seus dados…')}</p></div>`; }
-  function failed(msg) {
-    shell().innerHTML = `<div class="w"><span class="lg"></span><h1>Opa.</h1><p>Não deu pra carregar seus dados. ${esc(msg || '')}</p><form><button type="button" id="kbRetry">Tentar de novo</button></form></div>`;
-    document.getElementById('kbRetry').onclick = () => location.reload();
+  const $ = s => root ? root.querySelector(s) : null, $$ = s => root ? [...root.querySelectorAll(s)] : [];
+  function mount(css, html) { shell(); styleEl.textContent = scope(css, '#kboot'); injectProps(); root.style.opacity = '1'; root.style.pointerEvents = ''; root.removeAttribute('style'); root.innerHTML = html; root.scrollTop = 0; }
+  const dismissRoot = () => { if (!root) return; const r = root; root = null; r.style.opacity = '0'; r.style.pointerEvents = 'none'; setTimeout(() => r.remove(), 600); };
+
+  /* botão líquido: a pílula mede o próprio texto */
+  function liq() { $$('.lq').forEach(b => { const l = b.querySelector('.lb, .lbl'); const set = () => b.style.setProperty('--pw', l.offsetWidth + 'px'); set(); if (document.fonts) document.fonts.ready.then(set); }); }
+  const measure = b => { const l = b.querySelector('.lb, .lbl'); b.style.setProperty('--pw', l.offsetWidth + 'px'); };
+  /* parallax da imagem canelada (±16px/±11px), suavização por tempo (dt), não por frame */
+  function parallax() {
+    const img = $('.L .img'); if (!img || reduce()) return; let tx = 0, ty = 0, x = 0, y = 0, last = performance.now();
+    const mv = e => { tx = (e.clientX / innerWidth - .5) * 32; ty = (e.clientY / innerHeight - .5) * 22; }; addEventListener('mousemove', mv);
+    const tick = t => { if (!img.isConnected) { removeEventListener('mousemove', mv); return; } const dt = Math.min(64, t - last); last = t; const k = 1 - Math.exp(-dt / 140);
+      x += (tx - x) * k; y += (ty - y) * k; img.style.setProperty('--px', x.toFixed(2) + 'px'); img.style.setProperty('--py', y.toFixed(2) + 'px'); requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
   }
+  const busyBtn = (go, on, txt, idle) => { go.classList.toggle('busy', on); go.setAttribute('aria-busy', on); go.querySelector('.lb').textContent = on ? txt : idle; measure(go); };
+
+  /* ================= 7. CARREGANDO (09e) ================= */
+  const CSS_LOAD = `
+:root{--roxo:#5B3DF5;--claro:#F4F3F1;--E:cubic-bezier(.65,0,.35,1);--T:650ms}
+*{box-sizing:border-box}
+.ld{position:fixed;inset:0;z-index:10;background:var(--claro);isolation:isolate;transition:opacity .55s ease;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;color:#fff}
+.ld.gone{opacity:0;pointer-events:none}
+.cols{position:absolute;inset:0;display:flex}
+.col{position:relative;flex:1 1 0;height:100%;overflow:hidden;margin-right:-.5px}
+.col i{position:absolute;left:0;right:0;height:calc(50% + 1px);overflow:hidden}
+.col .t{top:0}.col .b{bottom:0}
+.col i::before{content:"";position:absolute;left:0;right:0;height:200%;will-change:transform;transition:transform var(--T) var(--E);transition-delay:var(--d)}
+.col .t::before{bottom:0;background:linear-gradient(to bottom,rgba(244,243,241,0) 0%,#D9D0FF 7%,#8B6DFF 17%,#4B25F0 27%,#2A0FB4 35%,#0C043C 40%,#000 45%,#000 100%)}
+.col .b::before{top:0;background:linear-gradient(to top,rgba(244,243,241,0) 0%,#D9D0FF 7%,#8B6DFF 17%,#4B25F0 27%,#2A0FB4 35%,#0C043C 40%,#000 45%,#000 100%)}
+.ld.light .col .t::before{transform:translateY(100%)}
+.ld.light .col .b::before{transform:translateY(-100%)}
+.col::after{content:"";position:absolute;top:0;bottom:0;right:0;width:1px;background:rgba(255,255,255,.035)}
+.ld::after{content:"";position:absolute;inset:0;z-index:3;pointer-events:none;opacity:.28;mix-blend-mode:overlay;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
+.cc{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;text-align:center;pointer-events:none;mix-blend-mode:difference;color:#fff}
+.cc h1{margin:0;font-size:clamp(34px,4.4vw,60px);font-weight:700;letter-spacing:-.055em;line-height:.9;text-transform:uppercase}
+.cc .ln{width:1px;height:34px;background:#fff;opacity:.7}
+.cc .wm{display:flex;align-items:center;gap:10px;font-size:19px;font-weight:700;letter-spacing:-.02em}
+.cc .wm i{width:24px;height:24px;border-radius:8px;display:block;background:transparent}
+.mk{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;pointer-events:none;visibility:hidden}
+.mk>*{visibility:hidden}.mk .wm{display:flex;align-items:center;gap:10px;font-size:19px;font-weight:700;letter-spacing:-.02em}
+.mk .wm i{visibility:visible;width:24px;height:24px;border-radius:8px;display:block;background:var(--roxo)}
+.mk h1{margin:0;font-size:clamp(34px,4.4vw,60px);font-weight:700;letter-spacing:-.055em;line-height:.9;text-transform:uppercase}.mk .ln{width:1px;height:34px}
+.cc>*,.mk .wm i{transition:transform .9s var(--E),opacity .7s ease}
+.ld.fin .cc>*,.ld.fin .mk .wm i{transform:translateY(-36px);opacity:0}
+.ld.fin .cc h1{transition-delay:.35s}.ld.fin .cc .ln{transition-delay:.45s}.ld.fin .cc .wm,.ld.fin .mk .wm i{transition-delay:.55s}
+@media (prefers-reduced-motion:reduce){.col i::before{transition:none}.ld{transition:opacity .3s ease}}`;
+  /* Roteiro (cada gatilho move as colunas UMA vez): abre no preto → claro → (não carregou) preto → claro … ; a conclusão entra na fila e o ÚLTIMO gatilho é sempre claro → preto.
+     Tempo encurtado a pedido do Jay (≈2,7s numa carga rápida; o canvas tinha ≈4,2s). */
+  let LOADER = null;
+  function loader() {
+    if (LOADER) LOADER.abort(true);
+    const st = document.createElement('style'); st.textContent = scope(CSS_LOAD, '#kload'); injectProps(); document.head.appendChild(st);
+    const el = document.createElement('div'); el.id = 'kload';
+    el.innerHTML = '<div class="ld" role="status" aria-live="polite" aria-label="Carregando"><div class="cols" aria-hidden="true"></div><div class="cc"><h1>Organizando<br>suas finanças</h1><span class="ln"></span><span class="wm"><i></i>Kontar</span></div><div class="mk" aria-hidden="true"><h1>Organizando<br>suas finanças</h1><span class="ln"></span><span class="wm"><i></i>Kontar</span></div></div>';
+    document.body.appendChild(el); const ld = el.firstChild, cols = ld.firstChild; el.style.cssText = 'position:fixed;inset:0;z-index:2147483600';
+    const N = 20, T = 650, SPREAD = 380, HOLD = 300, TOTAL = T + SPREAD + 80, J = [.31, .82, .12, .67, .45, .93, .05, .58, .24, .76, .39, .88, .17, .63, .5, .97, .09, .71, .28, .84];
+    for (let i = 0; i < N; i++) { const c = document.createElement('div'); c.className = 'col'; c.innerHTML = '<i class="t"></i><i class="b"></i>'; cols.appendChild(c); }
+    const each = fn => [...cols.children].forEach((c, i) => c.style.setProperty('--d', Math.round(fn(i)) + 'ms')), edge = i => 1 - Math.abs(i - (N - 1) / 2) / ((N - 1) / 2);
+    const toLight = () => { each(i => edge(i) * SPREAD * .8 + J[i] * SPREAD * .2); ld.classList.add('light'); return wait(TOTAL); };
+    const toDark = () => { each(i => (1 - i / (N - 1)) * SPREAD * .55 + edge(i) * SPREAD * .3 + J[i] * SPREAD * .15); ld.classList.remove('light'); return wait(TOTAL); };
+    let ready = false, dead = false, resolveGone; const gone = new Promise(r => { resolveGone = r; });
+    const end = () => { if (dead) return; dead = true; ld.classList.add('gone'); setTimeout(() => { el.remove(); st.remove(); resolveGone(); if (LOADER === ctl) LOADER = null; }, 650); };
+    const ctl = { finish: () => { ready = true; return gone; }, abort: (now) => { if (now) { dead = true; el.remove(); st.remove(); resolveGone(); LOADER = null; } else end(); return gone; } };
+    LOADER = ctl; window.KontarLoader = ctl;
+    (async () => { await wait(250);
+      if (reduce()) { while (!ready && !dead) await wait(120); end(); return; }
+      for (;;) { if (dead) return; await toLight(); if (ready) break; await wait(HOLD); if (ready) break; if (dead) return; await toDark(); await wait(HOLD); }
+      if (dead) return; await wait(100); ld.classList.add('fin'); await toDark(); await wait(80); end(); })();
+    return ctl;
+  }
+
+  /* ================= 8. ERRO (09f) ================= */
+  const CSS_ERR = `
+:root{--ink:#fff;--mut:#9A9AA3;--bone:#F2F0EB;--roxo:#5B3DF5;--amar:#FFC24A;--verm:#FF5A4D;--rule:rgba(255,255,255,.2);--pad:clamp(20px,4.4vw,64px)}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#000;color:var(--ink);font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+body{overflow-x:hidden}
+@keyframes up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes wipe{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.sign{min-height:100vh;display:grid;grid-template-rows:auto 1fr auto;padding:0 var(--pad)}
+.top{display:flex;align-items:center;justify-content:space-between;height:84px;position:relative}
+.top::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--rule);transform-origin:left;animation:wipe .9s cubic-bezier(.65,0,.35,1) both}
+.wm{display:flex;align-items:center;gap:9px;font-size:21px;font-weight:700;letter-spacing:-.02em}
+.wm i{width:27px;height:27px;border-radius:8px;background:var(--roxo);display:block}
+.lbl{font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--mut);display:flex;align-items:center;gap:10px}
+.lbl::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--verm);animation:pulse 1.8s ease-in-out infinite}
+.mid{display:flex;flex-direction:column;justify-content:center;gap:clamp(28px,5vh,48px);padding:clamp(28px,6vh,64px) 0}
+.hd{display:flex;align-items:center;gap:clamp(20px,3vw,44px);animation:up .7s cubic-bezier(.65,0,.35,1) .1s both}
+.bul{flex:none;width:clamp(76px,10vw,148px);aspect-ratio:1;border-radius:50%;background:var(--amar);color:#000;display:grid;place-items:center;font-weight:700;font-size:clamp(52px,7vw,104px);line-height:1;letter-spacing:-.04em;padding-bottom:.04em}
+h1{margin:0;font-size:clamp(34px,5.8vw,88px);font-weight:700;letter-spacing:-.06em;line-height:.88;text-transform:uppercase}
+.row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:clamp(20px,3vw,44px);animation:up .7s cubic-bezier(.65,0,.35,1) .22s both}
+.sp{width:clamp(76px,10vw,148px)}
+.row p{margin:0;font-size:clamp(16px,1.5vw,20px);line-height:1.4;color:var(--mut);max-width:440px;text-wrap:pretty}.row p b{color:#fff;font-weight:500}
+.go{height:56px;padding:0 10px 0 28px;border-radius:9999px;border:0;background:var(--bone);color:#000;font:inherit;font-size:15.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:18px;transition:filter .25s ease}
+.go .ar{width:36px;height:36px;border-radius:50%;background:#000;display:grid;place-items:center;transition:transform .3s cubic-bezier(.65,0,.35,1)}
+.go:hover{filter:brightness(.93)}.go:hover .ar{transform:translateX(3px)}.go:disabled{opacity:.5;cursor:default}.go:disabled .ar{transform:none}
+.bot{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:84px;position:relative}
+.bot::before{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:var(--rule);transform-origin:left;animation:wipe .9s cubic-bezier(.65,0,.35,1) .1s both}
+.det{display:inline-flex;align-items:center;gap:9px;min-height:34px;padding:7px 15px;border-radius:9999px;border:1px solid var(--verm);color:var(--verm);font:500 12.5px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.01em;max-width:100%;overflow-wrap:anywhere}
+.det::before{content:"";flex:none;width:6px;height:6px;border-radius:50%;background:var(--verm)}
+.bot small{font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#6A6A72}
+@media (max-width:760px){.row{grid-template-columns:1fr}.sp{display:none}.hd{align-items:flex-start;flex-direction:column}.bot small{display:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}`;
+  function failed(msg, retry) {
+    mount(CSS_ERR, '<main class="sign"><header class="top"><span class="wm"><i></i>Kontar</span><span class="lbl">Erro ao carregar</span></header><section class="mid" aria-labelledby="t"><div class="hd"><span class="bul" aria-hidden="true">!</span><h1 id="t">Não deu pra<br>carregar seus dados</h1></div><div class="row"><span class="sp" aria-hidden="true"></span><p>Pode ser a internet ou uma instabilidade nossa. <b>Seus dados continuam salvos.</b></p><button class="go" type="button" id="go"><span class="t">Tentar de novo</span><span class="ar" aria-hidden="true">' + ARROW('#fff', 2.4) + '</span></button></div></section><footer class="bot"><span class="det" id="det" role="status">Detalhe: ' + esc(msg || 'erro desconhecido') + '</span><small>Se continuar, tente mais tarde</small></footer></main>');
+    const go = $('#go'), t = go.querySelector('.t');
+    go.onclick = async () => { t.textContent = 'Tentando…'; go.disabled = true; try { await retry(); } finally { if (go.isConnected) { t.textContent = 'Tentar de novo'; go.disabled = false; } } };
+  }
+
+  /* ================= CSS comum (Login 09c + Nova senha 09d): painel 2 colunas, botão líquido escuro, stroke opaco ================= */
+  const CSS_PANEL = `
+@property --a{syntax:'<angle>';inherits:true;initial-value:0deg}
+:root{--ink:#fff;--mut:#9A9AA3;--bone:#F2F0EB;--roxo:#5B3DF5;--amar:#FFC24A;--dk:#07060C}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#05030F;color:var(--ink);font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+.stage{position:relative;z-index:1;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px 24px}
+.panel{position:relative;display:grid;grid-template-columns:1.04fr 1fr;border-radius:30px;overflow:hidden;isolation:isolate;background:var(--dk);box-shadow:0 40px 120px rgba(0,0,0,.55);animation:cIn .9s cubic-bezier(.65,0,.35,1) both}
+.panel::after{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;z-index:5;background:linear-gradient(160deg,#3A345A,#130F29);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+@keyframes cIn{from{opacity:0;transform:translateY(16px) scale(.985)}to{opacity:1;transform:none}}
+.L{position:relative;padding:56px;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.L .img{position:absolute;left:-6%;right:-6%;top:-5%;z-index:-2;transform:translate3d(var(--px,0px),var(--py,0px),0);will-change:transform;background:url("assets/fluted-glass.webp") 60% 30%/cover no-repeat,#15112B;animation:drift 22s cubic-bezier(.65,0,.35,1) infinite alternate}
+.L .shade{position:absolute;inset:0;z-index:-1}
+@keyframes drift{from{background-position:58% 26%}to{background-position:66% 36%}}
+.wm{display:flex;align-items:center;gap:12px;font-size:21px;font-weight:700;letter-spacing:-.02em;color:var(--bone)}
+.wm i{width:27px;height:27px;border-radius:9px;background:var(--roxo);display:block}
+.tt{display:flex;flex-direction:column;gap:18px}
+h1{margin:0;font-size:84px;font-weight:700;letter-spacing:-0.065em;line-height:.85}
+.sub{margin:0;font-size:26px;line-height:1.2;font-weight:500;letter-spacing:-.02em;color:#fff;max-width:400px;text-wrap:balance}
+.R{position:relative;padding:56px;display:flex;flex-direction:column;gap:36px;min-width:0;background:rgba(7,6,12,.58);-webkit-backdrop-filter:blur(26px) saturate(1.2);backdrop-filter:blur(26px) saturate(1.2);border-left:1px solid rgba(255,255,255,.06)}
+.form{display:flex;flex-direction:column}
+.fld{display:flex;flex-direction:column;gap:8px}
+input{height:52px;width:100%;padding:0 22px;border-radius:9999px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.4);color:#fff;font:inherit;font-size:15px;outline:0;transition:border-color .25s ease,background .25s ease}
+input::placeholder{color:#6A6A72}
+input:focus{border-color:var(--bone);background:rgba(0,0,0,.55)}
+.lk{font-size:13px;color:var(--mut);text-decoration:underline;text-underline-offset:3px;cursor:pointer;white-space:nowrap}
+.lk:hover{color:#fff}
+.lq{--h:52px;--gap:16px;--E:cubic-bezier(.22,1,.36,1);--pw:140px;--uw:var(--pw);--off:calc(var(--pw) - var(--h));position:relative;height:var(--h);width:var(--pw);flex:none;display:inline-block;text-align:left;cursor:pointer;border:0;padding:0;background:none;font:inherit;color:#fff;transition:width .7s var(--E);animation:spin 5.5s linear infinite}
+@keyframes spin{to{--a:360deg}}
+.lq:hover{--uw:calc(var(--pw) + var(--gap) + var(--h));--off:calc(var(--pw) + var(--gap));width:var(--uw)}
+.lq .shp{position:absolute;inset:-14px -80px -14px -14px;pointer-events:none}
+.lq .g{filter:url(#goo)}
+.lq .glow{filter:blur(13px) saturate(1.3);opacity:.45;transition:opacity .5s ease}
+.lq:hover .glow{opacity:.95}
+.lq .shp span{position:absolute;top:14px;height:var(--h)}
+.lq .g span,.lq .glow span{background:conic-gradient(from var(--a),#fff 0deg,#CDBBFF 9deg,#7F59FF 34deg,rgba(120,90,255,.55) 85deg,rgba(110,80,255,.38) 170deg,rgba(120,90,255,.55) 265deg,#8E5CFF 322deg,#E8DFFF 350deg,#fff 360deg);background-size:var(--uw) var(--h);transition:left .7s var(--E),width .7s var(--E),background-size .7s var(--E),background-position .7s var(--E)}
+.lq .shp .pill{left:14px;width:var(--pw);border-radius:9999px;background-position:0 0}
+.lq .shp .dot{width:var(--h);border-radius:50%;left:calc(14px + var(--off));background-position:calc(-1 * var(--off)) 0}
+.lq .d span{background:#08070D;transition:left .7s var(--E)}
+.lq .d .pill{left:15.5px;top:15.5px;width:calc(var(--pw) - 3px);height:calc(var(--h) - 3px);border-radius:9999px}
+.lq .d .dot{top:15.5px;width:calc(var(--h) - 3px);height:calc(var(--h) - 3px);border-radius:50%;left:calc(15.5px + var(--off))}
+.lq .lb{position:relative;display:inline-flex;align-items:center;height:var(--h);padding:0 28px;font-size:14.5px;font-weight:700;white-space:nowrap;letter-spacing:.01em}
+.lq .arr{position:absolute;top:0;width:var(--h);height:var(--h);left:var(--off);display:flex;align-items:center;justify-content:center;opacity:0;transition:left .7s var(--E),opacity .35s ease}
+.lq .arr svg{transform:rotate(-45deg);transition:transform .6s var(--E)}
+.lq:hover .arr{opacity:1;transition:left .7s var(--E),opacity .5s ease .12s}
+.lq:hover .arr svg{transform:rotate(0)}
+.lq:focus-visible{outline:2px solid #A594FF;outline-offset:6px;border-radius:9999px}
+.lq:active .d span{background:#000}
+.lq.busy{animation-duration:1.5s;pointer-events:none;cursor:progress}
+.lq.busy .glow{opacity:.9}
+.L>*,.R>*{animation:up .7s cubic-bezier(.65,0,.35,1) both}
+.R>*:nth-child(1){animation-delay:.25s}.R>*:nth-child(2){animation-delay:.35s}.R>*:nth-child(3){animation-delay:.45s}
+@keyframes up{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}`;
+
+  const CSS_LOGIN = CSS_PANEL + `
+.bg{position:fixed;inset:0;overflow:hidden;background:#0A0A0E url("assets/login-bg.jpg") center/cover no-repeat;pointer-events:none;z-index:0}
+.bg::after{content:"";position:absolute;inset:0;opacity:.18;mix-blend-mode:overlay;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
+.panel{width:min(1080px,100%,calc((100vh - 64px)*1.6));aspect-ratio:16/10}
+.L{justify-content:space-between}
+.L .img{height:92%}
+.L .shade{background:linear-gradient(180deg,rgba(7,6,12,0) 0%,rgba(7,6,12,.08) 22%,rgba(7,6,12,.72) 52%,rgba(7,6,12,.95) 72%,#07060C 88%)}
+.R{justify-content:space-between}
+.form{gap:14px}
+.err{min-height:18px;font-size:12.5px;line-height:1.4;color:#FF6A5C}
+.acts{display:flex;align-items:center;gap:22px;margin-top:10px}
+.foot{display:flex;align-items:center;gap:14px;font-size:12px;line-height:1.5;color:#8A8A93}
+.foot svg{flex:none}
+.foot span{max-width:300px}
+.lq:disabled{opacity:.5;cursor:default;pointer-events:none}
+.L>.wm{animation-delay:.2s}.L>.tt{animation-delay:.3s}
+@media (max-width:860px){.stage{padding:16px}.panel{grid-template-columns:1fr;aspect-ratio:auto;width:min(560px,100%)}.L{min-height:340px;padding:36px 28px}.R{padding:36px 28px}h1{font-size:72px}}`;
+
+  const CSS_NOVA = CSS_PANEL + `
+.bg{position:fixed;inset:0;background:#000;pointer-events:none;z-index:0}
+.panel{width:min(1080px,100%)}
+.L{justify-content:flex-end;min-height:300px}
+.L .img{height:112%}
+.L .shade{background:linear-gradient(40deg,#07060C 0%,rgba(7,6,12,.95) 22%,rgba(7,6,12,.8) 42%,rgba(7,6,12,.5) 58%,rgba(7,6,12,.14) 78%,rgba(7,6,12,0) 100%)}
+.tt .ico{display:block;margin-bottom:6px}
+.R{justify-content:stretch}
+.form{justify-content:space-between;gap:14px;flex:1}
+.grp{display:flex;flex-direction:column;gap:14px}
+.meter{display:grid;grid-template-columns:minmax(0,auto) minmax(40px,1fr) auto;align-items:center;column-gap:14px;padding:0 16px;margin-top:-2px;font-size:12.5px;line-height:1.2;white-space:nowrap}
+.meter #mh{min-width:0;overflow:hidden;text-overflow:ellipsis;color:#7C7C85;transition:color .3s ease}
+.meter b{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#7C7C85;transition:color .5s ease}
+.bar{display:block;height:4px;border-radius:9999px;background:#26262B;overflow:hidden}.bar span{display:block;height:100%;width:0;border-radius:9999px;background:#26262B;transition:width .5s cubic-bezier(.65,0,.35,1),background .5s cubic-bezier(.65,0,.35,1)}
+.acts{display:flex;align-items:center;justify-content:space-between;gap:22px}
+.lq:disabled{opacity:.35;cursor:default;pointer-events:none}
+.L>.tt{animation-delay:.3s}
+@media (max-width:860px){.stage{padding:16px}.panel{grid-template-columns:1fr;width:min(560px,100%)}.L{min-height:340px;padding:36px 28px}.R{padding:36px 28px}h1{font-size:72px}}`;
+
+  /* ================= 5. LOGIN (09c) ================= */
   function login(sb, note) {
-    shell().innerHTML = `<div class="w"><span class="lg"></span><h1>Entrar.</h1><p>${esc(note || 'Seus dados ficam salvos e só você vê.')}</p>
-      <form id="kbF" autocomplete="on"><input id="kbE" type="text" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" name="email" placeholder="E-mail ou usuário" autocomplete="username" required>
-      <input id="kbP" type="password" name="password" placeholder="Senha" autocomplete="current-password" required>
-      <button id="kbB" type="submit">Entrar</button><div class="err" id="kbX"></div><span class="lk" id="kbR">Esqueci a senha</span></form></div>`;
-    const f = document.getElementById('kbF'), b = document.getElementById('kbB'), x = document.getElementById('kbX');
-    f.onsubmit = async e => { e.preventDefault(); b.disabled = true; x.textContent = '';
-      const r = await sb.auth.signInWithPassword({ email: (v => /@/.test(v) ? v : v.toLowerCase() + '@kontar.app')(document.getElementById('kbE').value.trim()), password: document.getElementById('kbP').value });
-      if (r.error) { b.disabled = false; x.textContent = /Invalid login/i.test(r.error.message) ? 'E-mail/usuário ou senha não conferem.' : r.error.message; return; }
-      start(sb, r.data.user); };
-    document.getElementById('kbR').onclick = async () => { const em = document.getElementById('kbE').value.trim(); if (!em) { x.textContent = 'Escreva seu e-mail primeiro.'; return; }
-      const r = await sb.auth.resetPasswordForEmail(em, { redirectTo: location.origin + location.pathname }); x.style.color = r.error ? '#FF6A5C' : '#6AFF2A'; x.textContent = r.error ? r.error.message : 'Mandamos um link pro seu e-mail. Vale por 30 min.'; };
+    mount(CSS_LOGIN, GOO + '<div class="bg" aria-hidden="true"></div><main class="stage"><section class="panel" aria-labelledby="t"><div class="L"><div class="img" aria-hidden="true"></div><div class="shade" aria-hidden="true"></div><span class="wm"><i></i>Kontar</span><div class="tt"><p class="sub">' + esc(note || 'Seus dados ficam salvos e só você vê.') + '</p></div></div>'
+      + '<div class="R"><h1 id="t">Entrar.</h1><form class="form" id="f" autocomplete="on" novalidate><div class="fld"><input id="u" type="text" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" name="email" placeholder="E-mail ou usuário" autocomplete="username" aria-label="E-mail ou usuário"></div><div class="fld"><input id="p" type="password" name="password" placeholder="Senha" autocomplete="current-password" aria-label="Senha"></div><div class="err" id="x" role="alert" aria-live="polite"></div><div class="acts">' + LQ('go', 'Fazer Login') + '<span class="lk" id="r" role="button" tabindex="0">Esqueci a senha</span></div></form>'
+      + '<div class="foot"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9A9AA3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span>Esqueceu a senha? Escreva seu e-mail e toque em “Esqueci a senha”: mandamos um link pra criar outra.</span></div></div></section></main>');
+    liq(); parallax();
+    const x = $('#x'), u = $('#u'), p = $('#p'), go = $('#go'), say = (t, ok) => { x.style.color = ok ? '#00E08A' : '#FF6A5C'; x.textContent = t; };
+    const lock = on => { busyBtn(go, on, 'Entrando…', 'Fazer Login'); u.disabled = p.disabled = on; };
+    $('#f').addEventListener('submit', async e => { e.preventDefault(); if (go.classList.contains('busy')) return; x.textContent = '';
+      if (!(u.value.trim() && p.value)) return say('Preencha e-mail e senha.');
+      lock(true); let r; try { r = await sb.auth.signInWithPassword({ email: toEmail(u.value.trim()), password: p.value }); } catch (er) { r = { error: er }; }
+      if (r.error) { lock(false); return say(/Invalid login/i.test(r.error.message) ? 'E-mail/usuário ou senha não conferem.' : r.error.message); }
+      LS.del(EXP); start(sb, r.data.user); });
+    const forgot = async () => { const em = u.value.trim(); if (!em) return say('Escreva seu e-mail primeiro.');
+      const r = await sb.auth.resetPasswordForEmail(toEmail(em), { redirectTo: location.origin + location.pathname }); say(r.error ? r.error.message : 'Mandamos um link pro seu e-mail. Vale por 30 min.', !r.error); };
+    $('#r').onclick = forgot; $('#r').onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); forgot(); } };
   }
+
+  /* ================= 6. NOVA SENHA (09d) ================= */
   function newPassword(sb) {
-    shell().innerHTML = `<div class="w"><span class="lg"></span><h1>Nova senha.</h1><p>Escolha a senha que você vai usar daqui pra frente.</p>
-      <form id="kbF"><input id="kbP" type="password" placeholder="Nova senha" autocomplete="new-password" minlength="8" required><button id="kbB" type="submit">Salvar senha</button><div class="err" id="kbX"></div></form></div>`;
-    document.getElementById('kbF').onsubmit = async e => { e.preventDefault(); const b = document.getElementById('kbB'), x = document.getElementById('kbX'); b.disabled = true;
-      const r = await sb.auth.updateUser({ password: document.getElementById('kbP').value });
-      if (r.error) { b.disabled = false; x.textContent = r.error.message; return; } history.replaceState(null, '', location.pathname); start(sb, r.data.user); };
+    mount(CSS_NOVA, GOO + '<div class="bg" aria-hidden="true"></div><main class="stage"><section class="panel" aria-labelledby="t"><div class="L"><div class="img" aria-hidden="true"></div><div class="shade" aria-hidden="true"></div><div class="tt"><svg class="ico" width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#5B3DF5" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="10.5" width="17" height="11" rx="3"/><path d="M7.5 10.5V7.5a4.5 4.5 0 0 1 9 0v3"/><circle cx="12" cy="15" r="1.3" fill="#5B3DF5"/><path d="M12 16.3V18"/></svg><h1 id="t">Nova<br>senha.</h1><p class="sub">Escolha a senha que você vai usar daqui pra frente.</p></div></div>'
+      + '<div class="R"><form class="form" id="f" autocomplete="off" novalidate><div class="grp"><div class="fld"><input id="p1" type="password" name="new-password" placeholder="Nova senha" autocomplete="new-password" aria-label="Nova senha"></div><div class="fld"><input id="p2" type="password" name="confirm-password" placeholder="Confirmar senha" autocomplete="new-password" aria-label="Confirmar senha"></div><div class="meter" aria-live="polite"><span id="mh">Mínimo 8 caracteres</span><span class="bar"><span id="mb"></span></span><b id="ml">Força</b></div></div><div class="acts">' + LQ('go', 'Salvar senha').replace('type="submit"', 'type="submit" disabled') + '<span class="wm"><i></i>Kontar</span></div></form></div></section></main>');
+    liq(); parallax();
+    const p1 = $('#p1'), p2 = $('#p2'), go = $('#go'), mb = $('#mb'), ml = $('#ml'), mh = $('#mh');
+    const upd = () => { const c = KD.pwCheck(p1.value, p2.value); mb.style.width = c.pct; mb.style.background = c.col; ml.style.color = c.lv ? c.col : '#7C7C85'; ml.textContent = c.lbl || 'Força'; mh.textContent = c.hint; mh.style.color = c.hintC; go.disabled = !c.ok; };
+    p1.addEventListener('input', upd); p2.addEventListener('input', upd);
+    $('#f').addEventListener('submit', async e => { e.preventDefault(); if (go.disabled || go.classList.contains('busy')) return;
+      busyBtn(go, true, 'Salvando…', 'Salvar senha'); p1.disabled = p2.disabled = true;
+      const r = await sb.auth.updateUser({ password: p1.value });
+      if (r.error) { busyBtn(go, false, '', 'Salvar senha'); p1.disabled = p2.disabled = false; mh.style.color = '#FF6A5C'; mh.textContent = r.error.message; return; }
+      mh.style.color = '#00E08A'; mh.textContent = 'Senha salva. Entrando…'; history.replaceState(null, '', location.pathname); LS.del(EXP); start(sb, r.data.user); });
   }
+
+  /* ================= 3. SESSÃO ENCERRADA (09b) ================= */
+  const CSS_SESS = `
+:root{--bg:#000;--ink:#fff;--mut:#9A9AA3;--line:#3A3A40;--bone:#F2F0EB;--roxo:#5B3DF5;--amar:#FFC24A}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+body{overflow-x:hidden}
+.stage{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.card{position:relative;width:min(560px,100%);border-radius:30px;overflow:hidden;isolation:isolate;background:#07060C;box-shadow:0 40px 120px rgba(0,0,0,.6);animation:cIn .9s cubic-bezier(.65,0,.35,1) both}
+.card .img{position:absolute;left:0;right:0;top:0;height:78%;z-index:-2;background:url("assets/fluted-glass.webp") 60% 30%/cover no-repeat,#15112B;animation:drift 22s cubic-bezier(.65,0,.35,1) infinite alternate}
+.card::after{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;background:linear-gradient(160deg,#3A345A,#130F29);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+.card .shade{position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(7,6,12,0) 0%,rgba(7,6,12,.08) 18%,rgba(7,6,12,.72) 40%,rgba(7,6,12,.94) 56%,#07060C 70%)}
+@keyframes drift{from{background-position:58% 26%}to{background-position:66% 36%}}
+.in{position:relative;min-height:min(733px,calc(100vh - 48px));padding:60px;display:flex;flex-direction:column;justify-content:space-between;align-items:stretch}
+.wm{display:flex;align-items:center;gap:12px;font-size:21px;font-weight:700;letter-spacing:-.02em;color:var(--bone)}
+.wm i{width:27px;height:27px;border-radius:9px;background:var(--roxo);display:block}
+.body{display:flex;flex-direction:column;gap:41px}
+.tt{display:flex;flex-direction:column;gap:18px}
+h1{margin:0;font-size:84px;font-weight:700;letter-spacing:-0.065em;line-height:.85}
+.sub{margin:0;font-size:15px;line-height:1.45;color:#B4B4BC;text-wrap:pretty}
+.login{display:flex;flex-direction:column;gap:32px}
+.uinfo{display:flex;flex-direction:column;gap:16px}
+.urow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.who{display:flex;align-items:center;gap:12px;min-width:0}
+.av{flex:none;width:40px;height:40px;border-radius:50%;background:var(--bone);color:#000;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px}
+.who .t{display:flex;flex-direction:column;gap:2px;min-width:0}
+.who b{font-size:15px;line-height:1.2;color:var(--bone)}
+.who .em{font-size:13px;color:var(--mut);overflow:hidden;text-overflow:ellipsis}
+.notme{font-size:12.5px;color:var(--mut);text-decoration:underline;text-underline-offset:3px;cursor:pointer;white-space:nowrap}
+.notme:hover{color:#fff}
+input{height:48px;width:100%;padding:0 20px;border-radius:9999px;border:1px solid rgba(255,255,255,.22);background:rgba(0,0,0,.4);color:#fff;font:inherit;font-size:15px;outline:0;transition:border-color .25s ease}
+input::placeholder{color:#6A6A72}
+input:focus{border-color:var(--bone)}
+.err{min-height:0;font-size:12.5px;line-height:1.4;color:#FF6A5C}.err:empty{display:none}
+.acts{display:flex;align-items:center;gap:20px}
+.lk{font-size:13px;color:var(--mut);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.lk:hover{color:#fff}
+.lq{--h:48px;--gap:16px;--E:cubic-bezier(.22,1,.36,1);position:relative;height:var(--h);width:var(--pw);flex:none;display:inline-block;text-align:left;cursor:pointer;border:0;padding:0;background:none;font:inherit;color:#000;transition:width .7s var(--E)}
+.lq .shp{position:absolute;inset:-14px -80px -14px -14px;filter:url(#goo);pointer-events:none}
+.lq .pill,.lq .dot{position:absolute;top:14px;height:var(--h);background:var(--bone)}
+.lq .pill{left:14px;width:var(--pw);border-radius:9999px}
+.lq .dot{width:var(--h);border-radius:50%;left:calc(14px + var(--pw) - var(--h));transition:left .7s var(--E)}
+.lq .lbl{position:relative;display:inline-flex;align-items:center;height:var(--h);padding:0 24px;font-size:14.5px;font-weight:700;white-space:nowrap}
+.lq .arr{position:absolute;top:0;width:var(--h);height:var(--h);left:calc(var(--pw) - var(--h));display:flex;align-items:center;justify-content:center;opacity:0;transition:left .7s var(--E),opacity .35s ease}
+.lq .arr svg{transform:rotate(-45deg);transition:transform .6s var(--E)}
+.lq:hover{width:calc(var(--pw) + var(--gap) + var(--h))}
+.lq:hover .dot{left:calc(14px + var(--pw) + var(--gap))}
+.lq:hover .arr{left:calc(var(--pw) + var(--gap));opacity:1;transition:left .7s var(--E),opacity .5s ease .12s}
+.lq:hover .arr svg{transform:rotate(0)}
+.lq:active .pill{filter:brightness(.94)}
+.lq:focus-visible{outline:2px solid var(--roxo);outline-offset:6px;border-radius:9999px}
+.lq.busy{pointer-events:none;opacity:.6;cursor:progress}
+.foot{display:flex;align-items:center;gap:16px;font-size:12px;line-height:1.45;color:#9A9AA3}
+.foot span{max-width:285px}
+.foot svg{flex:none}
+@keyframes cIn{from{opacity:0;transform:translateY(16px) scale(.985)}to{opacity:1;transform:none}}
+.in>*,.body>*{animation:up .7s cubic-bezier(.65,0,.35,1) both}
+.in>.wm{animation-delay:.2s}.body>*:nth-child(1){animation-delay:.3s}.body>*:nth-child(2){animation-delay:.4s}.body>*:nth-child(3){animation-delay:.5s}
+.in>.body{animation:none}
+@keyframes up{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@media (max-width:560px){h1{font-size:60px}.in{padding:28px 24px;min-height:0;gap:90px}.urow{flex-direction:column;align-items:flex-start}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}`;
+  function expired(sb, info) {
+    const nome = (info.nome || '').trim(), who = nome || info.email.split('@')[0], ini = (who.charAt(0) || 'K').toUpperCase();
+    mount(CSS_SESS, GOO + '<div class="stage"><section class="card" aria-labelledby="t"><div class="img" aria-hidden="true"></div><div class="shade" aria-hidden="true"></div><div class="in"><span class="wm"><i></i>Kontar</span><div class="body"><div class="tt"><h1 id="t">Sessão<br>encerrada.</h1><p class="sub">Por segurança, o Kontar pede seu login de novo a cada 24 horas. Entre de novo pra continuar de onde parou.</p></div>'
+      + '<form class="login" id="f" novalidate><div class="uinfo"><div class="urow"><div class="who"><span class="av">' + esc(ini) + '</span><span class="t"><b>' + esc(who) + '</b><span class="em">' + esc(info.email) + '</span></span></div><span class="notme" id="nm" role="button" tabindex="0">Não é você? Entrar com outra conta</span></div><input id="p" type="password" placeholder="Senha" autocomplete="current-password" aria-label="Senha"><div class="err" id="x" role="alert" aria-live="polite"></div></div>'
+      + '<div class="acts"><button class="lq" id="go" type="submit"><span class="shp" aria-hidden="true"><span class="pill"></span><span class="dot"></span></span><span class="lbl">Entrar de novo</span><span class="arr" aria-hidden="true">' + ARROW('#000') + '</span></button><span class="lk" id="r" role="button" tabindex="0">Esqueci a senha</span></div></form>'
+      + '<div class="foot"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFC24A" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><span>Pra não ver mais isso, troque para “Sem limite” em Minha Conta › Duração da sessão.</span></div></div></div></section></div>');
+    liq(); const x = $('#x'), p = $('#p'), go = $('#go'), say = (t, ok) => { x.style.color = ok ? '#00E08A' : '#FF6A5C'; x.textContent = t; };
+    $('#nm').onclick = () => { LS.del(EXP); login(sb); };
+    $('#f').addEventListener('submit', async e => { e.preventDefault(); if (go.classList.contains('busy')) return; x.textContent = '';
+      if (!p.value) return say('Escreva sua senha.');
+      go.classList.add('busy'); p.disabled = true; let r; try { r = await sb.auth.signInWithPassword({ email: info.email, password: p.value }); } catch (er) { r = { error: er }; }
+      if (r.error) { go.classList.remove('busy'); p.disabled = false; return say(/Invalid login/i.test(r.error.message) ? 'Senha não confere.' : r.error.message); }
+      LS.del(EXP); start(sb, r.data.user); });
+    const forgot = async () => { const r = await sb.auth.resetPasswordForEmail(info.email, { redirectTo: location.origin + location.pathname }); say(r.error ? r.error.message : 'Mandamos um link pro seu e-mail. Vale por 30 min.', !r.error); };
+    $('#r').onclick = forgot;
+  }
+
+  /* ================= 9. ONBOARDING (09g) ================= */
+  const CSS_ONB = `
+:root{--ink:#fff;--mut:#9A9AA3;--dim:#6A6A72;--bone:#F2F0EB;--roxo:#5B3DF5;--amar:#FFC24A;--verde:#3FCF7F;--ln:#2A2A2F;--card:#111114;--btn:#1C1C20;--E:cubic-bezier(.65,0,.35,1);--ac:var(--roxo);--on:#fff}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#000;color:var(--ink);font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+body{overflow-x:hidden}
+button,input{font:inherit;color:inherit}
+@keyframes up{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.cap{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase}
+.stage{min-height:100vh;display:grid;place-items:center;padding:28px 24px}
+.board{position:relative;isolation:isolate;width:min(1120px,100%);height:min(660px,calc(100vh - 56px));min-height:580px;display:grid;grid-template-rows:73px 1fr;border-radius:30px 0 0 30px;overflow:hidden}
+.board>svg{position:absolute;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
+.hdr,.ftr{display:grid;align-items:stretch}
+.hdr{grid-template-columns:auto 1fr;position:relative}.hdr::after{content:"";position:absolute;left:0;right:18px;bottom:0;height:1px;background:var(--ln)}
+.ftr{grid-template-columns:1fr auto;border-top:1px solid var(--ln);color:var(--mut)}
+.hdr>*,.ftr>*{display:flex;align-items:center;padding:0 22px;border-right:1px solid var(--ln)}
+.hdr>*:last-child{border-right:0}.hdr .wm{padding-left:36px}
+.wm{gap:9px;font-size:21px;font-weight:700;letter-spacing:-.02em}.wm i{width:27px;height:27px;border-radius:8px;background:var(--roxo);display:block}
+.hdr .cap{color:var(--mut)}
+.route{position:absolute;top:18px;right:0;height:36px;display:flex;align-items:center;z-index:3}
+.route b{width:36px;height:36px;font-size:14px!important;border-radius:50%;flex:none;display:grid;place-items:center;font-size:13px;font-weight:700;color:var(--dim);border:1.5px solid #3A3A40;transition:background .45s var(--E),color .45s var(--E),border-color .45s var(--E)}
+.route u{width:28px;height:2px;background:#2A2A2F;position:relative;overflow:hidden}.route u::after{content:"";position:absolute;inset:0;background:#fff;transform:scaleX(0);transform-origin:left;transition:transform .55s var(--E)}
+.route u.done::after{transform:scaleX(1)}
+.route b.done{background:#fff;border-color:#fff;color:#000}
+.route b.cur{background:var(--ac);border-color:var(--ac);color:var(--on)}
+.body{display:grid;grid-template-columns:minmax(0,.92fr) minmax(0,1fr);min-height:0}
+.T{position:relative;display:flex;flex-direction:column;justify-content:space-between;padding:36px;border-right:1px solid var(--ln);overflow:hidden}
+.T .row{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.T .num{width:clamp(132px,15vw,188px);aspect-ratio:1;border-radius:50%;flex:none;display:grid;place-items:center;background:var(--ac);color:var(--on);font-size:clamp(84px,9.4vw,120px);font-weight:700;letter-spacing:0;line-height:1;transition:background .55s var(--E),color .55s var(--E)}
+.T .num .g{display:block;line-height:1;will-change:transform}
+.T .note{max-width:150px;line-height:1.5;color:var(--mut)}
+h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.9;text-transform:uppercase;font-weight:700}
+.anim{animation:up .55s var(--E) both}
+.U{display:grid;grid-template-rows:1fr auto auto;min-height:0;min-width:0}
+.desc{position:relative;display:flex;flex-direction:column;justify-content:flex-start;gap:18px;padding:36px 36px 26px}
+.desc p{margin:0;font-size:clamp(20px,1.9vw,26px);font-weight:500;line-height:1.25;letter-spacing:-.02em;color:#fff;max-width:none}
+.desc .cap{color:var(--ac);transition:color .45s}
+.ctl{min-width:0;padding:0 36px 36px}
+.step{display:none;flex-direction:column;gap:10px;animation:up .5s var(--E) both}.step.on{display:flex}
+.lab{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--mut);margin:0 0 2px 20px}
+.fld{display:flex;align-items:center;gap:10px;height:56px;padding:0 22px;border-radius:9999px;border:1px solid #3A3A40;background:var(--btn);transition:border-color .25s}
+.fld:focus-within{border-color:var(--ac)}
+.fld input{flex:1;min-width:0;background:none;border:0;outline:0;font-size:17px;font-weight:500;letter-spacing:-.01em}
+.fld input::placeholder{color:#5E5E66}
+.fld .pre{color:var(--mut);font-size:16px;font-weight:500}.fld .suf{color:var(--dim)}
+.hint{margin:2px 0 0 20px;font-size:13px;color:var(--dim);line-height:1.4}
+.opt{display:grid;grid-template-columns:40px 1fr 24px;align-items:center;gap:16px;text-align:left;padding:14px 18px 14px 14px;border-radius:24px;border:1px solid #2A2A2F;background:var(--btn);cursor:pointer;transition:border-color .25s,background .25s}
+.opt .n{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;border:1.5px solid #3A3A40;font-size:15px;font-weight:700;transition:all .3s}
+.opt b{display:block;font-size:16px;font-weight:700;letter-spacing:-.02em}.opt small{display:block;margin-top:3px;font-size:13.5px;color:var(--mut)}
+.opt .rd{width:22px;height:22px;border-radius:50%;border:1.5px solid #4A4A52;display:grid;place-items:center;transition:all .25s}
+.opt:hover{border-color:#4A4A52}
+.opt[aria-checked=true]{border-color:var(--ac)}
+.opt[aria-checked=true] .n{background:var(--ac);border-color:var(--ac);color:var(--on)}
+.opt[aria-checked=true] .rd{background:var(--ac);border-color:var(--ac)}
+.opt[aria-checked=true] .rd::after{content:"";width:9px;height:5px;border-left:2px solid var(--on);border-bottom:2px solid var(--on);transform:rotate(-45deg) translate(1px,-1.5px)}
+.dh{display:flex;justify-content:space-between;align-items:center;margin:8px 0 2px 20px}
+.dh .lab{margin:0}
+.skip{border:0;background:none;color:var(--dim);font-size:12.5px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;padding:0}.skip:hover{color:#fff}
+.days{display:grid;grid-template-columns:repeat(14,1fr);gap:5px}
+.days button{aspect-ratio:1;width:100%;max-width:36px;justify-self:center;border-radius:50%;border:1px solid #2A2A2F;background:var(--btn);font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;cursor:pointer;padding:0;transition:background .2s,color .2s,border-color .2s}
+.days button:hover{border-color:#4A4A52}.days button[aria-pressed=true]{background:var(--ac);border-color:var(--ac);color:var(--on);font-weight:700}
+.sum{border-radius:24px;background:var(--btn);border:1px solid #2A2A2F;padding:4px 18px}
+.sum div{display:grid;grid-template-columns:30px 1fr auto;gap:14px;align-items:center;min-height:52px;border-bottom:1px solid #2A2A2F}.sum div:last-child{border-bottom:0}
+.sum i{font-style:normal;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;border:1.5px solid #3A3A40;font-size:12px;font-weight:700;color:var(--mut)}
+.sum span{color:var(--mut);font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase}.sum b{font-size:16px;font-weight:700;letter-spacing:-.02em}
+.acts .lt{display:flex;flex-direction:column;align-items:flex-start;gap:2px}.acts .lt .cap{color:var(--dim);padding-left:4px}
+.acts{display:flex;align-items:center;height:85px;padding:0 36px;position:relative}.acts::before{content:"";position:absolute;left:0;right:18px;top:0;height:1px;background:var(--ln)}
+.back{border:0;background:none;color:var(--mut);font-size:15px;font-weight:600;cursor:pointer;padding:4px;transition:color .2s}.back:hover{color:#fff}.back:disabled{color:#3A3A40;cursor:default}
+.go{position:absolute;right:0;bottom:18px;z-index:3;height:48px;padding:0 6px 0 0;border-radius:9999px;border:0;background:var(--bone);color:#000;font-size:15px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:16px;transition:filter .25s,opacity .25s}
+.go .t{flex:1;text-align:left;padding-left:22px;white-space:nowrap}.go .ar{flex:none;width:36px;height:36px;border-radius:50%;background:#000;display:grid;place-items:center;transition:transform .3s var(--E)}
+.go:hover{filter:brightness(.93)}.go:hover .ar{transform:translateX(3px)}.go:disabled{opacity:.3;cursor:default}.go:disabled .ar{transform:none}
+@media (max-width:820px){.board{height:auto}.body{grid-template-columns:1fr}.T{border-right:0;border-bottom:1px solid var(--ln);min-height:260px}.hdr .cap{display:none}.days{grid-template-columns:repeat(7,1fr)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}`;
+
+  /* Devolve uma Promise com as respostas ({nm, how, rd (centavos|null), dia}) quando o Jay/usuário clica "Abrir meu Kontar". */
+  function onboarding(nameGuess) {
+    mount(CSS_ONB, '<main class="stage"><div class="board" id="board"><svg id="bgs" aria-hidden="true"></svg><nav class="route" id="route" aria-label="Progresso"></nav><header class="hdr"><span class="wm"><i></i>Kontar</span><span class="cap">Primeiro acesso</span></header>'
+      + '<div class="body"><section class="T" aria-live="polite"><div class="row"><span class="num" id="num">1</span><span class="cap note" id="note"></span></div><h1 id="h"></h1></section><section class="U"><div class="desc"><span class="cap" id="tag"></span><p id="sb"></p></div><div class="ctl">'
+      + '<div class="step" data-s="0"><label class="lab" for="nm">Nome</label><div class="fld"><input id="nm" type="text" placeholder="Como te chamamos?" autocomplete="given-name"></div><p class="hint">Você muda isso depois, em Minha Conta.</p></div>'
+      + '<div class="step" data-s="1" role="radiogroup" aria-label="Como começar"><button class="opt" role="radio" aria-checked="false" data-v="import"><span class="n">A</span><span><b>Importar extrato</b><small>CSV, OFX ou PDF do seu banco ou cartão.</small></span><span class="rd"></span></button><button class="opt" role="radio" aria-checked="false" data-v="manual"><span class="n">B</span><span><b>Lançar manualmente</b><small>Começa do zero e você vai adicionando.</small></span><span class="rd"></span></button><button class="opt" role="radio" aria-checked="false" data-v="demo"><span class="n">C</span><span><b>Explorar com dados demo</b><small>Veja tudo funcionando antes de usar os seus.</small></span><span class="rd"></span></button></div>'
+      + '<div class="step" data-s="2"><label class="lab" for="rd">Renda mensal</label><div class="fld"><span class="pre">R$</span><input id="rd" inputmode="numeric" placeholder="0,00"><span class="suf cap">por mês</span></div><div class="dh"><span class="lab">Dia de fechamento da fatura</span><button class="skip" type="button" id="sk">Pular essa etapa</button></div><div class="days" id="days"></div></div>'
+      + '<div class="step" data-s="3"><div class="sum" id="sum"></div></div></div>'
+      + '<div class="acts"><div class="lt"><button class="back" type="button" id="bk" disabled>← Voltar</button><span class="cap" id="fn"></span></div><button class="go" type="button" id="nx"><span class="t">Continuar</span><span class="ar" aria-hidden="true">' + ARROW('#fff', 2.4) + '</span></button></div></section></div></div></main>');
+    return new Promise(done => {
+      const drawNotch = () => { const g = $('#bgs'), b = $('#board'); if (!g || !b) return; const W = b.offsetWidth, H = b.offsetHeight, Dp = 72, gp = 18, F = 18, R = 36, D2 = 84, R2 = 42, RW = $('#route').offsetWidth, N = RW + gp + F, x = W - N; $('#nx').style.width = RW + 'px';
+        const d = 'M0 30A30 30 0 0 1 30 0H' + x + 'A' + F + ' ' + F + ' 0 0 1 ' + (x + F) + ' ' + F + 'V' + (Dp - R) + 'A' + R + ' ' + R + ' 0 0 0 ' + (x + F + R) + ' ' + Dp + 'H' + (W - F) + 'A' + F + ' ' + F + ' 0 0 1 ' + W + ' ' + (Dp + F) + 'V' + (H - D2 - F) + 'A' + F + ' ' + F + ' 0 0 1 ' + (W - F) + ' ' + (H - D2) + 'H' + (x + F + R2) + 'A' + R2 + ' ' + R2 + ' 0 0 0 ' + (x + F) + ' ' + (H - D2 + R2) + 'V' + (H - F) + 'A' + F + ' ' + F + ' 0 0 1 ' + x + ' ' + H + 'H30A30 30 0 0 1 0 ' + (H - 30) + 'Z';
+        g.setAttribute('viewBox', '0 0 ' + W + ' ' + H); g.innerHTML = '<defs><clipPath id="nc"><path d="' + d + '"/></clipPath></defs><path d="' + d + '" fill="#111114" stroke="#2A2A2F" stroke-width="2" clip-path="url(#nc)"/>'; };
+      const optic = (el, txt) => { const cs = getComputedStyle(el), fs = parseFloat(cs.fontSize), c = document.createElement('canvas').getContext('2d'); c.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; const m = c.measureText(txt);
+        const L = m.actualBoundingBoxLeft, Rt = m.actualBoundingBoxRight, A = m.fontBoundingBoxAscent, Dd = m.fontBoundingBoxDescent, base = (fs - (A + Dd)) / 2 + A;
+        const dy = fs / 2 - (base + (m.actualBoundingBoxDescent - m.actualBoundingBoxAscent) / 2);
+        /* centro de massa da tinta: 70% centroide, 30% caixa da tinta */
+        const cv = document.createElement('canvas'), k = 2, cw = Math.ceil((L + Rt) * k) + 4, ch = Math.ceil((m.actualBoundingBoxAscent + m.actualBoundingBoxDescent) * k) + 4; cv.width = cw; cv.height = ch;
+        const x2 = cv.getContext('2d'); x2.font = c.font; x2.scale(k, k); x2.fillText(txt, L + 1, m.actualBoundingBoxAscent + 1);
+        const px = x2.getImageData(0, 0, cw, ch).data; let sx = 0, sw = 0; for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) { const a = px[(y * cw + x) * 4 + 3]; sx += a * x; sw += a; }
+        const cx = sw ? sx / sw / k - 1 - L : (Rt - L) / 2, bx = (Rt - L) / 2, dxo = m.width / 2 - (bx * .3 + cx * .7);
+        return 'translate(' + dxo.toFixed(2) + 'px,' + dy.toFixed(2) + 'px)'; };
+      const setNum = n => { const el = $('#num'); if (!el) return; el.innerHTML = '<span class="g"></span>'; const g = el.firstChild; g.textContent = n; g.style.transform = optic(el, String(n)); };
+      const ST = [
+        { n: 'Boas-vindas', h: 'Oi. Vamos<br>começar.', sb: 'Leva menos de um minuto.<br>Seus dados ficam salvos e só você vê.', note: 'Quatro paradas até o seu painel', tag: '≈ 1 min', ac: 'var(--roxo)', on: '#fff' },
+        { n: 'Ponto de partida', h: 'Por onde<br>começar?', sb: 'Escolha um caminho pra trazer seus lançamentos. Dá pra mudar a qualquer hora.', note: 'Escolha um dos três caminhos', tag: '3 caminhos', ac: 'var(--amar)', on: '#000' },
+        { n: 'Renda e fatura', h: 'Sua renda<br>e fatura.', sb: 'Com isso o Kontar já calcula<br>seus tetos e as faturas futuras.', note: 'Opcional. Dá pra pular', tag: 'Opcional', ac: 'var(--verde)', on: '#000' },
+        { n: 'Tudo pronto', h: 'Pronto,<br><span id="who"></span>', sb: 'Confira o resumo.<br>O resto você ajusta<br>nos próprios cards.', note: 'Confira e abra o seu painel', tag: 'Resumo', ac: 'var(--bone)', on: '#000' }];
+      const D = { nm: nameGuess || '', how: null, rd: '', dia: null }; let i = 0;
+      $('#nm').value = D.nm;
+      $('#route').innerHTML = ST.map((_, k) => '<b>' + (k + 1) + '</b>' + (k < 3 ? '<u></u>' : '')).join('');
+      $('#days').innerHTML = Array.from({ length: 28 }, (_, k) => '<button type="button" aria-pressed="false">' + (k + 1) + '</button>').join('');
+      const HOW = { import: 'Importar extrato', manual: 'Lançar manualmente', demo: 'Dados demo' }, ok = () => i === 0 ? D.nm.trim().length > 0 : i === 1 ? !!D.how : true;
+      function render() {
+        const s = ST[i]; root.style.setProperty('--ac', s.ac); root.style.setProperty('--on', s.on);
+        setNum(i + 1); $('#h').innerHTML = s.h; $('#sb').innerHTML = s.sb; $('#note').textContent = s.note; $('#tag').textContent = s.tag; $('#fn').textContent = s.n;
+        ['#num', '#h', '#sb'].forEach(q => { const e = $(q); e.classList.remove('anim'); void e.offsetWidth; e.classList.add('anim'); });
+        if (i === 3) { $('#who').textContent = (D.nm.trim().split(/\s+/)[0] || 'você') + '.'; const rows = [['Nome', D.nm.trim()], ['Começando por', HOW[D.how]], ['Renda mensal', D.rd ? 'R$ ' + D.rd : '—'], ['Fecha a fatura', D.dia ? 'Dia ' + D.dia : '—']];
+          $('#sum').innerHTML = rows.map((r, k) => '<div><i>' + (k + 1) + '</i><span>' + r[0] + '</span><b></b></div>').join(''); $$('#sum b').forEach((e, k) => { e.textContent = rows[k][1]; }); }
+        $$('.step').forEach(e => e.classList.toggle('on', +e.dataset.s === i));
+        $$('#route u').forEach((e, k) => e.classList.toggle('done', k < i));
+        $$('#route b').forEach((e, k) => { e.classList.toggle('done', k < i); e.classList.toggle('cur', k === i); e.textContent = k < i ? '✓' : k + 1; });
+        $('#bk').disabled = i === 0; $('#nx .t').textContent = i === 3 ? 'Abrir meu Kontar' : 'Continuar'; $('#nx').disabled = !ok();
+      }
+      new ResizeObserver(drawNotch).observe($('#board')); new ResizeObserver(drawNotch).observe($('#route')); new ResizeObserver(() => setNum(i + 1)).observe($('#num'));
+      $('#nm').oninput = e => { D.nm = e.target.value; $('#nx').disabled = !ok(); };
+      $('#nm').onkeydown = e => { if (e.key === 'Enter') $('#nx').click(); };
+      $$('.opt').forEach(b => { b.onclick = () => { D.how = b.dataset.v; $$('.opt').forEach(o => o.setAttribute('aria-checked', o === b)); $('#nx').disabled = !ok(); }; });
+      $('#rd').oninput = e => { const d = e.target.value.replace(/\D/g, '').slice(0, 11); e.target.value = d ? (+d / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : ''; D.rd = e.target.value; };
+      $$('#days button').forEach(b => { b.onclick = () => { const on = b.getAttribute('aria-pressed') === 'true'; $$('#days button').forEach(x => x.setAttribute('aria-pressed', 'false')); b.setAttribute('aria-pressed', !on); D.dia = on ? null : +b.textContent; }; });
+      $('#sk').onclick = () => { D.rd = ''; D.dia = null; $('#rd').value = ''; $$('#days button').forEach(x => x.setAttribute('aria-pressed', 'false')); i = 3; render(); };
+      $('#bk').onclick = () => { if (i > 0) { i--; render(); } };
+      $('#nx').onclick = () => { if (!ok()) return; if (i < 3) { i++; render(); } else { $('#nx .t').textContent = 'Abrindo…'; $('#nx').disabled = true; $('#bk').disabled = true;
+        done({ nm: D.nm.trim(), how: D.how, rd: D.rd ? parseInt(D.rd.replace(/\D/g, ''), 10) : null, dia: D.dia }); } };
+      render(); drawNotch();
+    });
+  }
+
+  /* ================= partida ================= */
   let started = false;
-  async function start(sb, user) {
-    if (started) return; started = true; loading();
-    try {
-      await window.KD.load(sb, user);
-      const p = window.KD.M.profile;
-      if (p && p.avatar_url && sb.storage) { try { const r = await sb.storage.from('avatars').createSignedUrl(p.avatar_url, 3600 * 24 * 30); window.KD.avatarUrl = (r.data && r.data.signedUrl) || ''; } catch (e) {} }
-      window.KD.primeLocalStorage();
-    } catch (e) { console.error(e); started = false; return failed(e.message || ''); }
+  const mountApp = () => new Promise(res => {
     const s = document.createElement('script'); s.src = './support.js'; document.body.appendChild(s);
-    const t0 = Date.now(), iv = setInterval(() => {
-      if (document.querySelector('[data-screen-label]') || Date.now() - t0 > 20000) { clearInterval(iv); requestAnimationFrame(() => { root.style.opacity = '0'; root.style.pointerEvents = 'none'; setTimeout(() => root.remove(), 450); }); }
-    }, 60);
+    const t0 = Date.now(), iv = setInterval(() => { if (document.querySelector('[data-screen-label]') || Date.now() - t0 > 20000) { clearInterval(iv); requestAnimationFrame(() => res()); } }, 60);
+  });
+  /* primeiro acesso = conta nova: sem lançamentos, sem a marca "onboarded" (guardada em user_prefs.prefs) e que não seja a conta demo */
+  const needsOnboarding = () => { const KD = window.KD; if (qs('onb') === '1') return true; return !KD.isDemo() && !(KD.M.prefs && KD.M.prefs.onboarded) && !(KD.M.rows && KD.M.rows.length); };
+  async function saveOnboarding(sb, user, a) {
+    const KD = window.KD, P = Object.assign({}, KD.M.prefs, { onboarded: true, inicio: a.how });
+    if (a.rd != null) P.renda = a.rd; if (a.dia) P.diaFech = a.dia;            /* renda em centavos (inteiro), como o resto do banco */
+    KD.M.prefs = P; KD.M.profile = Object.assign({}, KD.M.profile, { nome_exibicao: a.nm });
+    if (qs('onb') === '1') return;
+    const r1 = await sb.from('profiles').upsert({ user_id: user.id, nome_exibicao: a.nm }, { onConflict: 'user_id' });
+    const r2 = await sb.from('user_prefs').upsert({ user_id: user.id, prefs: P, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    if (r1.error || r2.error) console.error('[kontar] onboarding', r1.error || r2.error);
+  }
+  async function start(sb, user) {
+    if (started) return; started = true;
+    const L = loader(), KD = window.KD;
+    try {
+      await KD.load(sb, user);
+      const p = KD.M.profile;
+      if (p && p.avatar_url && sb.storage) { try { const r = await sb.storage.from('avatars').createSignedUrl(p.avatar_url, 3600 * 24 * 30); KD.avatarUrl = (r.data && r.data.signedUrl) || ''; } catch (e) {} }
+      KD.primeLocalStorage();
+    } catch (e) { console.error(e); started = false; L.abort(); return failed(e.message || String(e), () => start(sb, user)); }
+    if (needsOnboarding()) {
+      const guess = (KD.M.profile && KD.M.profile.nome_exibicao) || '', done = onboarding(guess);   /* monta embaixo do carregando */
+      await L.finish(); const a = await done;
+      try { await saveOnboarding(sb, user, a); } catch (e) { console.error(e); }
+      const L2 = loader(); await mountApp(); dismissRoot(); await L2.finish(); return;
+    }
+    await mountApp(); dismissRoot(); await L.finish();
   }
   async function main() {
-    loading('Abrindo o Kontar…');
-    const local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname), mock = local && /[?&]mock=1/.test(location.search);
+    const mock = local && /[?&]mock=1/.test(location.search), tela = qs('tela');
+    if (tela === 'carregando') { loader(); return; }
+    if (tela === 'erro') return failed('Failed to fetch', async () => { await wait(1200); });
     let sb;
-    if (mock) {
-      await new Promise((ok, no) => { const s = document.createElement('script'); s.src = '../test/mock-sb.js'; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
-      sb = window.KontarMock.make(await (await fetch('../test/fixture.json')).json());
-    } else {
-      if (!CFG.url || !CFG.key) return failed('Faltam as chaves do Supabase em config.js.');
-      sb = window.supabase.createClient(CFG.url, CFG.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
-    }
-    window.KD_SB = sb;
-    let recovering = /type=recovery/.test(location.hash);
-    sb.auth.onAuthStateChange((ev, session) => { if (ev === 'PASSWORD_RECOVERY') { recovering = true; newPassword(sb); } });
-    const { data } = await sb.auth.getSession();
-    if (recovering) return newPassword(sb);
-    if (data && data.session) start(sb, data.session.user); else login(sb);
+    const boot = async () => {
+      if (mock) {
+        await new Promise((ok, no) => { const s = document.createElement('script'); s.src = '../test/mock-sb.js'; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+        sb = window.KontarMock.make(await (await fetch('../test/fixture.json')).json());
+      } else {
+        if (!CFG.url || !CFG.key) throw new Error('Faltam as chaves do Supabase em config.js.');
+        sb = window.supabase.createClient(CFG.url, CFG.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+      }
+      window.KD_SB = sb;
+      let recovering = /type=recovery/.test(location.hash);
+      sb.auth.onAuthStateChange((ev) => { if (ev === 'PASSWORD_RECOVERY') { recovering = true; newPassword(sb); } });
+      const { data } = await sb.auth.getSession();
+      if (tela === 'login') return login(sb); if (tela === 'nova') return newPassword(sb);
+      if (tela === 'sessao') return expired(sb, { email: 'lia@kontar.app', nome: 'Lia Santos' });
+      if (recovering) return newPassword(sb);
+      if (data && data.session) return start(sb, data.session.user);
+      let info = null; try { info = JSON.parse(LS.get(EXP) || 'null'); } catch (e) {}
+      if (info && info.email) expired(sb, info); else login(sb);
+    };
+    const run = async () => { try { await boot(); } catch (e) { console.error(e); failed(e.message || String(e), run); } };
+    await run();
   }
+  window.KontarBoot = { start, main };
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('./sw.js').catch(() => {});
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', main); else main();
 })();

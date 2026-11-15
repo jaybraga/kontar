@@ -90,7 +90,7 @@
     M.cards = R.cards.filter(c => !c.removido_em).sort((a, b) => a.ordem - b.ordem).map(c => {
       const col = colorOf(c.nome, c.instituicao, c.brand_hex), cy = cycOf(c.id, T), lim = Number(c.limite) || 0;
       const used = lim && c.disponivel_informado != null ? Math.max(0, lim - Number(c.disponivel_informado)) : 0;
-      return { id: c.id, n: c.nome, nick: c.apelido || '', fin: c.final4 || '····', lim, used, cor: col[0], ink: c.tinta || col[1], bank: bankOf(c.nome, c.instituicao), cy,
+      return { id: c.id, n: c.nome, informed: lim && c.disponivel_informado != null, nick: c.apelido || '', fin: c.final4 || '····', lim, used, cor: col[0], ink: c.tinta || col[1], bank: bankOf(c.nome, c.instituicao), cy,
         fe: cy ? cy.dia_fechamento : null, ve: cy ? cy.dia_vencimento : null, orig: cy ? ({ fatura: 'fatura real', chute: 'chute', manual: 'cadastro manual' })[cy.origem] || 'chute' : 'chute',
         since: cy && cy.vigencia_inicio > '2025-01-01' ? cy.vigencia_inicio : null };
     });
@@ -138,6 +138,12 @@
     M.cash = [];
     M.rows.forEach(r => { if (isTransf(r) || hasInst.has(r.id)) return; if (r.out || r.inn) M.cash.push({ r, dt: r.dt, mi: r.mi, out: r.out, inn: r.inn, card: r.out && r.card ? r.card : null }); });
     M.inst.forEach(i => { if (isTransf(i.r)) return; const o = i.r.out ? i.v : 0; M.cash.push({ r: i.r, dt: i.dt, mi: i.mi, out: o, inn: i.r.inn ? i.v : 0, card: o && i.r.card ? i.r.card : null }); });
+    /* F1: sem "disponível informado", o limite usado = fatura aberta (compras à vista do ciclo atual) + parcelas que ainda vão vencer */
+    M.cards.forEach(c => { if (!c.lim || c.informed) return; const T0 = new Date(T.getFullYear(), T.getMonth(), T.getDate()), fe = Number(c.fe) || 1,
+        close = new Date(T0.getFullYear(), T0.getMonth() - (T0.getDate() >= fe ? 0 : 1), fe); let u = 0;
+      M.rows.forEach(r => { if (r.card === c.n && r.out && !isTransf(r) && !hasInst.has(r.id) && r.dt > close && r.dt <= T0) u += r.out; });
+      M.inst.forEach(i => { if (i.r.card === c.n && i.r.out && !isTransf(i.r) && i.dt > T0) u += i.v; });
+      c.used = Math.min(c.lim, Math.round(u * 100) / 100); });
 
     /* limites mínimos do período */
     const firstData = M.rows.length ? M.rows[M.rows.length - 1].mi : M.CUR;

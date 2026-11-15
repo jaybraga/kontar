@@ -156,7 +156,7 @@
     o.hojeLbl = 'Ir pra hoje · ' + mShort(C.CUR); o.desdeLbl = 'Dados desde ' + mShort(C.MIN); o.ac_since = 'Desde ' + mShort(mIdx(KD.since()));
     o.ac_ses = (o.ac_ses || []).map(x => Object.assign(x, { meta: x.meta.replace(/^ · /, '') }));
     o.hasConn = false;
-    o.ac_hasOthers = true; o.ac_endAll = () => KD.signOutOthers();
+    o.ac_hasOthers = true; o.ac_othDone = !!st.ac.oth; o.ac_othIdle = !st.ac.oth; o.ac_endAll = () => { if (!KD.isDemo()) KD.signOutOthers(); comp.setState(x => ({ ac: Object.assign({}, x.ac, { oth: true }) })); };
     { /* Conta: nome em duas linhas, pílulas do topo, senha, toggles de segurança */
       const ac = st.ac, A = p => comp.setState(x => ({ ac: Object.assign({}, x.ac, p) }));
       const nmv = (ac.n0 || '').trim(), sp = nmv.split(/\s+/).filter(Boolean), l1 = sp[0] || '', l2 = sp.slice(1).join(' ');
@@ -172,10 +172,10 @@
       o.ac_inPw1 = e => A({ pw1: e.target.value.slice(0, 72), pwMsg: '' }); o.ac_inPw2 = e => A({ pw2: e.target.value.slice(0, 72), pwMsg: '' });
       o.ac_inPwCode = e => A({ pwCodeV: e.target.value.replace(/\D/g, '').slice(0, 8) });
       o.ac_pwMsg = ac.pwMsg || ''; o.ac_pwMsgC = ac.pwErr ? '#FF6A5C' : '#6AFF2A';
-      { const pw = ac.pw1 || '', cls = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter(r => r.test(pw)).length, pts = (pw.length >= 8) + (pw.length >= 12) + cls, lv = !pw ? 0 : pw.length < 8 || pts <= 3 ? 1 : pts <= 5 ? 2 : 3;
-        o.ac_pwPct = ['0%', '33.3%', '66.6%', '100%'][lv]; o.ac_pwCol = ['#26262B', '#FF4436', '#F5B83D', '#00E08A'][lv]; o.ac_pwLbl = ['', 'Fraca', 'Média', 'Forte'][lv]; }
-      o.ac_pwBtn = ac.pwBusy ? 'Aguarde…' : ac.pwStep === 1 ? 'Confirmar código' : 'Salvar senha'; o.ac_pwO = (ac.pwBusy || !ac.pw1) ? '.4' : '1';
-      o.ac_pwGo = () => KD.changePassword(comp);
+      { const c = KD.pwCheck(ac.pw1 || '', ac.pw2 || ''); o.ac_pwPct = c.pct; o.ac_pwCol = c.col; o.ac_pwLbl = c.lbl; o.ac_pwHint = c.hint; o.ac_pwHintC = c.hintC;
+        o.ac_pwOk = !ac.pwBusy && (ac.pwStep === 1 ? (ac.pwCodeV || '').length >= 6 : c.ok); }
+      o.ac_pwBtn = ac.pwBusy ? 'Aguarde…' : ac.pwStep === 1 ? 'Confirmar código' : 'Salvar senha'; o.ac_pwO = o.ac_pwOk ? '1' : '.35'; o.ac_pwCur = o.ac_pwOk ? 'pointer' : 'default';
+      o.ac_pwGo = () => { if (o.ac_pwOk) KD.changePassword(comp); };
       const sw = (p, on) => { o[p + '_track'] = on ? '#5B3DF5' : '#26262B'; o[p + '_knob'] = on ? '31px' : '3px'; };
       o.ac_ss_knob = st.sess24 ? '49px' : '3px'; o.ac_ss_inkA = st.sess24 ? '#9A9AA3' : '#000'; o.ac_ss_inkB = st.sess24 ? '#000' : '#9A9AA3';
       o.ac_ss_lbl = 'Duração da sessão'; o.ac_ss_word = st.sess24 ? '24 horas' : 'Sem limite';
@@ -253,6 +253,15 @@
     ck(await sb().storage.from('avatars').upload(path, blob, { upsert: true, contentType: 'image/jpeg' }));
     ck(await sb().from('profiles').upsert({ user_id: uid(), avatar_url: path }, { onConflict: 'user_id' })); } catch (e) { console.error('[kontar] foto', e); } };
   KD.smallImage = src => new Promise(res => { if (/^data:/.test(src) || /^https?:/.test(src)) return res(src); const im = new Image(); im.onload = () => { const s = 128, cv = document.createElement('canvas'); cv.width = cv.height = s; const g = cv.getContext('2d'), k = Math.min(s / im.width, s / im.height); g.drawImage(im, (s - im.width * k) / 2, (s - im.height * k) / 2, im.width * k, im.height * k); res(cv.toDataURL('image/png')); }; im.onerror = () => res(null); im.src = src; });
+  /* força da senha + dicas curtas: UMA função, usada na Conta e na tela Nova senha (boot.js) */
+  KD.pwCheck = (pw, c) => {
+    pw = pw || ''; c = c || ''; const cls = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter(r => r.test(pw)).length, pts = (pw.length >= 8) + (pw.length >= 12) + cls,
+      lv = !pw ? 0 : pw.length < 8 || pts <= 3 ? 1 : pts <= 5 ? 2 : 3, same = !!pw && pw === c, lst = a => a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' e ' + a[a.length - 1], miss = [];
+    if (pw.length < 8) miss.push('mais ' + (8 - pw.length) + (8 - pw.length === 1 ? ' caractere' : ' caracteres')); if (!/[A-Z]/.test(pw)) miss.push('maiúscula'); if (!/[a-z]/.test(pw)) miss.push('minúscula'); if (!/\d/.test(pw)) miss.push('número'); if (!/[^A-Za-z0-9]/.test(pw)) miss.push('símbolo');
+    return { lv, same, ok: lv >= 2 && same, pct: ['0%', '33.3%', '66.6%', '100%'][lv], col: ['#26262B', '#FF4436', '#F5B83D', '#00E08A'][lv], lbl: ['', 'Fraca', 'Média', 'Forte'][lv],
+      hint: !pw ? 'Mínimo 8 caracteres' : lv === 1 ? 'Falta ' + lst(miss.slice(0, 2)) : lv === 2 && miss.length ? 'Melhore com ' + lst(miss.slice(0, 2)) : (c && !same) ? 'As senhas não são iguais' : !c ? 'Repita a senha acima' : 'Tudo certo',
+      hintC: !pw ? '#7C7C85' : lv === 1 || (c && !same) ? '#FF6A5C' : lv === 3 && same ? '#00E08A' : '#B4B4BC' };
+  };
   KD.sendReset = () => sb().auth.resetPasswordForEmail(KD.user.email, { redirectTo: location.origin + location.pathname });
 
   KD.changePassword = async comp => {
@@ -275,7 +284,7 @@
   KD.sessGuard = () => {
     clearInterval(KD._sg);
     const chk = () => { try { const t = KD.comp && KD.comp.state.sess24; if (!t) return; const last = Date.parse((KD.user && KD.user.last_sign_in_at) || '') || 0, since = Math.max(last, Number(t) || 0);
-      if (since && Date.now() - since > 864e5) KD.signOut().then(() => location.reload()); } catch (e) {} };
+      if (since && Date.now() - since > 864e5) { try { localStorage.setItem('kontar-sessao-vencida', JSON.stringify({ email: KD.user.email, nome: (KD.M.profile && KD.M.profile.nome_exibicao) || '' })); } catch (e) {} KD.signOut().then(() => location.reload()); } } catch (e) {} };
     chk(); KD._sg = setInterval(chk, 300000);
   };
   KD.signOut = () => sb().auth.signOut();
