@@ -69,7 +69,7 @@
   };
   KD.metas = () => KD.M.goals.map(g => {
     const alvo = Number(g.alvo), gd = Number(g.guardado), pz = KD.pd(g.prazo), ink = (c => { const h = c.replace('#', ''), n = parseInt(h, 16), L = (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255; return L > 0.55 ? '#0A0A0A' : '#FFFFFF'; })(g.cor);
-    return { id: g.id, n: g.nome, p: alvo ? Math.round(gd / alvo * 100) : 0, ate: mShort(mIdx(pz)), g: brl0(gd), of: brl0(alvo), f: brl0(Math.max(0, alvo - gd)), c: g.cor, ink, i: g.icone };
+    return { id: g.id, n: g.nome, p: alvo ? Math.round(gd / alvo * 100) : 0, ate: mShort(mIdx(pz)), g: brl0(gd), of: brl0(alvo), f: brl0(Math.max(0, alvo - gd)), c: g.cor, ink, i: g.icone, _v: alvo, _g: gd };
   });
 
   KD.apply = function (C, mi) {
@@ -192,7 +192,7 @@
   };
 
   /* ---------------- gravação ---------------- */
-  const TRACK = ['cats', 'alt', 'eov', 'tet', 'cor', 'ico', 'custom', 'cOv', 'cDel', 'nCards', 'mU', 'nRead', 'alerts', 'atyp', 'ms', 'fc', 'anim', 'sv', 'lay', 'dord', 'nm', 'wd', 'exl', 'pwMail', 'sess24'];
+  const TRACK = ['cats', 'alt', 'eov', 'tet', 'cor', 'ico', 'custom', 'cOv', 'cDel', 'nCards', 'mU', 'mEd', 'mDel', 'nRead', 'alerts', 'atyp', 'ms', 'fc', 'anim', 'sv', 'lay', 'dord', 'nm', 'wd', 'exl', 'pwMail', 'sess24'];
   const PREF = { nRead: 'nRead', alerts: 'alerts', atyp: 'atyp', ms: 'ms', fc: 'fc', anim: 'anim', sv: 'sv', lay: 'lay', dord: 'dord', nm: 'nm', wd: 'wd', exl: 'exl', pwMail: 'pwMail', sess24: 'sess24' };
   KD.snap = st => { KD._snap = {}; TRACK.forEach(k => { KD._snap[k] = JSON.stringify(st[k]); }); };
   const changedKeys = (a, b) => { a = a || {}; b = b || {}; return [...new Set(Object.keys(a).concat(Object.keys(b)))].filter(k => JSON.stringify(a[k]) !== JSON.stringify(b[k])); };
@@ -241,6 +241,9 @@
     if (ch.includes('mU')) (st.mU || []).slice((old.mU || []).length).forEach(m => { if (!m._new) return; queue(async () => {
       const ord = Math.max(0, ...M.goals.map(g => g.ordem || 0)) + 1, pz = KD.mStart(m._new.m);
       ck(await sb().from('goals').insert({ user_id: uid(), nome: m.n, icone: m.i, cor: m.c, alvo: m._new.v, guardado: m._new.g, prazo: KD.iso(pz), ordem: ord })); }); });
+    if (ch.includes('mEd')) changedKeys(old.mEd, st.mEd).forEach(id => { const e = st.mEd[id]; if (!e) return; queue(async () => {
+      ck(await sb().from('goals').update({ nome: e.n, icone: e.i, cor: e.c, alvo: e.v, guardado: e.g, prazo: KD.iso(KD.mStart(e.m)) }).eq('id', id)); }); });
+    if (ch.includes('mDel')) (st.mDel || []).filter(id => !(old.mDel || []).includes(id)).forEach(id => queue(async () => ck(await sb().from('goals').update({ arquivada_em: new Date().toISOString() }).eq('id', id))));
     if (dataDirty) { dataDirty = false; dataQ = dataQ.then(() => KD.refresh(comp)); }
   };
 
@@ -303,8 +306,8 @@
     await KD.load(KD.sb, KD.user); KD._ver = (KD._ver || 0) + 1;
     const C = KD._C; C.ROWS = KD.M.rows; C.EST = KD.M.est; C.DOM = KD.M.DOM; C.METAS = KD.metas(); C.NOTIFS = KD.notifs();
     const KC = {}; KD.M.accs.forEach(a => { KC[a.nome] = a.cor; }); KD.M.cards.forEach(c => { KC[c.n] = c.cor; if (c.nick) KC[c.nick] = c.cor; }); C.KC = KC;
-    const busy = comp.state.ce || comp.state.es || comp.state.nc || comp.state.mf || comp.state.edit;
-    const reset = { cats: {}, eov: {}, alt: Object.fromEntries(KD.M.est.map(e => [e.nome, e.alterna])), cOv: {}, cDel: [], nCards: [], mU: [] };
+    const busy = comp.state.ce || comp.state.es || comp.state.nc || comp.state.mf || comp.state.me || comp.state.edit;
+    const reset = { cats: {}, eov: {}, alt: Object.fromEntries(KD.M.est.map(e => [e.nome, e.alterna])), cOv: {}, cDel: [], nCards: [], mU: [], mEd: {}, mDel: [] };
     if (busy) { setTimeout(() => KD.refresh2(comp, reset), 900); return; }
     KD.refresh2(comp, reset);
   };
