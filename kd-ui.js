@@ -52,6 +52,7 @@
     const KC = {}; M.accs.forEach(a => { KC[a.nome] = a.cor; }); M.cards.forEach(c => { KC[c.n] = c.cor; if (c.nick) KC[c.nick] = c.cor; }); C.KC = KC;
     C.METAS = KD.metas();
     C.NOTIFS = KD.notifs();
+    KD.ux();
     C.EXP.lanc.nav = '';
     const did = C.prototype.componentDidMount, dup = C.prototype.componentDidUpdate;
     C.prototype.componentDidMount = function () {
@@ -188,9 +189,67 @@
     /* Extrato: busca */
     o.xfQ = st.xf.q || ''; o.xfSetQ = e => { const v = e.target.value; comp.setState(x => ({ xf: Object.assign({}, x.xf, { q: v }) })); };
     o.xfAny = o.xfAny || !!st.xf.q; o.xfClear = ((orig) => () => { orig(); comp.setState(x => ({ xf: Object.assign({}, x.xf, { q: '' }) })); })(o.xfClear);
+    /* listas longas: 50 por vez; as próximas entram em cascata quando o fim da lista é alcançado */
+    KD._more = KD._more || {}; KD._sig = KD._sig || {};
+    const lim = (k, sig) => { const l = (st.lim || {})[k]; KD._sig[k] = sig; return l && l.sig === sig ? l : { n: 50, prev: 0, sig }; };
+    const AN = (i, L) => (L.prev > 0 && i >= L.prev) ? 'animation:kRowIn .5s cubic-bezier(.2,.7,.2,1) both;animation-delay:' + Math.min(1100, (i - L.prev) * 32) + 'ms;' : '';
+    if (Array.isArray(o.days)) {
+      const L = lim('extrato', JSON.stringify([st.mes, st.xf])); let c = 0, tot = 0; o.days.forEach(d => { tot += (d.rows || []).length; });
+      o.days = o.days.map(d => { const rows = (d.rows || []).slice(0, Math.max(0, L.n - c)).map((r, i) => Object.assign({}, r, { an: AN(c + i, L) })); c += rows.length; return rows.length ? Object.assign({}, d, { rows }) : null; }).filter(Boolean);
+      KD._more.extrato = tot > L.n;
+    }
+    if (Array.isArray(o.estRowsF)) {
+      const L = lim('estab', JSON.stringify([st.ef, st.eq, st.mes])); KD._more.estab = o.estRowsF.length > L.n;
+      o.estRowsF = o.estRowsF.slice(0, L.n).map((r, i) => Object.assign({}, r, { an: AN(i, L) }));
+    }
     return o;
   };
+  KD.loadMore = function (k) {
+    const comp = KD.comp; if (!comp || !KD._more[k] || Date.now() - (KD._lm || 0) < 450) return; KD._lm = Date.now();
+    comp.setState(x => { const cur = (x.lim || {})[k], sig = KD._sig[k], n = cur && cur.sig === sig ? cur.n : 50; return { lim: Object.assign({}, x.lim, { [k]: { n: n + 50, prev: n, sig } }) }; });
+  };
 
+
+  /* ---------------- interações globais: arrastar com o mouse e rolar pelas laterais ---------------- */
+  KD.ux = function () {
+    if (KD._ux) return; KD._ux = true;
+    const sx = e => { const c = getComputedStyle(e); return (c.overflowX === 'auto' || c.overflowX === 'scroll') && e.scrollWidth > e.clientWidth + 2; };
+    const sy = e => { const c = getComputedStyle(e); return (c.overflowY === 'auto' || c.overflowY === 'scroll') && e.scrollHeight > e.clientHeight + 2; };
+    /* 1) clicar e arrastar pro lado em qualquer lista com scroll horizontal */
+    let d = null;
+    document.addEventListener('pointerdown', ev => {
+      if (ev.pointerType !== 'mouse' || ev.button !== 0) return;
+      if (ev.target.closest && ev.target.closest('input,textarea,select,[data-rg-hist],[data-nodrag]')) return;
+      let el = ev.target; while (el && el !== document.body && !sx(el)) el = el.parentElement;
+      if (!el || el === document.body) return;
+      d = { el, x: ev.clientX, sl: el.scrollLeft, on: false, snap: el.style.scrollSnapType, id: ev.pointerId };
+    }, true);
+    document.addEventListener('pointermove', ev => {
+      if (!d) return; const dx = ev.clientX - d.x;
+      if (!d.on) { if (Math.abs(dx) < 6) return; d.on = true; d.el.style.scrollSnapType = 'none'; d.el.style.cursor = 'grabbing'; d.el.style.userSelect = 'none'; try { d.el.setPointerCapture(d.id); } catch (e) {} }
+      d.el.scrollLeft = d.sl - dx; ev.preventDefault();
+    }, true);
+    const end = () => { if (!d) return; const q = d; d = null; if (!q.on) return;
+      q.el.style.cursor = ''; q.el.style.userSelect = ''; const cur = q.el.scrollLeft; q.el.style.scrollSnapType = q.snap;
+      /* devolve o snap suavemente à coluna mais próxima */
+      q.el.scrollTo({ left: cur, behavior: 'auto' }); KD._dragged = Date.now(); };
+    document.addEventListener('pointerup', end, true); document.addEventListener('pointercancel', end, true);
+    document.addEventListener('click', ev => { if (KD._dragged && Date.now() - KD._dragged < 250) { ev.stopPropagation(); ev.preventDefault(); KD._dragged = 0; } }, true);
+    const st = document.createElement('style'); st.textContent = '.kscroll[data-dragx]{cursor:grab}'; document.head.appendChild(st);
+    document.addEventListener('scroll', ev => { const el = ev.target; if (!el || !el.getAttribute) return; const pg = el.getAttribute('data-page-scroll'); if (!pg || !KD._more || !KD._more[pg]) return; if (el.scrollTop + el.clientHeight >= el.scrollHeight - 200) KD.loadMore(pg); }, true);
+    const mark = () => document.querySelectorAll('.kscroll').forEach(e => { if (sx(e)) e.setAttribute('data-dragx', '1'); else e.removeAttribute('data-dragx'); });
+    new MutationObserver(() => { clearTimeout(KD._mk); KD._mk = setTimeout(mark, 200); }).observe(document.body, { childList: true, subtree: true }); setTimeout(mark, 1500);
+    /* 2) roda do mouse nas laterais (fora do conteúdo) rola a página */
+    window.addEventListener('wheel', ev => {
+      if (ev.defaultPrevented || ev.ctrlKey || !ev.deltaY) return;
+      const t = ev.target; if (!t || !t.closest) return;
+      if (t.closest('[data-px-scroll],[data-page-scroll]')) return;
+      for (let e = t; e && e !== document.body; e = e.parentElement) if (sy(e)) return;
+      const sc = document.querySelector('[data-px-scroll]') || [...document.querySelectorAll('[data-page-scroll]')].find(e => e.offsetParent);
+      if (!sc) return;
+      sc.scrollTop += ev.deltaY * (ev.deltaMode === 1 ? 16 : 1); ev.preventDefault();
+    }, { passive: false });
+  };
   /* ---------------- gravação ---------------- */
   const TRACK = ['cats', 'alt', 'eov', 'tet', 'cor', 'ico', 'custom', 'cOv', 'cDel', 'nCards', 'mU', 'mEd', 'mDel', 'nRead', 'alerts', 'atyp', 'ms', 'fc', 'anim', 'sv', 'lay', 'dord', 'nm', 'wd', 'exl', 'pwMail', 'sess24'];
   const PREF = { nRead: 'nRead', alerts: 'alerts', atyp: 'atyp', ms: 'ms', fc: 'fc', anim: 'anim', sv: 'sv', lay: 'lay', dord: 'dord', nm: 'nm', wd: 'wd', exl: 'exl', pwMail: 'pwMail', sess24: 'sess24' };

@@ -253,7 +253,7 @@ input:focus{border-color:var(--bone);background:rgba(0,0,0,.55)}
   /* ================= 5. LOGIN (09c) ================= */
   function login(sb, note) {
     mount(CSS_LOGIN, GOO + '<div class="bg" aria-hidden="true"></div><main class="stage"><section class="panel" aria-labelledby="t"><div class="L"><div class="img" aria-hidden="true"></div><div class="shade" aria-hidden="true"></div><span class="wm">' + LOGO(30) + '</span><div class="tt"><p class="sub">' + esc(note || 'Seus dados ficam salvos e só você vê.') + '</p></div></div>'
-      + '<div class="R"><h1 id="t">Entrar.</h1><form class="form" id="f" autocomplete="on" novalidate><div class="fld"><input id="u" type="text" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" name="email" placeholder="E-mail ou usuário" autocomplete="username" aria-label="E-mail ou usuário"></div><div class="fld"><input id="p" type="password" name="password" placeholder="Senha" autocomplete="current-password" aria-label="Senha"></div><div class="err" id="x" role="alert" aria-live="polite"></div><div class="acts">' + LQ('go', 'Fazer Login') + '<span class="lk" id="r" role="button" tabindex="0">Esqueci a senha</span></div></form>'
+      + '<div class="R"><h1 id="t">Entrar.</h1><form class="form" id="f" autocomplete="on" novalidate><div class="fld"><input id="u" type="text" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" name="email" placeholder="E-mail ou usuário" autocomplete="username" aria-label="E-mail ou usuário"></div><div class="fld"><input id="p" type="password" name="password" placeholder="Senha" autocomplete="current-password" aria-label="Senha"></div><div class="err" id="x" role="alert" aria-live="polite"></div><div class="acts">' + LQ('go', 'Fazer Login') + '<span class="lk" id="r" role="button" tabindex="0">Esqueci a senha</span></div></form><div class="foot" style="margin-top:-6px"><span>Ainda não tem conta? <span class="lk" id="cc" role="button" tabindex="0">Criar conta</span></span></div>'
       + '<div class="foot"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9A9AA3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span>Esqueceu a senha? Escreva seu e-mail e toque em “Esqueci a senha”: mandamos um link pra criar outra.</span></div></div></section></main>');
     liq(); parallax();
     const x = $('#x'), u = $('#u'), p = $('#p'), go = $('#go'), say = (t, ok) => { x.style.color = ok ? '#00E08A' : '#FF6A5C'; x.textContent = t; };
@@ -265,7 +265,27 @@ input:focus{border-color:var(--bone);background:rgba(0,0,0,.55)}
       LS.del(EXP); start(sb, r.data.user); });
     const forgot = async () => { const em = u.value.trim(); if (!em) return say('Escreva seu e-mail primeiro.');
       const r = await sb.auth.resetPasswordForEmail(toEmail(em), { redirectTo: location.origin + location.pathname }); say(r.error ? r.error.message : 'Mandamos um link pro seu e-mail. Vale por 30 min.', !r.error); };
+    $('#cc').onclick = () => signup(sb); $('#cc').onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); signup(sb); } };
     $('#r').onclick = forgot; $('#r').onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); forgot(); } };
+  }
+
+  /* ================= 5b. CRIAR CONTA ================= */
+  function signup(sb) {
+    mount(CSS_NOVA, GOO + '<div class="bg" aria-hidden="true"></div><main class="stage"><section class="panel" aria-labelledby="t"><div class="L"><div class="img" aria-hidden="true"></div><div class="shade" aria-hidden="true"></div><div class="tt"><h1 id="t">Criar<br>conta.</h1><p class="sub">Leva um minuto. Depois a gente monta o seu Kontar juntos.</p></div></div>'
+      + '<div class="R"><form class="form" id="f" autocomplete="on" novalidate><div class="grp"><div class="fld"><input id="e" type="text" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" name="email" placeholder="E-mail" autocomplete="email" aria-label="E-mail"></div><div class="fld"><input id="p1" type="password" name="new-password" placeholder="Senha" autocomplete="new-password" aria-label="Senha"></div><div class="fld"><input id="p2" type="password" name="confirm-password" placeholder="Confirmar senha" autocomplete="new-password" aria-label="Confirmar senha"></div><div class="meter" aria-live="polite"><span id="mh">Mínimo 8 caracteres</span><span class="bar"><span id="mb"></span></span><b id="ml">Força</b></div><div class="err" id="x" role="alert" aria-live="polite"></div></div><div class="acts">' + LQ('go', 'Criar conta').replace('type="submit"', 'type="submit" disabled') + '<span class="lk" id="vo" role="button" tabindex="0">Já tenho conta</span></div></form></div></section></main>');
+    liq(); parallax();
+    const e = $('#e'), p1 = $('#p1'), p2 = $('#p2'), go = $('#go'), mb = $('#mb'), ml = $('#ml'), mh = $('#mh'), x = $('#x');
+    const ok = () => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.value.trim());
+    const upd = () => { const c = KD.pwCheck(p1.value, p2.value); mb.style.width = c.pct; mb.style.background = c.col; ml.style.color = c.lv ? c.col : '#7C7C85'; ml.textContent = c.lbl || 'Força'; mh.textContent = c.hint; mh.style.color = c.hintC; go.disabled = !(c.ok && ok()); };
+    [e, p1, p2].forEach(i => i.addEventListener('input', upd));
+    const back = () => login(sb); $('#vo').onclick = back; $('#vo').onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); back(); } };
+    $('#f').addEventListener('submit', async ev => { ev.preventDefault(); if (go.disabled || go.classList.contains('busy')) return; x.textContent = '';
+      busyBtn(go, true, 'Criando…', 'Criar conta'); e.disabled = p1.disabled = p2.disabled = true;
+      let r; try { r = await sb.auth.signUp({ email: e.value.trim().toLowerCase(), password: p1.value, options: { emailRedirectTo: location.origin + location.pathname } }); } catch (er) { r = { error: er }; }
+      if (r.error) { busyBtn(go, false, '', 'Criar conta'); e.disabled = p1.disabled = p2.disabled = false; x.style.color = '#FF6A5C';
+        x.textContent = /already|registered/i.test(r.error.message) ? 'Esse e-mail já tem conta. Volte e entre.' : /not allowed|disabled/i.test(r.error.message) ? 'A criação de contas está fechada por enquanto.' : r.error.message; return; }
+      if (r.data && r.data.session) { LS.del(EXP); start(sb, r.data.session.user); return; }
+      x.style.color = '#00E08A'; x.textContent = 'Quase lá: mandamos um link de confirmação pro seu e-mail. Abra e volte pra entrar.'; busyBtn(go, false, '', 'Criar conta'); go.disabled = true; });
   }
 
   /* ================= 6. NOVA SENHA (09d) ================= */
@@ -544,7 +564,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
       let recovering = /type=recovery/.test(location.hash);
       sb.auth.onAuthStateChange((ev) => { if (ev === 'PASSWORD_RECOVERY') { recovering = true; newPassword(sb); } });
       const { data } = await sb.auth.getSession();
-      if (tela === 'login') return login(sb); if (tela === 'nova') return newPassword(sb);
+      if (tela === 'login') return login(sb); if (tela === 'criar') return signup(sb); if (tela === 'nova') return newPassword(sb);
       if (tela === 'sessao') return expired(sb, { email: 'lia@kontar.app', nome: 'Lia Santos' });
       if (recovering) return newPassword(sb);
       if (data && data.session) return start(sb, data.session.user);
