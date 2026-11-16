@@ -238,17 +238,32 @@
     const st = document.createElement('style'); st.textContent = '.kscroll[data-dragx]{cursor:grab}'; document.head.appendChild(st);
     document.addEventListener('scroll', ev => { const el = ev.target; if (!el || !el.getAttribute) return; const pg = el.getAttribute('data-page-scroll'); if (!pg || !KD._more || !KD._more[pg]) return; if (el.scrollTop + el.clientHeight >= el.scrollHeight - 200) KD.loadMore(pg); }, true);
     const mark = () => document.querySelectorAll('.kscroll').forEach(e => { if (sx(e)) e.setAttribute('data-dragx', '1'); else e.removeAttribute('data-dragx'); });
-    new MutationObserver(() => { clearTimeout(KD._mk); KD._mk = setTimeout(mark, 200); cancelAnimationFrame(KD._lp); KD._lp = requestAnimationFrame(() => KD.lgPass()); }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] }); setTimeout(mark, 1500);
-    /* 2) roda do mouse nas laterais (fora do conteúdo) rola a página */
-    window.addEventListener('wheel', ev => {
-      if (ev.defaultPrevented || ev.ctrlKey || !ev.deltaY) return;
-      const t = ev.target; if (!t || !t.closest) return;
-      if (t.closest('[data-px-scroll],[data-page-scroll]')) return;
-      for (let e = t; e && e !== document.body; e = e.parentElement) if (sy(e)) return;
-      const sc = document.querySelector('[data-px-scroll]') || [...document.querySelectorAll('[data-page-scroll]')].find(e => e.offsetParent);
-      if (!sc) return;
-      sc.scrollTop += ev.deltaY * (ev.deltaMode === 1 ? 16 : 1); ev.preventDefault();
-    }, { passive: false });
+    new MutationObserver(() => { clearTimeout(KD._mk); KD._mk = setTimeout(mark, 200); cancelAnimationFrame(KD._lp); KD._lp = requestAnimationFrame(() => { KD.lgPass(); KD.wide(); }); }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] }); setTimeout(mark, 1500);
+    /* 2) laterais (fora do artboard) fazem parte do scroll: o scroller se estende até as bordas da janela, então a roda é nativa (mesma suavização do conteúdo) */
+    KD.wide = function () {
+      const ab = document.querySelector('[data-screen-label]'); if (!ab) return;
+      const r = ab.getBoundingClientRect(), k = (ab.offsetWidth ? r.width / ab.offsetWidth : 1) || 1, L = Math.max(0, Math.round(r.left)), R = Math.max(0, Math.round(window.innerWidth - r.right));
+      const out = L > 2 || R > 2; const sy2 = (el, v) => { if (el.style.overflow !== v) el.style.overflow = v; };
+      document.querySelectorAll('[data-px-scroll],[data-page-scroll]').forEach(sc => {
+        if (!sc.offsetParent) return;
+        const D = sc.dataset, cs = getComputedStyle(sc), l = out ? L / k : 0, rr = out ? R / k : 0;
+        let pl = parseFloat(cs.paddingLeft) || 0, pr = parseFloat(cs.paddingRight) || 0;
+        if (D.kwPL && Math.abs(parseFloat(sc.style.paddingLeft) - parseFloat(D.kwPL)) < 0.6) pl -= +D.kwL || 0; if (D.kwPR && Math.abs(parseFloat(sc.style.paddingRight) - parseFloat(D.kwPR)) < 0.6) pr -= +D.kwR || 0;
+        const nl = (pl + l) + 'px', nr = (pr + rr) + 'px', ml = (-l) + 'px', mr = (-rr) + 'px';
+        const df = (a, b) => Math.abs((parseFloat(a) || 0) - parseFloat(b)) > 0.6;
+        if (df(sc.style.marginLeft, ml)) sc.style.marginLeft = ml; if (df(sc.style.marginRight, mr)) sc.style.marginRight = mr;
+        if (df(sc.style.paddingLeft, nl)) sc.style.paddingLeft = nl; if (df(sc.style.paddingRight, nr)) sc.style.paddingRight = nr;
+        D.kwPL = nl; D.kwPR = nr; D.kwL = l; D.kwR = rr;
+        if (out) for (let e = sc.parentElement; e && e.getBoundingClientRect().width < window.innerWidth - 1; e = e.parentElement) sy2(e, 'visible clip');
+      });
+    };
+    window.addEventListener('resize', () => KD.wide()); setTimeout(() => KD.wide(), 600);
+    /* 3) clique na lateral (fora do conteúdo) fecha o painel/menu aberto mais acima */
+    document.addEventListener('click', ev => {
+      const ab = document.querySelector('[data-screen-label]'); if (!ab) return; const rc = ab.getBoundingClientRect(); if (ev.clientX >= rc.left && ev.clientX <= rc.right) return;
+      let best = null, bz = -1; document.querySelectorAll('[data-away]').forEach(o => { const c = getComputedStyle(o); if (c.display === 'none' || c.pointerEvents === 'none' || +c.opacity < 0.05) return; const z = parseInt(c.zIndex, 10) || 0; if (z >= bz) { bz = z; best = o; } });
+      if (best) best.click();
+    }, true);
   };
   /* ---------------- gravação ---------------- */
   const TRACK = ['cats', 'alt', 'eov', 'tet', 'cor', 'ico', 'custom', 'cOv', 'cDel', 'nCards', 'mU', 'mEd', 'mDel', 'nRead', 'alerts', 'atyp', 'ms', 'fc', 'anim', 'sv', 'lay', 'dord', 'nm', 'wd', 'exl', 'pwMail', 'sess24'];
