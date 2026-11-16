@@ -155,7 +155,7 @@
     M.est = Object.values(est).map(e => {
       const mas = [...e.chaves].map(k => M.maByChave[k]).filter(Boolean), def = mas.find(m => m.category_id), byN = Object.entries(e.cats).sort((a, b) => b[1] - a[1]);
       const cat = def && M.catById[def.category_id] ? M.catById[def.category_id].nome : byN[0][0];
-      return { nome: e.nome, n: e.n, cat, mix: byN.length > 1 ? byN.slice(0, 2).map(x => x[0]).join(' / ') : '', alterna: mas.some(m => m.sempre_perguntar), chaves: [...e.chaves], dom: e.dom, logo: e.logo, assin: mas.some(m => m.assinatura) };
+      return { nome: e.nome, n: e.n, cat, mix: byN.length > 1 ? byN.slice(0, 2).map(x => x[0]).join(' / ') : '', alterna: mas.some(m => m.sempre_perguntar), chaves: [...e.chaves], orig: [...new Set(mas.map(m => (m.amostra || '').trim()).filter(Boolean))], dom: e.dom, logo: e.logo, assin: mas.some(m => m.assinatura) };
     }).sort((a, b) => b.n - a.n || a.nome.localeCompare(b.nome, 'pt-BR'));
     M.estByName = Object.fromEntries(M.est.map(e => [e.nome, e]));
     M.DOM = {}; M.LOGO = {}; M.est.forEach(e => { if (e.dom) M.DOM[e.nome] = e.dom; if (e.logo) M.LOGO[e.nome] = e.logo; });

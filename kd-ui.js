@@ -238,7 +238,7 @@
     const st = document.createElement('style'); st.textContent = '.kscroll[data-dragx]{cursor:grab}'; document.head.appendChild(st);
     document.addEventListener('scroll', ev => { const el = ev.target; if (!el || !el.getAttribute) return; const pg = el.getAttribute('data-page-scroll'); if (!pg || !KD._more || !KD._more[pg]) return; if (el.scrollTop + el.clientHeight >= el.scrollHeight - 200) KD.loadMore(pg); }, true);
     const mark = () => document.querySelectorAll('.kscroll').forEach(e => { if (sx(e)) e.setAttribute('data-dragx', '1'); else e.removeAttribute('data-dragx'); });
-    new MutationObserver(() => { clearTimeout(KD._mk); KD._mk = setTimeout(mark, 200); }).observe(document.body, { childList: true, subtree: true }); setTimeout(mark, 1500);
+    new MutationObserver(() => { clearTimeout(KD._mk); KD._mk = setTimeout(mark, 200); cancelAnimationFrame(KD._lp); KD._lp = requestAnimationFrame(() => KD.lgPass()); }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] }); setTimeout(mark, 1500);
     /* 2) roda do mouse nas laterais (fora do conteúdo) rola a página */
     window.addEventListener('wheel', ev => {
       if (ev.defaultPrevented || ev.ctrlKey || !ev.deltaY) return;
@@ -314,6 +314,30 @@
   KD.saveAvatar = async blob => { try { const path = uid() + '/avatar.jpg';
     ck(await sb().storage.from('avatars').upload(path, blob, { upsert: true, contentType: 'image/jpeg' }));
     ck(await sb().from('profiles').upsert({ user_id: uid(), avatar_url: path }, { onConflict: 'user_id' })); } catch (e) { console.error('[kontar] foto', e); } };
+
+  /* ---- logos: modos de encaixe (ajustar / preencher / estender cor) + URL de imagem ---- */
+  const hsh = u => { let h = 5381; for (let i = 0; i < u.length; i++) h = ((h << 5) + h + u.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
+  KD.lg = { info: {}, tmpU: null, tmpM: null,
+    fit(u) { if (!u) return 'cor'; if (KD.lg.tmpU === u && KD.lg.tmpM) return KD.lg.tmpM; return ((KD.M && KD.M.prefs && KD.M.prefs.lgFit) || {})[hsh(u)] || 'cor'; },
+    tmp(u, m) { KD.lg.tmpU = u; KD.lg.tmpM = m; KD.lgPass(); },
+    clear() { KD.lg.tmpU = KD.lg.tmpM = null; KD.lgPass(); },
+    set(u, m) { if (!u || !m) return; const P = Object.assign({}, KD.M.prefs); P.lgFit = Object.assign({}, P.lgFit); if (m === 'cor') delete P.lgFit[hsh(u)]; else P.lgFit[hsh(u)] = m; KD.M.prefs = P;
+      sb().from('user_prefs').upsert({ user_id: uid(), prefs: P, updated_at: new Date().toISOString() }, { onConflict: 'user_id' }).then(r => r && r.error && console.error('[kontar] logo', r.error)); KD.lg.clear(); },
+    probe(u) { if (u in KD.lg.info) return KD.lg.info[u]; KD.lg.info[u] = null; const im = new Image(); im.crossOrigin = 'anonymous';
+      im.onload = () => { try { const n = 24, cv = document.createElement('canvas'); cv.width = cv.height = n; const g = cv.getContext('2d', { willReadFrequently: true }); g.drawImage(im, 0, 0, n, n); const d = g.getImageData(0, 0, n, n).data; let r = 0, gg = 0, b = 0, a = 0, c = 0;
+          for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { if (y > 1 && y < n - 2 && x > 1 && x < n - 2) continue; const i = (y * n + x) * 4; r += d[i]; gg += d[i + 1]; b += d[i + 2]; a += d[i + 3]; c++; }
+          a /= c; const col = a < 128 ? '#ffffff' : 'rgb(' + Math.round(r / c) + ',' + Math.round(gg / c) + ',' + Math.round(b / c) + ')'; const lum = a < 128 ? 1 : (0.2126 * r + 0.7152 * gg + 0.0722 * b) / c / 255;
+          KD.lg.info[u] = { ok: true, col: col, dark: lum < 0.16 }; } catch (e) { KD.lg.info[u] = { ok: false }; } KD.lgPass(); };
+      im.onerror = () => { KD.lg.info[u] = { ok: false }; KD.lgPass(); }; im.src = u; return null; } };
+  KD.lgPass = function () {
+    document.querySelectorAll('[data-lg]').forEach(el => { const m = /url\(["']?(.*?)["']?\)/.exec(el.style.backgroundImage || ''); if (!m) return; const u = m[1].replace(/&amp;/g, '&');
+      if (!el.dataset.lgS) el.dataset.lgS = el.style.backgroundSize || '';
+      const mode = KD.lg.fit(u), inf = mode === 'cor' ? KD.lg.probe(u) : null, base = el.dataset.lgS;
+      let size = base, bg = '#fff', sh = 'none';
+      if (mode === 'preencher') size = '136%';
+      else if (mode === 'cor') { if (inf && inf.ok) { size = '100%'; bg = inf.col; sh = inf.dark ? 'inset 0 0 0 1px rgba(255,255,255,.22)' : 'none'; } else if (inf) size = '136%'; }
+      if (el.style.backgroundSize !== size) el.style.backgroundSize = size; if (el.style.backgroundColor !== bg) el.style.backgroundColor = bg; if (el.style.boxShadow !== sh) el.style.boxShadow = sh; }); };
+  KD.imgFromUrl = u => new Promise(res => { fetch(u, { mode: 'cors' }).then(r => r.ok ? r.blob() : Promise.reject()).then(b => /^image\//.test(b.type) ? res(URL.createObjectURL(b)) : res(null)).catch(() => { const im = new Image(); im.onload = () => res(u); im.onerror = () => res(null); im.src = u; }); });
   KD.smallImage = src => new Promise(res => { if (/^data:/.test(src) || /^https?:/.test(src)) return res(src); const im = new Image(); im.onload = () => { const s = 128, cv = document.createElement('canvas'); cv.width = cv.height = s; const g = cv.getContext('2d'), k = Math.min(s / im.width, s / im.height); g.drawImage(im, (s - im.width * k) / 2, (s - im.height * k) / 2, im.width * k, im.height * k); res(cv.toDataURL('image/png')); }; im.onerror = () => res(null); im.src = src; });
   /* força da senha + dicas curtas: UMA função, usada na Conta e na tela Nova senha (boot.js) */
   KD.pwCheck = (pw, c) => {
