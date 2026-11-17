@@ -653,14 +653,38 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   }
 
   /* ---------------- ações ---------------- */
-  function parseTexto(t) {
-    const out = [], re = /([^\n(]+?)\s*\(C[óo]digo:\s*[\w-]+\)\s*Qtde\.?:?\s*([\d.,]+)\s*UN:?\s*(\w+)\s*Vl\.?\s*Unit\.?:?\s*([\d.,]+)\s*Vl\.?\s*Total\s*([\d.,]+)/gi; let m;
-    while ((m = re.exec(t.replace(/\s+/g, ' ')))) out.push({ nome: m[1].trim().replace(/^[\d\s-]+(?=[A-Za-zÀ-ú])/, '').trim() || m[1].trim(), qtd: num(m[2]) || 1, un: m[3], valor: num(m[5]), catId: null });
+  // Lê o texto colado da página da nota (Ctrl+A / Ctrl+C), mesmo com muito lixo em volta e campos em qualquer ordem.
+  function parseTexto(raw) {
+    const t = (raw || '').replace(/ /g, ' ').replace(/\s+/g, ' ').trim(), out = [];
+    const N = '(?:R\\$\\s*)?(\\d[\\d.]*,\\d{1,4}|\\d+(?:\\.\\d+)?)';
+    const marks = []; const rc = /\(\s*C[óo]digo:?\s*([\w.\-]+)\s*\)/gi; let m;
+    while ((m = rc.exec(t))) marks.push({ i: m.index, e: rc.lastIndex });
+    const grab = (seg, re) => { const x = re.exec(seg); return x ? { v: x[1], e: x.index + x[0].length } : null; };
+    let prevEnd = 0;
+    marks.forEach((mk, k) => {
+      let seg = t.slice(mk.e, k + 1 < marks.length ? marks[k + 1].i : t.length);
+      const fim = seg.search(/Valor\s+total|Valor\s+a\s+pagar|Qtd\.?\s+total|Informa[çc][õo]es\s+gerais|Forma\s+de\s+pagamento/i); if (fim >= 0) seg = seg.slice(0, fim);
+      const q = grab(seg, /Qtde\.?\s*(?:total)?:?\s*(\d[\d.,]*)/i), u = grab(seg, /\bUN:?\s*([A-Za-z]{1,4})\b/i), vu = grab(seg, new RegExp('Vl\\.?\\s*Unit(?:\\.|ário)?:?\\s*' + N, 'i')), vt = grab(seg, new RegExp('Vl\\.?\\s*Total:?\\s*' + N, 'i'));
+      let name = t.slice(prevEnd, mk.i);
+      if (k === 0) { const ad = [...name.matchAll(/,\s*[A-Z]{2}\s+/g)].pop(); if (ad && /CNPJ/i.test(name)) name = name.slice(ad.index + ad[0].length); }
+      if (k === 0) name = name.split(/Documento Auxiliar[^]*?Eletr[ôo]nica|Vl\.?\s*Total\s*(?:\(R\$\))?|\bItens?\b|\bProdutos?\b/i).pop();
+      name = name.trim().replace(/^[\d\s.\-:]+(?=[A-Za-zÀ-ú])/, '').trim();
+      const ends = [q, u, vu, vt].filter(Boolean).map(x => x.e); prevEnd = mk.e + (ends.length ? Math.max(...ends) : 0);
+      const qtd = q ? num(q.v) || 1 : 1, unit = vu ? num(vu.v) : 0, tot = vt ? num(vt.v) : Math.round(qtd * unit * 100) / 100;
+      if (name && tot > 0) out.push({ nome: name.slice(0, 90), qtd, un: u ? u.v.toUpperCase() : '', valor: tot, catId: null });
+    });
+    if (!out.length) {   // plano B: linhas do tipo "NOME 1 UN x 4,65 4,65"
+      const rb = /([A-Za-zÀ-ú][^\d]{2,80}?)\s+(\d[\d.,]*)\s*(UN|KG|L|PC|PCT|CX|G|ML)\s*[xX]\s*(\d[\d.]*,\d{2})\s+(\d[\d.]*,\d{2})/gi;
+      while ((m = rb.exec(t))) out.push({ nome: m[1].trim(), qtd: num(m[2]) || 1, un: m[3].toUpperCase(), valor: num(m[5]), catId: null });
+    }
+    parseTexto.meta = { cnpj: (t.match(/CNPJ:?\s*(\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2})/i) || [])[1] || null, chave_acesso: ((t.match(/(?:\d{4}\s){10}\d{4}/) || [])[0] || '').replace(/\s/g, '') || null, emitida_em: (() => { const e = t.match(/Emiss[ãa]o:?\s*(\d{2})\/(\d{2})\/(\d{4})/i); return e ? e[3] + '-' + e[2] + '-' + e[1] : null; })(), emitente: ((t.match(/([A-ZÀ-Ú0-9][A-ZÀ-Ú0-9&.\- ]{4,120}?)\s+CNPJ:?\s*\d{2}\./) || [])[1] || '').replace(/^.*ELETR[ÔO]NICA\s+/i, '').trim() || null };
     return out;
   }
   function aceitarItens(its, url) {
     if (!its.length) { S.msg = 'Não achei itens nesse texto. Confira se copiou a página inteira.'; render(); return; }
-    S.itens = its; S.nota = Object.assign({}, S.nota || {}, { url: url || (S.nota && S.nota.url) || null, total: its.reduce((a, i) => a + i.valor, 0) }); S.notaDirty = true; S.partes = []; S.partesDirty = true; S.msg = ''; S.mode = 'dividir'; render();
+    S.itens = its; S.nota = Object.assign({}, S.nota || {}, { url: url || (S.nota && S.nota.url) || null, total: its.reduce((a, i) => a + i.valor, 0) }); S.notaDirty = true; S.partes = []; S.partesDirty = true; S.msg = ''; S.mode = 'dividir';
+    if (S.isNew) { const n = S.nota || {}; if (!(S.totalV > 0)) S.totalV = Math.round(its.reduce((a, i) => a + i.valor, 0) * 100) / 100; if (!(S.nome || '').trim() && n.emitente) S.nome = n.emitente.toLowerCase().replace(/(^|[\s.])([a-zà-ú])/g, (m0, a, b) => a + b.toUpperCase()); if (n.emitida_em && /^\d{4}-\d{2}-\d{2}$/.test(n.emitida_em)) S.iso = n.emitida_em; }
+    render();
   }
   async function lerLink() {
     const url = (S.link || '').trim(); if (!/^https?:\/\//i.test(url)) { S.msg = 'Cole o endereço completo do link da nota.'; render(); return; }
@@ -786,7 +810,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       else if (a === 'save') salvar();
       else if (a === 'confirm') { if (somaPartes() <= total() + 0.005) { S.partesDirty = true; salvar(true); } }
       else if (a === 'lerlink') lerLink();
-      else if (a === 'lertexto') aceitarItens(parseTexto(S.texto || ''), S.link);
+      else if (a === 'lertexto') { const its = parseTexto(S.texto || ''); if (its.length) S.nota = Object.assign({}, S.nota || {}, parseTexto.meta); aceitarItens(its, S.link); }
       else if (a === 'padd') { const used = new Set(S.partes.map(p => p.catId)), n = cats().find(c => !used.has(catId(c))) || 'Outros'; S.partes.push({ catId: catId(n), valor: Math.max(0, Math.round((total() - somaPartes()) * 100) / 100) || 0.01, rotulo: '', itens: [] }); S.sel = S.partes.length - 1; S.partesDirty = true; render(); }
       else if (a === 'pdel') { ev.stopPropagation(); S.partes.splice(+v, 1); S.sel = 0; S.partesDirty = true; render(); }
       else if (a === 'pcat') { ev.stopPropagation(); S.pop = S.pop === 'pcat' ? null : 'pcat'; render(); }
