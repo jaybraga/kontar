@@ -420,7 +420,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const c = sb(); let id = d.id, r = id ? KD.M.rowById[id] : null;
     if (d.isNew) {
       const nm = (d.nome || '').trim();
-      const ins = { user_id: uid(), estabelecimento: nm, chave: nm.toUpperCase().replace(/\s+/g, ''), valor_total: Math.round(d.totalV * 100) / 100, direcao: d.dir, meio: d.cardId ? 'cartao' : d.meio, data_compra: d.iso, card_id: d.cardId || null, account_id: d.cardId ? null : (d.accId || null), category_id: d.catId || null, observacao: d.obs || null, parcelas_total: d.cardId ? Math.max(1, d.parc || 1) : 1, origem: 'manual', status: d.catId ? 'confirmado' : 'pendente_revisao', categoria_origem: d.catId ? 'usuario' : null };
+      // chave é coluna gerada pelo banco a partir de estabelecimento; nunca enviar aqui.
+      const ins = { user_id: uid(), estabelecimento: nm, valor_total: Math.round(d.totalV * 100) / 100, direcao: d.dir, meio: d.cardId ? 'cartao' : d.meio, data_compra: d.iso, card_id: d.cardId || null, account_id: d.cardId ? null : (d.accId || null), category_id: d.catId || null, observacao: d.obs || null, parcelas_total: d.cardId ? Math.max(1, d.parc || 1) : 1, origem: 'manual', status: d.catId ? 'confirmado' : 'pendente_revisao', categoria_origem: d.catId ? 'usuario' : null };
       const q = ck(await c.from('transactions').insert(ins).select('id').single());
       id = Array.isArray(q.data) ? q.data[0].id : q.data.id; r = { items: [], e: nm, obs: '', iso: d.iso };
     } else {
@@ -679,6 +680,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   function render(first) {
     if (!S || !host) return;
     const keep = {}; host.querySelectorAll('[data-in]').forEach(i => { if (document.activeElement === i) keep.k = i.getAttribute('data-in') + (i.getAttribute('data-k') || ''); });
+    // mantém a posição das listas roláveis: render() troca o painel inteiro, o que por padrão zera o scroll
+    const scrollKeep = [...host.querySelectorAll('.kscroll')].map(e => e.scrollTop);
     const hw = host.clientWidth || 1358, W = S.inline ? Math.max(1000, Math.min(1358, Math.round(hw / 0.9))) : 1358, k = S.inline ? Math.min(1, hw / W) : Math.min(1, (hw - 32) / 1358), TOPI = 14;
     if (S.inline) host.style.height = (Math.round(480 * k) + TOPI + 26) + 'px';
     const bodyHtml = S.mode === 'dados' ? viewDados() : S.mode === 'ler' ? viewLer() : viewDividir();
@@ -702,6 +705,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const ta = pn.querySelector('[data-in="obs"]'); if (ta) ta.value = S.obs;
     const tt = pn.querySelector('[data-in="texto"]'); if (tt) tt.value = S.texto;
     if (keep.k) { const el = [...pn.querySelectorAll('[data-in]')].find(i => i.getAttribute('data-in') + (i.getAttribute('data-k') || '') === keep.k); if (el) { el.focus(); try { const l = el.value.length; el.setSelectionRange(l, l); } catch (e) { } } }
+    pn.querySelectorAll('.kscroll').forEach((e, i) => { if (scrollKeep[i] != null) e.scrollTop = scrollKeep[i]; });
     fitTitle(host.querySelector('[data-pw]'));
     wire(host.querySelector('[data-pw]'));
     const xi = host.querySelector('[data-xi]'); if (xi && first) { xi.style.transform = 'rotate(-180deg)'; requestAnimationFrame(() => requestAnimationFrame(() => { xi.style.transform = 'rotate(0deg)'; })); }
