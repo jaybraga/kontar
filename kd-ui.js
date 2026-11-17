@@ -481,6 +481,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const somaPartes = () => S.partes.reduce((a, p) => a + p.valor, 0);
   const catAtual = () => S.catId ? catName(S.catId) : (S.isNew ? 'Sem categoria' : 'Outros');
 
+  const dirtyKey = () => JSON.stringify([S.nome, S.obs, S.iso, S.cardId, S.accId, S.catId, S.totalV, S.dir, S.meio, S.parc || 1, S.itens, S.partes, S.nota && S.nota.url]);
+  const isDirty = () => !!S && S.base !== undefined && dirtyKey() !== S.base;
   function init(row) {
     const S = { row, mode: 'dados', nome: row.e, obs: row.obs || '', iso: row.iso, cardId: row.cardId, accId: row.accId, catId: row.catId || catId(row.c), pop: null,
       link: row.nota && row.nota.url || '', texto: '', nota: row.nota ? { url: row.nota.url, chave_acesso: row.nota.chave_acesso, emitente: row.nota.emitente, cnpj: row.nota.cnpj, emitida_em: row.nota.emitida_em, total: row.nota.total } : null,
@@ -492,23 +494,24 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
 
   TX.open = function (c, row, o) {
     comp = c; TX.close(true);
-    S = init(row); S.inline = !!(o && o.inline);
+    S = init(row); S.inline = !!(o && o.inline); S.base = dirtyKey();
     const ab = document.querySelector(S.inline ? '[data-tx-in="' + row.id + '"]' : '[data-tx-host]'); if (!ab) { S = null; return; }
-    host = ab; if (S.inline) { const bx = host.parentElement.querySelector('[data-xbox]'); if (bx) bx.style.display = 'none'; } else host.style.pointerEvents = 'auto'; render(true);
+    host = ab; if (S.inline) { const bx = host.parentElement.querySelector('[data-xbox]'); if (bx) bx.style.display = 'none'; const rw = host.closest('[data-x-e]'); if (rw && rw.firstElementChild) rw.firstElementChild.style.display = 'none'; } else host.style.pointerEvents = 'auto'; render(true);
   };
   TX.openNew = function (c) {
     comp = c; TX.close(true);
     const t = KD.today, iso = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
     const row = { id: null, e: '', obs: '', iso, cardId: null, accId: null, catId: null, c: 'Outros', total: 0, inn: 0, items: [], parts: [], nota: null, origem: 'manual' };
-    S = init(row); S.isNew = true; S.totalV = 0; S.dir = 'entrada'; S.meio = 'pix'; S.catId = null; S.nome = '';
+    S = init(row); S.isNew = true; S.totalV = 0; S.dir = 'entrada'; S.meio = 'pix'; S.catId = null; S.nome = ''; S.base = dirtyKey();
     const ab = document.querySelector('[data-tx-host]'); if (!ab) return;
     host = ab; host.style.pointerEvents = 'auto'; render(true);
   };
+  TX.requestClose = function () { if (!S) return; if (isDirty()) { S.askClose = true; S.askBack = false; render(); return; } TX.close(); };
   TX.close = function (quick) {
     if (!host) { S = null; return; }
     const inl = S && S.inline, h = host;
     const pn = h.querySelector('[data-pw]'), bd = h.querySelector('[data-bd]'), xi = h.querySelector('[data-xi]');
-    const done = () => { h.innerHTML = ''; if (inl) { h.style.height = ''; const bx = h.parentElement && h.parentElement.querySelector('[data-xbox]'); if (bx) bx.style.display = ''; } else h.style.pointerEvents = 'none'; };
+    const done = () => { h.innerHTML = ''; if (inl) { h.style.height = ''; const bx = h.parentElement && h.parentElement.querySelector('[data-xbox]'); if (bx) bx.style.display = ''; const rw = h.closest && h.closest('[data-x-e]'); if (rw && rw.firstElementChild) rw.firstElementChild.style.display = ''; } else h.style.pointerEvents = 'none'; };
     S = null;
     if (quick || !pn) { done(); return; }
     if (xi) { xi.style.transition = 'transform .3s cubic-bezier(.65,0,.2,1)'; xi.style.transform = 'rotate(180deg)'; }
@@ -624,12 +627,12 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   function render(first) {
     if (!S || !host) return;
     const keep = {}; host.querySelectorAll('[data-in]').forEach(i => { if (document.activeElement === i) keep.k = i.getAttribute('data-in') + (i.getAttribute('data-k') || ''); });
-    const hw = host.clientWidth || 1358, k = S.inline ? Math.min(1, hw / 1358) : Math.min(1, (hw - 32) / 1358);
-    if (S.inline) host.style.height = Math.round(480 * k) + 'px';
+    const hw = host.clientWidth || 1358, k = Math.min(1, (hw - 32) / 1358);
+    if (S.inline) host.style.height = (Math.round(480 * k) + 46) + 'px';
     const bodyHtml = S.mode === 'dados' ? viewDados() : S.mode === 'ler' ? viewLer() : viewDividir();
     const x = '<span data-a="close" style="position:absolute;right:0;top:0;width:44px;height:44px;border-radius:50%;background:#F2F0EB;color:#0A0A0A;display:flex;align-items:center;justify-content:center;z-index:3;cursor:pointer;"><span data-xi style="display:flex;transition:transform .5s cubic-bezier(.65,0,.2,1)">' + svg('x', 18, 2.4) + '</span></span>';
     const prevPn = host.querySelector('[data-pn]');
-    const modal = S.askBack ? '<div style="position:absolute;inset:0;z-index:9;background:rgba(0,0,0,.6);border-radius:30px;display:flex;align-items:center;justify-content:center;animation:txfade .2s ease"><div style="width:460px;background:#151518;border:1px solid #3A3A40;border-radius:28px;padding:28px;display:flex;flex-direction:column;gap:12px"><div style="font-size:22px;font-weight:700;letter-spacing:-.02em">Sair sem confirmar?</div><div style="font-size:14px;color:#9A9AA3;line-height:1.5">As alterações dessa divisão não foram salvas e vão se perder. Elas só valem quando você clica em Confirmar divisão.</div><div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px"><span data-a="keep" style="height:44px;display:flex;align-items:center;padding:0 22px;border-radius:9999px;border:2px solid #2A2A2F;font-weight:900;letter-spacing:.06em;font-size:12.5px;text-transform:uppercase;cursor:pointer">Continuar editando</span><span data-a="discard" style="height:44px;display:flex;align-items:center;padding:0 22px;border-radius:9999px;background:#FF6B5A;color:#0A0A0A;font-weight:900;letter-spacing:.06em;font-size:12.5px;text-transform:uppercase;cursor:pointer">Descartar</span></div></div></div>' : '';
+    const modal = (S.askBack || S.askClose) ? '<div style="position:absolute;inset:0;z-index:9;background:rgba(0,0,0,.6);border-radius:30px;display:flex;align-items:center;justify-content:center;animation:txfade .2s ease"><div style="width:460px;background:#151518;border:1px solid #3A3A40;border-radius:28px;padding:28px;display:flex;flex-direction:column;gap:12px"><div style="font-size:22px;font-weight:700;letter-spacing:-.02em">' + (S.askClose ? 'Fechar sem salvar?' : 'Sair sem confirmar?') + '</div><div style="font-size:14px;color:#9A9AA3;line-height:1.5">' + (S.askClose ? (S.isNew ? 'Essa transação ainda não foi salva e o que você preencheu vai se perder.' : 'As alterações dessa transação não foram salvas e vão se perder.') : 'As alterações dessa divisão não foram salvas e vão se perder. Elas só valem quando você clica em Confirmar divisão.') + '</div><div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px"><span data-a="keep" style="height:44px;display:flex;align-items:center;padding:0 22px;border-radius:9999px;border:2px solid #2A2A2F;font-weight:900;letter-spacing:.06em;font-size:12.5px;text-transform:uppercase;cursor:pointer">Continuar editando</span><span data-a="discard" style="height:44px;display:flex;align-items:center;padding:0 22px;border-radius:9999px;background:#FF6B5A;color:#0A0A0A;font-weight:900;letter-spacing:.06em;font-size:12.5px;text-transform:uppercase;cursor:pointer">Descartar</span></div></div></div>' : '';
     const Wn = 120, r = 32, fr = 10, cy = 22, cx = Wn - 22, dd = Math.sqrt((r + fr) ** 2 - (cy - fr) ** 2), xf = cx - dd, yf = cy + dd, P1 = [cx + (xf - cx) * r / (r + fr), cy + (fr - cy) * r / (r + fr)], P2 = [cx + (Wn - fr - cx) * r / (r + fr), cy + (yf - cy) * r / (r + fr)];
     const bdp = 'M' + xf + ',0.5A' + fr + ',' + fr + ' 0 0 1 ' + P1[0] + ',' + P1[1] + 'A' + r + ',' + r + ' 0 0 0 ' + P2[0] + ',' + P2[1] + 'A' + fr + ',' + fr + ' 0 0 1 ' + (Wn - .5) + ',' + yf;
     const goo = '<div style="position:absolute;right:0;top:0;width:119px;height:119px;overflow:hidden;border-radius:0 30px 0 0;z-index:2;pointer-events:none"><svg width="120" height="120" style="position:absolute;right:-1px;top:-1px;overflow:visible"><path d="' + bdp + '" fill="none" stroke="#2A2A2F" stroke-width="1"/></svg></div>';
@@ -638,9 +641,9 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const maskSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="1358" height="480"><path fill-rule="evenodd" d="M0,0H1358V480H0Z' + notchD + '"/></svg>';
     const maskUrl = "url('data:image/svg+xml," + encodeURIComponent(maskSvg).replace(/'/g, '%27') + "')";
     const css = '<style>@keyframes txfade{from{opacity:0}to{opacity:1}}@keyframes txin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}@keyframes txdrop{from{opacity:0;transform:translateY(-8px) scaleY(.9)}to{opacity:1;transform:none}}@keyframes txup{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}[data-pw] .txsv,[data-pw] .txcn{transition:background .25s ease,color .25s ease}[data-pw] .txsv:hover,[data-pw] .txcn:hover{background:rgba(255,255,255,.1)}[data-pw] .txnf:hover{transform:translateY(-3px)}[data-pw] .txnf svg{transition:transform .35s cubic-bezier(.2,.7,.2,1)}[data-pw] .txnf:hover svg{transform:scale(1.1)}[data-pw] .txtot:empty:before{content:"0,00";color:#51515C}[data-pw] input::placeholder,[data-pw] textarea::placeholder{color:#51515C}</style>';
-    const pos = S.inline ? 'position:absolute;left:0;top:0;width:1358px;height:480px;transform:scale(' + k + ');transform-origin:top left;' : 'position:absolute;left:50%;top:50%;width:1358px;height:480px;margin:-240px 0 0 -679px;transform:scale(' + k + ');transform-origin:center;';
+    const pos = S.inline ? 'position:absolute;left:16px;top:8px;width:1358px;height:480px;transform:scale(' + k + ');transform-origin:top left;' : 'position:absolute;left:50%;top:50%;width:1358px;height:480px;margin:-240px 0 0 -679px;transform:scale(' + k + ');transform-origin:center;';
     host.innerHTML = (S.inline ? '' : '<div data-bd style="position:absolute;inset:0;background:rgba(0,0,0,.72);' + (first ? 'animation:txfade .25s ease' : '') + '"></div>') + css
-      + '<div data-pw style="' + pos + 'font-family:Helvetica,Arial,sans-serif;color:#F2F0EB;' + (first ? 'animation:txup .4s ' + E : '') + '"><div data-pn style="position:absolute;inset:0;background:#111114;border:1px solid #2A2A2F;border-radius:30px;display:flex;overflow:visible;-webkit-mask:' + maskUrl + ' 0 0/100% 100% no-repeat;mask:' + maskUrl + ' 0 0/100% 100% no-repeat">' + bodyHtml + modal + '</div>'
+      + '<div data-pw style="' + pos + 'font-family:Helvetica,Arial,sans-serif;color:#F2F0EB;' + (first ? 'animation:txup .4s ' + E : '') + '">' + (S.inline ? '<div style="position:absolute;inset:0;border-radius:30px;box-shadow:0 18px 44px rgba(0,0,0,.65),0 4px 14px rgba(0,0,0,.5);pointer-events:none"></div>' : '') + '<div data-pn style="position:absolute;inset:0;background:#111114;border:1px solid #2A2A2F;border-radius:30px;display:flex;overflow:visible;-webkit-mask:' + maskUrl + ' 0 0/100% 100% no-repeat;mask:' + maskUrl + ' 0 0/100% 100% no-repeat">' + bodyHtml + modal + '</div>'
       + '<div style="position:absolute;left:0;right:0;top:140px;height:1px;background:#3A3A40;z-index:1;pointer-events:none"></div>' + goo + x + '</div>';
     const pn = host.querySelector('[data-pn]');
     if (S.mode === 'dados') ticket();
@@ -694,7 +697,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       if (r.error || !r.data || !r.data.itens) throw r.error || new Error('sem dados');
       S.nota = { url, chave_acesso: r.data.chave_acesso || null, emitente: r.data.emitente || null, cnpj: r.data.cnpj || null, emitida_em: r.data.emitida_em || null, total: r.data.total || null };
       aceitarItens(r.data.itens.map(i => ({ nome: i.nome, qtd: i.quantidade || 1, un: i.unidade || '', valor: i.valor, catId: null })), url);
-    } catch (e) { let x = ''; try { const j = e && e.context && (await e.context.json()); x = (j && (j.erro || j.detalhe)) || ''; } catch (_) {} if (!x && e && e.message) x = e.message; S.msg = ''; S.err = { t: 'Não consegui ler a nota', d: 'O portal da Fazenda não respondeu como esperado. Tente de novo, ou abra o link, copie o texto da página e cole no campo ao lado.', x: String(x).slice(0, 300) }; render(); }
+    } catch (e) { let x = ''; try { const j = e && e.context && (await e.context.json()); x = j ? [j.erro, j.detalhe].filter(Boolean).join(': ') : ''; } catch (_) {} if (!x && e && e.message) x = e.message; S.msg = ''; S.err = { t: 'Não consegui ler a nota', d: 'O portal da Fazenda não respondeu como esperado. Tente de novo, ou abra o link, copie o texto da página e cole no campo ao lado.', x: String(x).slice(0, 300) }; render(); }
   }
   // ---- Conversão de imagens (formatos de celular) ----
   const loadScript = (src) => new Promise((ok, no) => { const el = document.createElement('script'); el.src = src; el.onload = ok; el.onerror = () => no(new Error('script')); document.head.appendChild(el); });
@@ -763,7 +766,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     S.busy = true; S.msg = ''; render();
     S.partes = S.partes.filter(p => p.valor > 0);
     const d = { parc: S.parc || 1, isNew: !!S.isNew, totalV: S.totalV, dir: S.dir, meio: S.meio, id: S.row.id, nome: S.nome, obs: S.obs, iso: S.iso, cardId: S.cardId, accId: S.accId, catId: S.catId, notaDirty: S.notaDirty, partesDirty: S.partesDirty, nota: S.nota, itens: S.itens, partes: S.partes };
-    try { await KD.txSave(comp, d); if (stay && S) { const r = KD.M.rowById[S.row.id]; if (r) { const m = S.mode; S = init(r); S.mode = 'dados'; void m; render(); } else TX.close(); } else TX.close(); }
+    try { await KD.txSave(comp, d); if (stay && S) { const r = KD.M.rowById[S.row.id]; if (r) { const inl = S.inline; S = init(r); S.inline = inl; S.mode = 'dados'; S.base = dirtyKey(); render(); } else TX.close(); } else TX.close(); }
     catch (e) { console.error('[kontar] salvar transação', e); S.busy = false; S.msg = 'Não consegui salvar: ' + ((e && e.message) || 'erro'); render(); }
   }
 
@@ -793,11 +796,11 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       if (S && S.merge && !ev.target.closest('[data-a="domerge"]')) { S.merge = null; render(); }
       const el = ev.target.closest('[data-a]'); if (!el || !S) { if (S && S.pop && !ev.target.closest('[data-pop]')) { S.pop = null; render(); } else if (had) render(); return; }
       const a = el.getAttribute('data-a'), v = el.getAttribute('data-v');
-      if (a === 'close') TX.close();
+      if (a === 'close') TX.requestClose();
       else if (a === 'mode') goMode(v);
       else if (a === 'retry') { S.err = null; S.msg = ''; render(); const fi = pn.querySelector('[data-in="foto"]'); if (fi) { fi.value = ''; fi.click(); } }
-      else if (a === 'discard') { restoreSnap(); S.askBack = false; S.mode = 'dados'; render(); }
-      else if (a === 'keep') { S.askBack = false; render(); }
+      else if (a === 'discard') { if (S.askClose) { TX.close(); return; } restoreSnap(); S.askBack = false; S.mode = 'dados'; render(); }
+      else if (a === 'keep') { S.askBack = false; S.askClose = false; render(); }
       else if (a === 'pop') { ev.stopPropagation(); S.pop = S.pop === v ? null : v; render(); }
       else if (a === 'domerge') { const m = S.merge; S.merge = null; if (m && S.partes[m.from] && S.partes[m.to]) { const A = S.partes[m.from], B = S.partes[m.to]; B.valor = Math.round((A.valor + B.valor) * 100) / 100; B.itens = B.itens.concat(A.itens); S.partes.splice(m.from, 1); S.sel = Math.min(m.to > m.from ? m.to - 1 : m.to, S.partes.length - 1); S.partesDirty = true; } render(); }
       else if (a === 'anotar') anotar();
@@ -839,5 +842,5 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     S.partes.forEach(q => { q.itens = q.itens.filter(x => x !== i); });
     p.itens.push(i); recalc(); S.partesDirty = true; render();
   }
-  window.addEventListener('keydown', e => { if (S && e.key === 'Escape') TX.close(); });
+  window.addEventListener('keydown', e => { if (S && e.key === 'Escape') { if (S.askClose || S.askBack) { S.askClose = false; S.askBack = false; render(); } else TX.requestClose(); } });
 })();
