@@ -481,6 +481,11 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const somaPartes = () => S.partes.reduce((a, p) => a + p.valor, 0);
   const catAtual = () => S.catId ? catName(S.catId) : (S.isNew ? 'Sem categoria' : 'Outros');
 
+  function fitTitle(pn) {   // no inline o painel é mais estreito: encolhe o título só o bastante pra não bater no valor
+    if (!S || !S.inline) return; const t = pn.querySelector('[data-ttl]'); if (!t) return; t.style.fontSize = '64px';
+    const hd = t.parentElement.parentElement, right = hd.lastElementChild; const avail = hd.clientWidth - (right ? right.offsetWidth : 0) - 36, w = t.scrollWidth;
+    if (w > avail && avail > 0) t.style.fontSize = Math.max(40, Math.floor(64 * avail / w)) + 'px';
+  }
   const dirtyKey = () => JSON.stringify([S.nome, S.obs, S.iso, S.cardId, S.accId, S.catId, S.totalV, S.dir, S.meio, S.parc || 1, S.itens, S.partes, S.nota && S.nota.url]);
   const isDirty = () => !!S && S.base !== undefined && dirtyKey() !== S.base;
   function init(row) {
@@ -492,11 +497,41 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     return S;
   }
 
+  let timers = [];
+  const later = (fn, ms) => { const t = setTimeout(fn, ms); timers.push(t); return t; };
+  const clearTimers = () => { timers.forEach(clearTimeout); timers = []; };
+  const kidsOf = (h) => { const rw = h && h.closest && h.closest('[data-x-e]'); return { rw, kids: rw ? [...rw.children].filter(c => c !== h) : [] }; };
+  function inlineReset(h) {
+    const { rw, kids } = kidsOf(h);
+    if (rw) { rw.style.height = ''; rw.style.transition = ''; rw.style.position = ''; rw.style.clipPath = ''; }
+    kids.forEach(c => { c.style.opacity = ''; c.style.transition = ''; c.style.pointerEvents = ''; });
+    ['left', 'right', 'top', 'height', 'transition'].forEach(k => { h.style[k] = ''; }); h.style.position = 'relative';
+    h.innerHTML = '';
+  }
   TX.open = function (c, row, o) {
     comp = c; TX.close(true);
     S = init(row); S.inline = !!(o && o.inline); S.base = dirtyKey();
     const ab = document.querySelector(S.inline ? '[data-tx-in="' + row.id + '"]' : '[data-tx-host]'); if (!ab) { S = null; return; }
-    host = ab; if (S.inline) { const bx = host.parentElement.querySelector('[data-xbox]'); if (bx) bx.style.display = 'none'; const rw = host.closest('[data-x-e]'); if (rw && rw.firstElementChild) rw.firstElementChild.style.display = 'none'; } else host.style.pointerEvents = 'auto'; render(true);
+    host = ab;
+    if (!S.inline) { host.style.pointerEvents = 'auto'; render(true); return; }
+    host.style.pointerEvents = '';
+    // inline: o card da linha cresce e vira o painel (sem salto): o resto da linha some em fade enquanto a altura anima
+    const { rw, kids } = kidsOf(host);
+    if (!rw) { S.settled = true; render(true); return; }
+    const H0 = rw.offsetHeight;
+    rw.style.position = 'relative'; rw.style.clipPath = 'inset(0 -40px 0 -40px)'; rw.style.height = H0 + 'px'; rw.style.transition = 'none';
+    kids.forEach(k => { k.style.transition = 'opacity .12s ease'; k.style.opacity = '0'; k.style.pointerEvents = 'none'; });
+    host.style.position = 'absolute'; host.style.left = '0'; host.style.right = '0'; host.style.top = '0';
+    render(true);
+    const H1 = host.offsetHeight; void rw.offsetHeight;
+    rw.style.transition = 'height .5s cubic-bezier(.2,.7,.2,1)'; rw.style.height = H1 + 'px';
+    const mine = S;
+    later(() => {
+      if (S !== mine || !host) return;
+      S.settled = true; rw.style.height = ''; rw.style.transition = ''; rw.style.position = ''; rw.style.clipPath = '';
+      host.style.position = 'relative'; host.style.left = ''; host.style.right = ''; host.style.top = '';
+      const pw = host.querySelector('[data-pw]'); if (pw) pw.setAttribute('data-settled', '1');
+    }, 520);
   };
   TX.openNew = function (c) {
     comp = c; TX.close(true);
@@ -507,17 +542,34 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     host = ab; host.style.pointerEvents = 'auto'; render(true);
   };
   TX.requestClose = function () { if (!S) return; if (isDirty()) { S.askClose = true; S.askBack = false; render(); return; } TX.close(); };
+  let pendingDone = null;
   TX.close = function (quick) {
+    if (pendingDone) { const f = pendingDone; pendingDone = null; clearTimers(); f(); }   // fecha de vez o painel que ainda estava animando saída
+    clearTimers();
     if (!host) { S = null; return; }
     const inl = S && S.inline, h = host;
     const pn = h.querySelector('[data-pw]'), bd = h.querySelector('[data-bd]'), xi = h.querySelector('[data-xi]');
-    const done = () => { h.innerHTML = ''; if (inl) { h.style.height = ''; const bx = h.parentElement && h.parentElement.querySelector('[data-xbox]'); if (bx) bx.style.display = ''; const rw = h.closest && h.closest('[data-x-e]'); if (rw && rw.firstElementChild) rw.firstElementChild.style.display = ''; } else h.style.pointerEvents = 'none'; };
+    const done = () => { if (pendingDone === done) pendingDone = null; if (inl) inlineReset(h); else { h.innerHTML = ''; if (h.hasAttribute('data-tx-host')) h.style.pointerEvents = 'none'; } };
     S = null;
-    if (quick || !pn) { done(); return; }
+    if (quick || !pn) { if (!pn && !inl) { h.innerHTML = ''; if (h.hasAttribute('data-tx-host')) h.style.pointerEvents = 'none'; } else done(); return; }
     if (xi) { xi.style.transition = 'transform .3s cubic-bezier(.65,0,.2,1)'; xi.style.transform = 'rotate(180deg)'; }
-    pn.style.transition = 'opacity .22s ease, transform .3s ' + E; pn.style.opacity = '0'; if (!inl) pn.style.transform = pn.style.transform + ' translateY(14px)';
+    pn.style.transition = 'opacity .24s ease, transform .3s ' + E; pn.style.opacity = '0'; if (!inl) pn.style.transform = pn.style.transform + ' translateY(14px)'; else pn.style.transform = pn.style.transform + ' translateY(6px)';
     if (bd) { bd.style.transition = 'opacity .25s ease'; bd.style.opacity = '0'; }
-    setTimeout(done, 300);
+    if (inl) {
+      const { rw, kids } = kidsOf(h);
+      if (rw) {
+        const H1 = rw.offsetHeight; rw.style.position = 'relative'; rw.style.clipPath = 'inset(0 -40px 0 -40px)';
+        kids.forEach(k => { k.style.transition = 'none'; k.style.opacity = '0'; });
+        h.style.position = 'absolute'; h.style.left = '0'; h.style.right = '0'; h.style.top = '0';
+        pn.removeAttribute('data-settled');          // a linha original volta a existir no layout (ainda transparente)
+        rw.style.transition = 'none'; rw.style.height = 'auto'; const H0 = rw.offsetHeight; rw.style.height = H1 + 'px'; void rw.offsetHeight;
+        rw.style.transition = 'height .5s cubic-bezier(.2,.7,.2,1)'; rw.style.height = H0 + 'px';
+        kids.forEach(k => { k.style.transition = 'opacity .32s ease .16s'; k.style.opacity = '1'; });
+        pendingDone = done; later(done, 540);
+        return;
+      }
+    }
+    pendingDone = done; later(done, 300);
   };
 
   /* ---------------- peças ---------------- */
@@ -527,7 +579,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
 
   function header(eyebrow) {
     const cor = S.catId ? catCor(catAtual()) : '#F2F0EB';
-    return '<div style="display:flex;justify-content:space-between;align-items:flex-end;height:92px;flex:none"><div style="min-width:0;overflow:visible;position:relative;z-index:1"><div style="font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9A9AA3">' + eyebrow + '</div><div style="font-size:64px;font-weight:700;letter-spacing:-.06em;line-height:1;margin:6px 0 -6px;white-space:nowrap;overflow:visible">' + esc(S.nome || (S.isNew ? 'Nova transação' : '—')) + '</div></div>'
+    return '<div style="display:flex;justify-content:space-between;align-items:flex-end;height:92px;flex:none"><div style="min-width:0;overflow:visible;position:relative;z-index:1"><div style="font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9A9AA3">' + eyebrow + '</div><div data-ttl style="font-size:64px;font-weight:700;letter-spacing:-.06em;line-height:1;margin:6px 0 -6px;white-space:nowrap;overflow:visible">' + esc(S.nome || (S.isNew ? 'Nova transação' : '—')) + '</div></div>'
       + (S.isNew ? '<div style="display:flex;align-items:flex-end;gap:18px">' + dirToggle() + '<div style="display:flex;align-items:flex-end;gap:8px"><span data-in="total" class="txtot" contenteditable="plaintext-only" inputmode="decimal" spellcheck="false" style="display:block;min-width:150px;outline:0;text-align:right;font-family:inherit;font-size:96px;font-weight:700;letter-spacing:-.065em;line-height:.8;height:78px;white-space:nowrap;cursor:text;color:' + cor + '">' + (S.totalV ? brl(S.totalV) : '') + '</span><small style="font-size:20px;color:#F2F0EB;margin-bottom:2px">R$</small></div></div>'
       : '<div style="text-align:right;padding-right:' + 0 + 'px"><div style="font-size:76px;font-weight:700;letter-spacing:-.065em;line-height:.8;margin-top:12px;color:' + cor + ';transition:color .3s ease">' + brl(total()) + '<small style="font-size:20px;color:#F2F0EB;letter-spacing:0;margin-left:8px">R$</small></div></div>') + '</div>';
   }
@@ -627,8 +679,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   function render(first) {
     if (!S || !host) return;
     const keep = {}; host.querySelectorAll('[data-in]').forEach(i => { if (document.activeElement === i) keep.k = i.getAttribute('data-in') + (i.getAttribute('data-k') || ''); });
-    const hw = host.clientWidth || 1358, k = Math.min(1, (hw - 32) / 1358);
-    if (S.inline) host.style.height = (Math.round(480 * k) + 46) + 'px';
+    const hw = host.clientWidth || 1358, W = S.inline ? Math.max(1000, Math.min(1358, Math.round(hw / 0.9))) : 1358, k = S.inline ? Math.min(1, hw / W) : Math.min(1, (hw - 32) / 1358), TOPI = 14;
+    if (S.inline) host.style.height = (Math.round(480 * k) + TOPI + 26) + 'px';
     const bodyHtml = S.mode === 'dados' ? viewDados() : S.mode === 'ler' ? viewLer() : viewDividir();
     const x = '<span data-a="close" style="position:absolute;right:0;top:0;width:44px;height:44px;border-radius:50%;background:#F2F0EB;color:#0A0A0A;display:flex;align-items:center;justify-content:center;z-index:3;cursor:pointer;"><span data-xi style="display:flex;transition:transform .5s cubic-bezier(.65,0,.2,1)">' + svg('x', 18, 2.4) + '</span></span>';
     const prevPn = host.querySelector('[data-pn]');
@@ -636,20 +688,21 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const Wn = 120, r = 32, fr = 10, cy = 22, cx = Wn - 22, dd = Math.sqrt((r + fr) ** 2 - (cy - fr) ** 2), xf = cx - dd, yf = cy + dd, P1 = [cx + (xf - cx) * r / (r + fr), cy + (fr - cy) * r / (r + fr)], P2 = [cx + (Wn - fr - cx) * r / (r + fr), cy + (yf - cy) * r / (r + fr)];
     const bdp = 'M' + xf + ',0.5A' + fr + ',' + fr + ' 0 0 1 ' + P1[0] + ',' + P1[1] + 'A' + r + ',' + r + ' 0 0 0 ' + P2[0] + ',' + P2[1] + 'A' + fr + ',' + fr + ' 0 0 1 ' + (Wn - .5) + ',' + yf;
     const goo = '<div style="position:absolute;right:0;top:0;width:119px;height:119px;overflow:hidden;border-radius:0 30px 0 0;z-index:2;pointer-events:none"><svg width="120" height="120" style="position:absolute;right:-1px;top:-1px;overflow:visible"><path d="' + bdp + '" fill="none" stroke="#2A2A2F" stroke-width="1"/></svg></div>';
-    const ox = 1239, oy = -1, sh = (d) => d.replace(/([MLHVA])([^MLHVAZ]*)/g, (m0, c, rest) => { const nums = rest.trim().split(/[ ,]+/).filter(Boolean).map(Number); if (c === 'M' || c === 'L') return c + (nums[0] + ox) + ',' + (nums[1] + oy); if (c === 'H') return 'H' + (nums[0] + ox); if (c === 'V') return 'V' + (nums[0] + oy); return 'A' + nums[0] + ',' + nums[1] + ' ' + nums[2] + ' ' + nums[3] + ' ' + nums[4] + ' ' + (nums[5] + ox) + ',' + (nums[6] + oy); });
+    const ox = W - 119, oy = -1, sh = (d) => d.replace(/([MLHVA])([^MLHVAZ]*)/g, (m0, c, rest) => { const nums = rest.trim().split(/[ ,]+/).filter(Boolean).map(Number); if (c === 'M' || c === 'L') return c + (nums[0] + ox) + ',' + (nums[1] + oy); if (c === 'H') return 'H' + (nums[0] + ox); if (c === 'V') return 'V' + (nums[0] + oy); return 'A' + nums[0] + ',' + nums[1] + ' ' + nums[2] + ' ' + nums[3] + ' ' + nums[4] + ' ' + (nums[5] + ox) + ',' + (nums[6] + oy); });
     const notchD = sh(bdp + 'L' + (Wn + 4) + ',' + yf + 'V-4H' + xf + 'Z');
-    const maskSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="1358" height="480"><path fill-rule="evenodd" d="M0,0H1358V480H0Z' + notchD + '"/></svg>';
+    const maskSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="480"><path fill-rule="evenodd" d="M0,0H' + W + 'V480H0Z' + notchD + '"/></svg>';
     const maskUrl = "url('data:image/svg+xml," + encodeURIComponent(maskSvg).replace(/'/g, '%27') + "')";
-    const css = '<style>@keyframes txfade{from{opacity:0}to{opacity:1}}@keyframes txin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}@keyframes txdrop{from{opacity:0;transform:translateY(-8px) scaleY(.9)}to{opacity:1;transform:none}}@keyframes txup{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}[data-pw] .txsv,[data-pw] .txcn{transition:background .25s ease,color .25s ease}[data-pw] .txsv:hover,[data-pw] .txcn:hover{background:rgba(255,255,255,.1)}[data-pw] .txnf:hover{transform:translateY(-3px)}[data-pw] .txnf svg{transition:transform .35s cubic-bezier(.2,.7,.2,1)}[data-pw] .txnf:hover svg{transform:scale(1.1)}[data-pw] .txtot:empty:before{content:"0,00";color:#51515C}[data-pw] input::placeholder,[data-pw] textarea::placeholder{color:#51515C}</style>';
-    const pos = S.inline ? 'position:absolute;left:16px;top:8px;width:1358px;height:480px;transform:scale(' + k + ');transform-origin:top left;' : 'position:absolute;left:50%;top:50%;width:1358px;height:480px;margin:-240px 0 0 -679px;transform:scale(' + k + ');transform-origin:center;';
+    const css = '<style>@keyframes txfade{from{opacity:0}to{opacity:1}}@keyframes txin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}@keyframes txdrop{from{opacity:0;transform:translateY(-8px) scaleY(.9)}to{opacity:1;transform:none}}@keyframes txup{from{opacity:0;translate:0 18px}to{opacity:1;translate:0 0}}[data-pw] .txsv,[data-pw] .txcn{transition:background .25s ease,color .25s ease}[data-pw] .txsv:hover,[data-pw] .txcn:hover{background:rgba(255,255,255,.1)}[data-pw] .txnf:hover{transform:translateY(-3px)}[data-pw] .txnf svg{transition:transform .35s cubic-bezier(.2,.7,.2,1)}[data-pw] .txnf:hover svg{transform:scale(1.1)}[data-pw] .txtot:empty:before{content:"0,00";color:#51515C}[data-x-e]:has(>[data-tx-in] [data-pw][data-settled])>:not([data-tx-in]){display:none!important}[data-pw] input::placeholder,[data-pw] textarea::placeholder{color:#51515C}</style>';
+    const pos = S.inline ? 'position:absolute;left:0;top:' + TOPI + 'px;width:' + W + 'px;height:480px;transform:scale(' + k + ');transform-origin:top left;' : 'position:absolute;left:50%;top:50%;width:' + W + 'px;height:480px;margin:-240px 0 0 -' + (W / 2) + 'px;transform:scale(' + k + ');transform-origin:center;';
     host.innerHTML = (S.inline ? '' : '<div data-bd style="position:absolute;inset:0;background:rgba(0,0,0,.72);' + (first ? 'animation:txfade .25s ease' : '') + '"></div>') + css
-      + '<div data-pw style="' + pos + 'font-family:Helvetica,Arial,sans-serif;color:#F2F0EB;' + (first ? 'animation:txup .4s ' + E : '') + '">' + (S.inline ? '<div style="position:absolute;inset:0;border-radius:30px;box-shadow:0 18px 44px rgba(0,0,0,.65),0 4px 14px rgba(0,0,0,.5);pointer-events:none"></div>' : '') + '<div data-pn style="position:absolute;inset:0;background:#111114;border:1px solid #2A2A2F;border-radius:30px;display:flex;overflow:visible;-webkit-mask:' + maskUrl + ' 0 0/100% 100% no-repeat;mask:' + maskUrl + ' 0 0/100% 100% no-repeat">' + bodyHtml + modal + '</div>'
+      + '<div data-pw' + (S.settled ? ' data-settled="1"' : '') + ' style="' + pos + 'font-family:Helvetica,Arial,sans-serif;color:#F2F0EB;' + (first ? 'animation:txup .4s ' + E + (S.inline ? ' .1s backwards' : '') : '') + '">' + (S.inline ? '<div style="position:absolute;inset:0;border-radius:30px;box-shadow:0 30px 54px -16px rgba(0,0,0,.42),0 10px 26px -6px rgba(0,0,0,.22);pointer-events:none"></div>' : '') + '<div data-pn style="position:absolute;inset:0;background:#111114;border:1px solid #2A2A2F;border-radius:30px;display:flex;overflow:visible;-webkit-mask:' + maskUrl + ' 0 0/100% 100% no-repeat;mask:' + maskUrl + ' 0 0/100% 100% no-repeat">' + bodyHtml + modal + '</div>'
       + '<div style="position:absolute;left:0;right:0;top:140px;height:1px;background:#3A3A40;z-index:1;pointer-events:none"></div>' + goo + x + '</div>';
     const pn = host.querySelector('[data-pn]');
     if (S.mode === 'dados') ticket();
     const ta = pn.querySelector('[data-in="obs"]'); if (ta) ta.value = S.obs;
     const tt = pn.querySelector('[data-in="texto"]'); if (tt) tt.value = S.texto;
     if (keep.k) { const el = [...pn.querySelectorAll('[data-in]')].find(i => i.getAttribute('data-in') + (i.getAttribute('data-k') || '') === keep.k); if (el) { el.focus(); try { const l = el.value.length; el.setSelectionRange(l, l); } catch (e) { } } }
+    fitTitle(host.querySelector('[data-pw]'));
     wire(host.querySelector('[data-pw]'));
     const xi = host.querySelector('[data-xi]'); if (xi && first) { xi.style.transform = 'rotate(-180deg)'; requestAnimationFrame(() => requestAnimationFrame(() => { xi.style.transform = 'rotate(0deg)'; })); }
     void prevPn;
@@ -824,7 +877,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     });
     pn.addEventListener('input', ev => {
       const el = ev.target, k = el.getAttribute && el.getAttribute('data-in'); if (!k) return;
-      if (k === 'nome') { S.nome = el.value; const b = pn.querySelector('div[style*="font-size:64px"]'); if (b) b.textContent = S.nome || '—'; }
+      if (k === 'nome') { S.nome = el.value; const b = pn.querySelector('[data-ttl]'); if (b) { b.textContent = S.nome || '—'; fitTitle(pn); } }
       else if (k === 'total') { S.totalV = num(el.textContent); }
       else if (k === 'obs') S.obs = el.value; else if (k === 'link') S.link = el.value; else if (k === 'texto') S.texto = el.value;
       else if (k === 'iso') { S.iso = el.value; render(); }
