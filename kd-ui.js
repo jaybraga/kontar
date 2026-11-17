@@ -575,7 +575,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       + '<div style="display:flex;gap:10px"><input data-in="link" value="' + esc(S.link) + '" placeholder="Cole o link do QR da nota" style="' + fieldCss + 'flex:1"><span data-a="lerlink" style="height:56px;display:flex;align-items:center;padding:0 24px;border-radius:9999px;background:#F2F0EB;color:#0A0A0A;font-weight:900;letter-spacing:.06em;font-size:13px;text-transform:uppercase;cursor:pointer;flex:none">Ler</span></div>'
       + '<div style="font-size:12.5px;color:#9A9AA3;line-height:1.4">O QR Code da nota abre uma página com os itens. Copie o endereço dela e cole aqui.</div>'
       + '<div style="margin-top:6px;font-size:16px;font-weight:700;color:#F2F0EB">Ou cole o texto da página</div><textarea data-in="texto" placeholder="Abra o link, selecione tudo, copie e cole aqui" style="' + fieldCss + 'flex:1;min-height:0;resize:none"></textarea></div>'
-      + '<label data-up style="display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed #3A3A40;border-radius:28px;cursor:pointer;margin-bottom:4px"><input data-in="foto" type="file" accept="image/*,application/pdf" style="display:none"><div style="display:flex;align-items:center;gap:22px"><span style="color:#F2F0EB;display:flex">' + svg('qr', 64, 1.4) + '</span><div style="display:flex;flex-direction:column;gap:6px"><span style="font-weight:900;letter-spacing:.06em;font-size:14px;text-transform:uppercase">Enviar foto ou print</span><span style="font-size:12.5px;color:#9A9AA3">Arraste a imagem aqui ou clique pra escolher</span><span style="font-size:11px;color:#51515C;font-weight:700;letter-spacing:.08em">PNG · JPG · PDF</span></div></div></label></div>';
+      + '<label data-up style="display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed #3A3A40;border-radius:28px;cursor:pointer;margin-bottom:4px"><input data-in="foto" type="file" accept="image/*,.heic,.heif,.dng,.tif,.tiff,.webp,.avif" style="display:none"><div style="display:flex;align-items:center;gap:22px"><span style="color:#F2F0EB;display:flex">' + svg('qr', 64, 1.4) + '</span><div style="display:flex;flex-direction:column;gap:6px"><span style="font-weight:900;letter-spacing:.06em;font-size:14px;text-transform:uppercase">Enviar foto ou print</span><span style="font-size:12.5px;color:#9A9AA3">Arraste a imagem aqui ou clique pra escolher</span><span style="font-size:11px;color:#51515C;font-weight:700;letter-spacing:.08em">PNG · JPG · HEIC · DNG · WEBP</span></div></div></label></div>';
     return '<div style="flex:1;min-width:0;padding:26px 34px 24px 30px;display:flex;flex-direction:column;gap:22px;box-sizing:border-box">' + header('Ler nota fiscal') + body + footer(primaryBtn('lertexto', 'Ler nota', false)) + '</div>';
   }
 
@@ -671,19 +671,66 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       aceitarItens(r.data.itens.map(i => ({ nome: i.nome, qtd: i.quantidade || 1, un: i.unidade || '', valor: i.valor, catId: null })), url);
     } catch (e) { S.msg = 'Não consegui ler esse link (o portal pode ter bloqueado). Abra o link, copie o texto da página e cole abaixo.'; render(); }
   }
+  // ---- Conversão de imagens (formatos de celular) ----
+  const loadScript = (src) => new Promise((ok, no) => { const el = document.createElement('script'); el.src = src; el.onload = ok; el.onerror = () => no(new Error('script')); document.head.appendChild(el); });
+  const extOf = (f) => ((f.name || '').split('.').pop() || '').toLowerCase();
+  // DNG/TIFF-RAW: o navegador não abre, mas o arquivo carrega JPEGs de prévia. Lê os IFDs e devolve os candidatos (maior primeiro).
+  async function jpegsDoTiff(file) {
+    const buf = await file.arrayBuffer(), dv = new DataView(buf), n = buf.byteLength;
+    const le = dv.getUint16(0) === 0x4949; if (!le && dv.getUint16(0) !== 0x4D4D) return [];
+    const u16 = (o) => dv.getUint16(o, le), u32 = (o) => dv.getUint32(o, le), out = [], seen = new Set();
+    const tipo = { 1: 1, 3: 2, 4: 4, 8: 2, 9: 4, 16: 8 };
+    const vals = (o, t, c) => { const sz = (tipo[t] || 1) * c, base = sz <= 4 ? o + 8 : u32(o + 8), r = []; for (let i = 0; i < Math.min(c, 4000); i++) { const q = base + i * (tipo[t] || 1); if (q + 4 > n) break; r.push(t === 3 ? u16(q) : u32(q)); } return r; };
+    const ifd = (off, depth) => {
+      if (!off || off + 2 > n || seen.has(off) || depth > 4) return; seen.add(off);
+      const cnt = u16(off), T = {};
+      for (let i = 0; i < cnt; i++) { const o = off + 2 + i * 12; if (o + 12 > n) break; T[u16(o)] = { t: u16(o + 2), c: u32(o + 4), o }; }
+      const g = (k) => T[k] ? vals(T[k].o, T[k].t, T[k].c) : null;
+      const jo = g(0x201), jl = g(0x202); if (jo && jl) out.push([jo[0], jl[0]]);
+      const so = g(0x111), sl = g(0x117), cp = g(0x103);
+      if (so && sl && cp && cp[0] === 7) { const a = Math.min(...so), last = so.length - 1; out.push([a, so[last] + sl[last] - a]); }
+      (g(0x14A) || []).forEach(x => ifd(x, depth + 1));
+      const nx = off + 2 + cnt * 12; if (nx + 4 <= n) { const nn = u32(nx); if (nn) ifd(nn, depth); }
+    };
+    ifd(u32(4), 0);
+    return out.filter(([o, l]) => o > 0 && l > 1000 && o + l <= n).sort((x, y) => y[1] - x[1]).slice(0, 5).map(([o, l]) => new Blob([buf.slice(o, o + l)], { type: 'image/jpeg' }));
+  }
+  // Devolve uma lista de bitmaps candidatos a partir de qualquer arquivo de imagem comum de celular.
+  async function bitmaps(file) {
+    const ext = extOf(file), t = (file.type || '').toLowerCase(), r = [];
+    const abrir = async (blob) => { try { return await createImageBitmap(blob, { imageOrientation: 'from-image' }); } catch (e) { return null; } };
+    if (/heic|heif/.test(t) || /^hei[cf]$/.test(ext)) {
+      let bm = await abrir(file);   // Safari abre HEIC direto
+      if (!bm) { if (!window.heic2any) await loadScript('https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js'); const o = await window.heic2any({ blob: file, toType: 'image/jpeg', quality: .92 }); bm = await abrir(Array.isArray(o) ? o[0] : o); }
+      if (bm) r.push(bm);
+    } else if (ext === 'dng' || /tiff?$/.test(ext) || /dng|tiff/.test(t)) {
+      for (const j of await jpegsDoTiff(file)) { const bm = await abrir(j); if (bm) { r.push(bm); if (r.length >= 2) break; } }
+    } else { const bm = await abrir(file); if (bm) r.push(bm); }
+    return r;
+  }
+  // Procura o QR em várias escalas e rotações (foto torta, de lado, de longe), com e sem contraste reforçado.
+  function acharQR(bmp) {
+    const rots = [0, 90, 180, 270], maxLado = 2000;
+    for (const [contr, escalas] of [[false, [1, .5]], [true, [1, .5]], [false, [.75, .35]], [true, [.75]]]) for (const k of escalas) for (const rot of rots) {
+      let w = Math.round(bmp.width * k), h = Math.round(bmp.height * k); const m = Math.max(w, h); if (m > maxLado) { w = Math.round(w * maxLado / m); h = Math.round(h * maxLado / m); }
+      if (w < 60 || h < 60) continue;
+      const cv = document.createElement('canvas'), sw = rot % 180; cv.width = sw ? h : w; cv.height = sw ? w : h;
+      const cx = cv.getContext('2d', { willReadFrequently: true }); cx.translate(cv.width / 2, cv.height / 2); cx.rotate(rot * Math.PI / 180); if (contr) cx.filter = 'grayscale(1) contrast(1.9) brightness(1.15)'; cx.drawImage(bmp, -w / 2, -h / 2, w, h);
+      const d = cx.getImageData(0, 0, cv.width, cv.height), f = window.KDQR && window.KDQR(d.data, cv.width, cv.height, { inversionAttempts: 'attemptBoth' }); if (f) return f;
+    }
+    return null;
+  }
   async function lerImagem(file) {
-    if (!/^image\//.test(file.type)) { S.msg = 'Por enquanto só imagens (PNG ou JPG). Se for PDF, tire um print.'; render(); return; }
+    const ext = extOf(file);
+    if (file.type === 'application/pdf' || ext === 'pdf') { S.msg = 'PDF não dá pra ler aqui. Tire um print da nota (ou da tela com o QR) e envie a imagem.'; render(); return; }
     S.msg = 'Procurando o QR Code…'; render();
     try {
-      const bmp = await createImageBitmap(file); let found = null;
-      for (const k of [1, .5, 1.6, .3]) {
-        const w = Math.max(50, Math.round(bmp.width * k)), h = Math.max(50, Math.round(bmp.height * k)), cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-        const cx = cv.getContext('2d', { willReadFrequently: true }); cx.drawImage(bmp, 0, 0, w, h);
-        const d = cx.getImageData(0, 0, w, h); found = window.KDQR && window.KDQR(d.data, w, h, { inversionAttempts: 'attemptBoth' }); if (found) break;
-      }
-      if (!found) { S.msg = 'Não achei um QR Code nessa imagem. Tente um print mais de perto.'; render(); return; }
+      const bms = await bitmaps(file);
+      if (!bms.length) { S.msg = 'Não consegui abrir esse arquivo. Tente enviar como JPG ou PNG (um print resolve).'; render(); return; }
+      let found = null; for (const b of bms) { await new Promise(r => setTimeout(r, 30)); found = acharQR(b); if (found) break; }
+      if (!found) { S.msg = 'Não achei um QR Code nessa imagem. Tente uma foto mais de perto, sem reflexo, com o QR inteiro e nítido.'; render(); return; }
       S.link = found.data; S.msg = ''; if (/^https?:\/\//i.test(found.data)) { render(); lerLink(); } else { S.msg = 'O QR foi lido, mas não é um link de nota: ' + found.data.slice(0, 60); render(); }
-    } catch (e) { S.msg = 'Não consegui abrir essa imagem.'; render(); }
+    } catch (e) { S.msg = 'Não consegui abrir essa imagem. Tente enviar como JPG ou PNG.'; render(); }
   }
   async function salvar(stay) {
     if (S.busy) return;
