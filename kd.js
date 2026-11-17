@@ -64,12 +64,13 @@
 
   KD.load = async function (sb, user) {
     KD.sb = sb; KD.user = user;
-    const [lanc, tx, inst, cards, cyc, accs, cats, ma, goals, prefs, prof] = await Promise.all([
+    const [lanc, tx, inst, cards, cyc, accs, cats, ma, goals, prefs, prof, parts, items, notas] = await Promise.all([
       all(sb, 'v_lancamento'), all(sb, 'transactions', 'id,card_id,account_id,category_id,categoria_origem,fora_do_comum,chave,created_at'),
       all(sb, 'installments', 'transaction_id,numero,valor,data_caixa'), all(sb, 'cards'), all(sb, 'card_cycles'), all(sb, 'accounts'),
-      all(sb, 'categories'), all(sb, 'merchant_aliases'), all(sb, 'goals'), all(sb, 'user_prefs'), all(sb, 'profiles')
+      all(sb, 'categories'), all(sb, 'merchant_aliases'), all(sb, 'goals'), all(sb, 'user_prefs'), all(sb, 'profiles'),
+      all(sb, 'transaction_parts').catch(() => []), all(sb, 'transaction_items').catch(() => []), all(sb, 'transaction_notas').catch(() => [])
     ]);
-    KD.raw = { lanc, tx, inst, cards, cyc, accs, cats, ma, goals, prefs, prof };
+    KD.raw = { lanc, tx, inst, cards, cyc, accs, cats, ma, goals, prefs, prof, parts, items, notas };
     build();
   };
 
@@ -104,13 +105,18 @@
     M.maByChave = Object.fromEntries(R.ma.map(m => [m.chave, m]));
 
     /* lançamentos */
+    const grp = (a, k) => a.reduce((o, x) => ((o[x[k]] = o[x[k]] || []).push(x), o), {});
+    const partsBy = grp(R.parts || [], 'transaction_id'), itemsBy = grp(R.items || [], 'transaction_id'), notaBy = Object.fromEntries((R.notas || []).map(n => [n.transaction_id, n]));
     M.rows = R.lanc.map(l => {
       const t = txById[l.id] || {}, dt = pd(l.data_compra), amt = (l.direcao === 'entrada' ? 1 : -1) * Number(l.valor_total);
       const card = l.cartao || null, k = l.cartao || l.conta || '—';
       return { id: l.id, dt, d: ddmm(dt), y: dt.getFullYear(), mi: mIdx(dt), t: METH[l.meio] || 'Pix', meio: l.meio, e: l.nome || l.apelido_global || l.nome_fatura || '—', chave: l.chave,
         sub: !!l.assinatura, atyp: !!t.fora_do_comum, c: (t.category_id && M.catById[t.category_id] ? M.catById[t.category_id].nome : l.categoria) || 'Outros', catId: t.category_id || null, k, card, cardId: t.card_id || null, accId: t.account_id || null,
         v: signed(amt), amt, out: amt < 0 ? -amt : 0, inn: amt > 0 ? amt : 0, pend: l.status === 'pendente_revisao', trab: !!l.trabalho, x: Number(l.parcelas_total) || 1,
-        obs: l.observacao || '', dom: l.dominio || null, logo: l.logo_url || null, created: t.created_at || '' };
+        obs: l.observacao || '', dom: l.dominio || null, logo: l.logo_url || null, created: t.created_at || '', iso: String(l.data_compra).slice(0, 10), total: Number(l.valor_total), origem: l.origem || '',
+        parts: (partsBy[l.id] || []).sort((a, b) => a.ordem - b.ordem).map(p => ({ id: p.id, catId: p.category_id, valor: Number(p.valor), auto: !!p.automatica, rotulo: p.rotulo || '' })),
+        items: (itemsBy[l.id] || []).sort((a, b) => a.ordem - b.ordem).map(i => ({ id: i.id, nome: i.nome, qtd: Number(i.quantidade) || 1, un: i.unidade || '', valor: Number(i.valor), catId: i.category_id, partId: i.part_id })),
+        nota: notaBy[l.id] || null };
     }).sort((a, b) => b.dt - a.dt || (b.created < a.created ? -1 : b.created > a.created ? 1 : 0));
     M.rowById = Object.fromEntries(M.rows.map(r => [r.id, r]));
     const isTransf = r => r.c === 'Transferência';

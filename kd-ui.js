@@ -412,4 +412,252 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     KD.refresh2(comp, reset);
   };
   KD.refresh2 = (comp, reset) => { Object.keys(reset).forEach(k => { KD._snap[k] = JSON.stringify(reset[k]); }); comp.setState(reset); };
+
+  /* editar transação: grava campos, nota (itens) e divisão de uma vez e recarrega */
+  KD.txSave = async (comp, d) => {
+    const c = sb(), id = d.id, r = KD.M.rowById[id];
+    const p = {};
+    const nm = (d.nome || '').trim(); if (nm && nm !== r.e) p.apelido = nm;
+    if ((d.obs || '') !== (r.obs || '')) p.observacao = d.obs || null;
+    if (d.iso && d.iso !== r.iso) p.data_compra = d.iso;
+    if (d.cardId !== (r.cardId || null) || d.accId !== (r.accId || null)) { p.card_id = d.cardId || null; p.account_id = d.cardId ? null : (d.accId || null); }
+    if (d.catId && d.catId !== r.catId) { p.category_id = d.catId; p.status = 'confirmado'; p.categoria_origem = 'usuario'; }
+    if (Object.keys(p).length) ck(await c.from('transactions').update(p).eq('id', id));
+    let ids = (r.items || []).map(i => i.id);
+    if (d.notaDirty) {
+      ck(await c.rpc('kontar_salvar_nota', { p_tx: id, p_nota: d.nota || {}, p_itens: (d.itens || []).map(i => ({ nome: i.nome, quantidade: i.qtd, unidade: i.un, valor: i.valor, category_id: i.catId || null })) }));
+      const q = ck(await c.from('transaction_items').select('id,ordem').eq('transaction_id', id).order('ordem')); ids = (q.data || []).map(x => x.id);
+    }
+    if (d.notaDirty || d.partesDirty) {
+      ck(await c.rpc('kontar_dividir', { p_tx: id, p_partes: (d.partes || []).map(x => ({ category_id: x.catId || null, valor: Math.round(x.valor * 100) / 100, rotulo: x.rotulo || null, itens: (x.itens || []).map(k => ids[k]).filter(Boolean) })) }));
+    }
+    await KD.refresh(comp);
+  };
+})();
+
+/* Kontar · painel de edição da transação (Dados · Ler nota · Dividir)
+   Desenhado direto no DOM (fora do template) para não depender do re-render do protótipo. */
+(function () {
+  'use strict';
+  const KD = window.KD, TX = (KD.tx = {});
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const brl = n => (Math.round(n * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const num = s => { const t = String(s == null ? '' : s).trim().replace(/[^\d.,-]/g, ''); if (!t) return 0; const v = t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t; return Number(v) || 0; };
+  const MES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const dfmt = iso => { const p = String(iso || '').split('-'); return p.length === 3 ? p[2] + ' ' + MES[+p[1] - 1] + ' ' + p[0] : '—'; };
+  const E = 'cubic-bezier(.2,.7,.2,1)';
+  const I = {
+    home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-5h4v5"/>',
+    lines: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+    cal: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+    card: '<rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 10h19M6 15h4"/>',
+    tag: '<path d="M20.5 13.5 13.5 20.5a2 2 0 0 1-2.8 0L3 12.8V4h8.8l8.7 8.7a1 1 0 0 1 0 .8Z"/><circle cx="7.5" cy="8.5" r="1.3"/>',
+    chev: '<path d="m6 9 6 6 6-6"/>', left: '<path d="m15 6-6 6 6 6"/>', x: '<path d="M18 6 6 18M6 6l12 12"/>', check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+    link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+    split: '<circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="12" r="2.2"/><path d="M6 7.2v9.6M8 5h4a4 4 0 0 1 4 4v.8M8 19h4a4 4 0 0 0 4-4v-.8"/>',
+    qr: '<path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><rect x="7" y="7" width="4" height="4" rx=".5"/><rect x="13" y="7" width="4" height="4" rx=".5"/><rect x="7" y="13" width="4" height="4" rx=".5"/><path d="M13 13h1.5M16.5 13H17M13 16.5V17M16 15v2"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>'
+  };
+  const svg = (k, w, sw, col) => '<svg width="' + w + '" height="' + w + '" viewBox="0 0 24 24" fill="none" stroke="' + (col || 'currentColor') + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round" style="flex:none;display:block">' + I[k] + '</svg>';
+  let S = null, host = null, comp = null;
+
+  const cats = () => comp.cats().filter(n => n !== 'Transferência');
+  const catId = n => (KD.M.catByName[n] || {}).id || null;
+  const catName = id => (KD.M.catById[id] || {}).nome || 'Outros';
+  const catCor = n => comp.cor(n);
+  const catIc = (n, col) => 'url("' + comp.constructor.uri(comp.icSvg(n), col || '#000') + '")';
+  const icDot = (n, sz, bg) => '<span style="width:' + sz + 'px;height:' + sz + 'px;flex:none;border-radius:50%;background:' + (bg || catCor(n)) + ';display:flex;align-items:center;justify-content:center"><span style="display:block;width:' + Math.round(sz * .55) + 'px;height:' + Math.round(sz * .55) + 'px;background-image:' + catIc(n) + ';background-size:contain;background-repeat:no-repeat;background-position:center"></span></span>';
+  const total = () => S.row.total;
+  const somaPartes = () => S.partes.reduce((a, p) => a + p.valor, 0);
+  const catAtual = () => catName(S.catId);
+
+  TX.open = function (c, row) {
+    comp = c; TX.close(true);
+    S = { row, mode: 'dados', nome: row.e, obs: row.obs || '', iso: row.iso, cardId: row.cardId, accId: row.accId, catId: row.catId || catId(row.c), pop: null,
+      link: row.nota && row.nota.url || '', texto: '', nota: row.nota ? { url: row.nota.url, chave_acesso: row.nota.chave_acesso, emitente: row.nota.emitente, cnpj: row.nota.cnpj, emitida_em: row.nota.emitida_em, total: row.nota.total } : null,
+      itens: row.items.map(i => Object.assign({}, i)), partes: [], notaDirty: false, partesDirty: false, msg: '', busy: false, sel: 0 };
+    const idx = {}; row.items.forEach((i, k) => { idx[i.id] = k; });
+    S.partes = row.parts.filter(p => !p.auto).map(p => ({ catId: p.catId, valor: p.valor, rotulo: p.rotulo, itens: row.items.filter(i => i.partId === p.id).map(i => idx[i.id]) }));
+    const ab = document.querySelector('[data-tx-host]'); if (!ab) return;
+    host = ab; host.style.pointerEvents = 'auto'; render(true);
+  };
+  TX.close = function (quick) {
+    if (!host) { S = null; return; }
+    const pn = host.querySelector('[data-pn]'), bd = host.querySelector('[data-bd]');
+    const done = () => { host.innerHTML = ''; host.style.pointerEvents = 'none'; };
+    S = null;
+    if (quick || !pn) { done(); return; }
+    pn.style.transition = 'opacity .22s ease, transform .3s ' + E; pn.style.opacity = '0'; pn.style.transform = pn.style.transform.replace(/translateY\([^)]*\)/, '') + ' translateY(14px)';
+    if (bd) { bd.style.transition = 'opacity .25s ease'; bd.style.opacity = '0'; }
+    setTimeout(done, 300);
+  };
+
+  /* ---------------- peças ---------------- */
+  const lb = (ic, t) => '<div style="display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700;white-space:nowrap;color:#F2F0EB"><span style="color:#9A9AA3;display:flex">' + svg(ic, 22, 2) + '</span>' + t + '</div>';
+  const fieldCss = 'background:#000;border:2px solid #2A2A2F;border-radius:28px;padding:15px 20px;font-size:16px;font-weight:500;color:#F2F0EB;font-family:inherit;outline:0;width:100%;box-sizing:border-box;';
+  const pill = (t, extra) => '<div style="' + fieldCss + 'border-radius:9999px;text-align:center;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' + (extra || '') + '">' + t + '</div>';
+
+  function header(eyebrow) {
+    const cor = catCor(catAtual());
+    return '<div style="display:flex;justify-content:space-between;align-items:flex-end"><div style="min-width:0"><div style="font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9A9AA3">' + eyebrow + '</div><div style="font-size:64px;font-weight:700;letter-spacing:-.06em;line-height:.84;margin-top:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:820px">' + esc(S.nome || '—') + '</div></div>'
+      + '<div style="text-align:right;padding-right:' + (S.mode === 'dados' ? 0 : 54) + 'px"><div style="font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9A9AA3">' + (S.row.inn ? 'Total da entrada' : 'Total da compra') + '</div><div style="font-size:76px;font-weight:700;letter-spacing:-.065em;line-height:.8;margin-top:12px;color:' + cor + ';transition:color .3s ease">' + brl(total()) + '<small style="font-size:20px;color:#F2F0EB;letter-spacing:0;margin-left:8px">R$</small></div></div></div>';
+  }
+
+  function popCat() {
+    return '<div data-pop style="position:absolute;z-index:6;left:0;bottom:calc(100% + 8px);background:#151518;border:1px solid #2A2A2F;border-radius:20px;padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px;width:300px;box-shadow:0 24px 48px rgba(0,0,0,.6);animation:txin .22s ' + E + '">'
+      + cats().map(n => { const on = catAtual() === n; return '<span data-a="cat" data-v="' + esc(n) + '" style="display:flex;align-items:center;gap:10px;height:38px;border-radius:12px;border:1px solid ' + (on ? '#F2F0EB' : '#2A2A2F') + ';background:#0D0D10;padding:0 10px;font-size:13.5px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden">' + icDot(n, 22) + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis">' + esc(n) + '</span>' + (on ? '<span style="color:#F2F0EB;display:flex">' + svg('check', 14, 2.6) + '</span>' : '') + '</span>'; }).join('') + '</div>';
+  }
+  function popCard() {
+    const opts = KD.M.cards.map(c => ({ k: 'c:' + c.id, n: c.nick || c.n, cor: c.cor })).concat(KD.M.accs.map(a => ({ k: 'a:' + a.id, n: a.nome, cor: a.cor })));
+    const cur = S.cardId ? 'c:' + S.cardId : S.accId ? 'a:' + S.accId : '';
+    return '<div data-pop style="position:absolute;z-index:6;left:0;bottom:calc(100% + 8px);background:#151518;border:1px solid #2A2A2F;border-radius:20px;padding:10px;display:flex;flex-direction:column;gap:6px;width:260px;box-shadow:0 24px 48px rgba(0,0,0,.6);animation:txin .22s ' + E + '">'
+      + opts.map(o => '<span data-a="meio" data-v="' + o.k + '" style="display:flex;align-items:center;gap:10px;height:38px;border-radius:12px;border:1px solid ' + (o.k === cur ? '#F2F0EB' : '#2A2A2F') + ';background:#0D0D10;padding:0 12px;font-size:13.5px;font-weight:700;cursor:pointer"><i style="width:10px;height:10px;border-radius:50%;background:' + o.cor + '"></i>' + esc(o.n) + '</span>').join('') + '</div>';
+  }
+
+  function viewDados() {
+    const cn = catAtual(), cor = catCor(cn);
+    const meio = S.cardId ? ((KD.M.cardById[S.cardId] || {}).nick || (KD.M.cardById[S.cardId] || {}).n) : S.accId ? ((KD.M.accs.find(a => a.id === S.accId) || {}).nome) : '—';
+    const left = '<div style="display:flex;flex-direction:column;gap:10px"><div>' + lb('home', 'Estabelecimento') + '</div><input data-in="nome" value="' + esc(S.nome) + '" style="' + fieldCss + '"></div>'
+      + '<div style="display:flex;flex-direction:column;gap:10px;flex:1;min-height:0">' + lb('lines', 'Observação') + '<textarea data-in="obs" placeholder="Adicionar observação" style="' + fieldCss + 'flex:1;resize:none;font-family:inherit"></textarea></div>';
+    const mid = '<div style="display:flex;flex-direction:column;gap:10px">' + lb('cal', 'Data') + '<label style="position:relative;display:block">' + pill(dfmt(S.iso), 'pointer-events:none') + '<input data-in="iso" type="date" value="' + esc(S.iso) + '" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%"></label></div>'
+      + '<div style="display:flex;flex-direction:column;gap:10px;position:relative">' + lb('card', 'Cartão / Conta') + '<div data-a="pop" data-v="card">' + pill(esc(meio)) + '</div>' + (S.pop === 'card' ? popCard() : '') + '</div>'
+      + '<div style="display:flex;flex-direction:column;gap:10px;position:relative">' + lb('tag', 'Categoria') + '<div data-a="pop" data-v="cat" style="display:flex;align-items:center;gap:12px;border-radius:28px;padding:9px 12px 9px 10px;border:2px solid ' + cor + '8C;background:color-mix(in srgb,' + cor + ' 14%,#000);cursor:pointer">' + icDot(cn, 30) + '<b style="font-size:16px;flex:1">' + esc(cn) + '</b><span style="width:28px;height:28px;border-radius:50%;background:#0A0A0A;display:flex;align-items:center;justify-content:center;color:#F2F0EB">' + svg('chev', 14, 2.6) + '</span></div>' + (S.pop === 'cat' ? popCat() : '') + '</div>';
+    const nf = S.itens.length ? S.itens.length + (S.itens.length === 1 ? ' item lido' : ' itens lidos') : 'Escaneie ou cole o link<br>pra ver os itens da compra';
+    const rail = '<div style="width:331px;flex:none;background:#1C1C20;border-left:1px solid #3A3A40;border-radius:0 30px 30px 0;padding:78px 24px 24px 26px;display:flex;flex-direction:column;gap:14px;box-sizing:border-box">'
+      + '<div data-a="mode" data-v="dividir" style="height:54px;flex:none;display:flex;align-items:center;justify-content:center;gap:14px;padding:0 20px;white-space:nowrap;border:2px solid #2A2A2F;border-radius:28px;background:#000;cursor:pointer;transition:border-color .25s ease" onmouseover="this.style.borderColor=\'#51515C\'" onmouseout="this.style.borderColor=\'#2A2A2F\'"><span style="color:#F2F0EB;display:flex">' + svg('split', 30, 1.7) + '</span><div style="display:flex;flex-direction:column;line-height:1.15;align-items:flex-start"><span style="font-weight:900;letter-spacing:.06em;font-size:14px;text-transform:uppercase">Dividir transação</span><span style="font-size:12.5px;color:#9A9AA3">' + (S.partes.length ? S.partes.length + ' partes' : 'Separe em categorias') + '</span></div></div>'
+      + '<div style="flex:1;min-height:0;position:relative"><svg data-tk style="position:absolute;inset:0;overflow:visible" width="280" height="308"></svg>'
+      + '<div data-a="mode" data-v="ler" style="position:absolute;left:0;right:0;top:0;height:244px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;font-weight:900;letter-spacing:.06em;font-size:14px;text-transform:uppercase;cursor:pointer;color:#0A0A0A"><span style="display:flex">' + svg('qr', 60, 1.5, '#0A0A0A') + '</span><span>Nota fiscal</span><small style="font-size:12.5px;font-weight:500;letter-spacing:0;text-transform:none;color:#51515C;text-align:center;line-height:1.4;margin-top:-6px">' + nf + '</small></div>'
+      + '<div data-a="save" style="position:absolute;left:0;top:244px;width:140px;height:64px;display:flex;align-items:center;justify-content:center;font-weight:900;letter-spacing:.06em;font-size:14px;text-transform:uppercase;color:#111114;cursor:pointer;opacity:' + (S.busy ? .5 : 1) + '">' + (S.busy ? 'Salvando…' : 'Salvar') + '</div>'
+      + '<div data-a="close" style="position:absolute;left:140px;top:244px;width:140px;height:64px;display:flex;align-items:center;justify-content:center;font-weight:900;letter-spacing:.06em;font-size:14px;text-transform:uppercase;color:#6A6A72;cursor:pointer">Cancelar</div></div></div>';
+    return '<div style="flex:1;min-width:0;padding:26px 34px 24px 30px;display:flex;flex-direction:column;gap:22px;box-sizing:border-box">' + header('Editando // ' + (S.row.origem === 'open_finance' ? 'Open Finance' : 'Transação'))
+      + '<div style="border-top:1px solid #3A3A40;display:grid;grid-template-columns:1fr 304px;flex:1;min-height:0"><div style="padding:24px 28px 0 0;display:flex;flex-direction:column;gap:24px;min-width:0">' + left + '</div><div style="border-left:1px solid #3A3A40;padding:24px 0 0 28px;display:flex;flex-direction:column;gap:20px">' + mid + '</div></div></div>' + rail
+      + (S.msg ? '<div style="position:absolute;left:30px;bottom:14px;font-size:12.5px;color:#FFC24A">' + esc(S.msg) + '</div>' : '');
+  }
+
+  const footer = (primary, dis) => '<div style="display:flex;justify-content:space-between;align-items:center;flex:none"><span data-a="mode" data-v="dados" style="height:46px;display:flex;align-items:center;gap:8px;padding:0 22px 0 14px;border-radius:9999px;border:2px solid #2A2A2F;font-weight:900;letter-spacing:.06em;font-size:13px;text-transform:uppercase;cursor:pointer">' + svg('left', 18, 2.4) + 'Voltar</span>' + (S.msg ? '<span style="font-size:12.5px;color:#FFC24A;flex:1;padding:0 20px;text-align:center">' + esc(S.msg) + '</span>' : '<span></span>') + primary + '</div>';
+  const primaryBtn = (a, t, dis) => '<span data-a="' + a + '" style="height:46px;display:flex;align-items:center;padding:0 28px;border-radius:9999px;background:#F2F0EB;color:#0A0A0A;font-weight:900;letter-spacing:.06em;font-size:13px;text-transform:uppercase;cursor:' + (dis ? 'default' : 'pointer') + ';opacity:' + (dis ? .35 : 1) + '">' + t + '</span>';
+
+  function viewLer() {
+    const body = '<div style="border-top:1px solid #3A3A40;display:grid;grid-template-columns:1fr 1fr;gap:34px;flex:1;min-height:0;padding:24px 0 0">'
+      + '<div style="display:flex;flex-direction:column;gap:10px;min-height:0"><div style="display:flex;align-items:center;justify-content:space-between">' + lb('link', 'Link da nota') + '<span style="font-size:10px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;padding:4px 10px;border-radius:9999px;background:#1C1C20;color:#6AFF2A">Mais rápido</span></div>'
+      + '<div style="display:flex;gap:10px"><input data-in="link" value="' + esc(S.link) + '" placeholder="Cole o link do QR da nota" style="' + fieldCss + 'flex:1"><span data-a="lerlink" style="height:56px;display:flex;align-items:center;padding:0 24px;border-radius:9999px;background:#F2F0EB;color:#0A0A0A;font-weight:900;letter-spacing:.06em;font-size:13px;text-transform:uppercase;cursor:pointer;flex:none">Ler</span></div>'
+      + '<div style="font-size:12.5px;color:#9A9AA3;line-height:1.4">O QR Code da nota abre uma página com os itens. Copie o endereço dela e cole aqui.</div>'
+      + '<div style="margin-top:6px;font-size:16px;font-weight:700;color:#F2F0EB">Ou cole o texto da página</div><textarea data-in="texto" placeholder="Abra o link, selecione tudo, copie e cole aqui" style="' + fieldCss + 'flex:1;min-height:0;resize:none"></textarea></div>'
+      + '<label style="display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed #3A3A40;border-radius:28px;cursor:pointer;margin-bottom:4px"><input data-in="foto" type="file" accept="image/*,application/pdf" style="display:none"><div style="display:flex;align-items:center;gap:22px"><span style="color:#F2F0EB;display:flex">' + svg('qr', 64, 1.4) + '</span><div style="display:flex;flex-direction:column;gap:6px"><span style="font-weight:900;letter-spacing:.06em;font-size:14px;text-transform:uppercase">Enviar foto ou print</span><span style="font-size:12.5px;color:#9A9AA3">Arraste a imagem aqui ou clique pra escolher</span><span style="font-size:11px;color:#51515C;font-weight:700;letter-spacing:.08em">PNG · JPG · PDF</span></div></div></label></div>';
+    return '<div style="flex:1;min-width:0;padding:26px 34px 24px 30px;display:flex;flex-direction:column;gap:22px;box-sizing:border-box">' + header('Ler nota fiscal') + body + footer(primaryBtn('lertexto', 'Ler nota', false)) + '</div>';
+  }
+
+  function viewDividir() {
+    const t = total(), soma = somaPartes(), resto = Math.max(0, t - soma), over = soma > t + 0.005;
+    const bar = S.partes.map(p => '<i style="flex:' + Math.max(p.valor, 0.01) + ';background:' + catCor(catName(p.catId)) + '"></i>').join('') + (resto > 0.004 ? '<i style="flex:' + resto + ';background:repeating-linear-gradient(135deg,#2A2A2F 0 6px,#1C1C20 6px 12px)"></i>' : '');
+    const rows = S.partes.map((p, k) => { const cn = catName(p.catId), cor = catCor(cn), on = S.sel === k;
+      return '<div data-a="sel" data-v="' + k + '" data-drop="' + k + '" style="display:flex;align-items:center;gap:12px;padding:8px 10px 8px 12px;border-radius:9999px;border:2px solid ' + (on ? cor : '#2A2A2F') + ';background:#000;cursor:pointer;transition:border-color .25s ease"><i style="width:12px;height:12px;border-radius:50%;background:' + cor + ';flex:none"></i><span data-a="pcat" data-v="' + k + '" style="font-size:15px;font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(cn) + '</span><span style="font-size:12px;color:#9A9AA3;white-space:nowrap">' + p.itens.length + (p.itens.length === 1 ? ' item' : ' itens') + '</span><span style="display:flex;align-items:center;gap:4px;padding:5px 12px;border-radius:9999px;background:#1C1C20;font-size:11px;color:#9A9AA3;font-weight:700">R$<input data-in="pv" data-k="' + k + '" value="' + brl(p.valor) + '" style="width:78px;background:transparent;border:0;outline:0;color:#F2F0EB;font-family:inherit;font-size:15px;font-weight:700;text-align:right"></span><span data-a="pdel" data-v="' + k + '" style="width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#9A9AA3">' + svg('x', 14, 2.4) + '</span></div>'
+        + (S.pop === 'p' + k ? '<div style="position:relative"><div data-pop style="position:absolute;z-index:6;left:0;top:6px;background:#151518;border:1px solid #2A2A2F;border-radius:20px;padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px;width:300px;box-shadow:0 24px 48px rgba(0,0,0,.6)">' + cats().map(n => '<span data-a="pset" data-k="' + k + '" data-v="' + esc(n) + '" style="display:flex;align-items:center;gap:10px;height:38px;border-radius:12px;border:1px solid ' + (n === cn ? '#F2F0EB' : '#2A2A2F') + ';background:#0D0D10;padding:0 10px;font-size:13.5px;font-weight:700;cursor:pointer;white-space:nowrap">' + icDot(n, 22) + esc(n) + '</span>').join('') + '</div></div>' : ''); }).join('');
+    const its = S.itens.map((it, k) => { const pi = S.partes.findIndex(p => p.itens.includes(k)), cor = pi >= 0 ? catCor(catName(S.partes[pi].catId)) : '#3A3A40';
+      return '<div draggable="true" data-a="item" data-v="' + k + '" data-drag="' + k + '" style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px dashed #2B2B30;cursor:grab"><i style="width:10px;height:10px;border-radius:50%;background:' + cor + ';flex:none"></i><span style="flex:1;min-width:0;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(it.nome) + '</span><span style="font-size:11px;color:#9A9AA3">R$</span><span style="font-size:14px;font-weight:700;font-variant-numeric:tabular-nums">' + brl(it.valor) + '</span></div>'; }).join('');
+    const left = '<div style="display:flex;flex-direction:column;gap:14px;min-height:0;padding-right:34px"><div style="display:flex;height:14px;border-radius:9999px;overflow:hidden;gap:2px;flex:none">' + bar + '</div><div style="display:flex;flex-direction:column;gap:8px;overflow:auto;min-height:0;flex:1" class="kscroll">' + rows
+      + '<div data-a="padd" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:9999px;border:2px dashed #3A3A40;cursor:pointer;color:#9A9AA3;font-size:14px;font-weight:700"><span style="display:flex">' + svg('plus', 18, 2.4) + '</span>Adicionar parte<span style="font-weight:500;font-size:12.5px;margin-left:6px">o que sobrar vira parte “Outros” sozinho</span></div></div>'
+      + '<div style="font-size:12.5px;color:' + (over ? '#FF6B5A' : '#9A9AA3') + ';flex:none">' + (over ? 'As partes passam do total em R$ ' + brl(soma - t) : 'A transação original continua intacta · R$ ' + brl(resto) + ' sem parte') + '</div></div>';
+    const right = '<div style="border-left:1px solid #3A3A40;padding-left:34px;display:flex;flex-direction:column;gap:10px;min-height:0"><div style="font-size:16px;font-weight:700">' + (S.itens.length ? 'Itens da nota <span style="color:#9A9AA3;font-weight:500;font-size:13px">(' + S.itens.length + ' · arraste pra uma parte)</span>' : 'Itens da nota') + '</div>'
+      + (S.itens.length ? '<div class="kscroll" style="overflow:auto;min-height:0;flex:1;-webkit-mask-image:linear-gradient(#0000,#000 14px,#000 calc(100% - 22px),#0000);mask-image:linear-gradient(#0000,#000 14px,#000 calc(100% - 22px),#0000)">' + its + '</div>' : '<div style="font-size:13px;color:#9A9AA3;line-height:1.5">Sem itens ainda. Leia a nota fiscal pra distribuir os itens, ou crie as partes só pelo valor.</div><span data-a="mode" data-v="ler" style="align-self:flex-start;margin-top:6px;display:flex;align-items:center;gap:10px;padding:10px 18px;border-radius:9999px;border:2px solid #2A2A2F;font-weight:900;letter-spacing:.06em;font-size:12px;text-transform:uppercase;cursor:pointer">' + svg('qr', 20, 1.7) + 'Ler nota fiscal</span>') + '</div>';
+    return '<div style="flex:1;min-width:0;padding:26px 34px 24px 30px;display:flex;flex-direction:column;gap:22px;box-sizing:border-box">' + header('Dividir transação') + '<div style="border-top:1px solid #3A3A40;display:grid;grid-template-columns:1fr 1fr;flex:1;min-height:0;padding:22px 0 0">' + left + right + '</div>' + footer(primaryBtn('confirm', S.busy ? 'Salvando…' : 'Confirmar divisão', over)) + '</div>';
+  }
+
+  /* bilhete (SVG): cantos, entalhes e perfuração */
+  function ticket() {
+    const sv = host.querySelector('[data-tk]'); if (!sv) return;
+    const W = 280, H = 308, hB = 64, n = 13, R = 28, seam = H - hB;
+    const P = 'M0,' + R + 'A' + R + ',' + R + ' 0 0 1 ' + R + ',0H' + (W - R) + 'A' + R + ',' + R + ' 0 0 1 ' + W + ',' + R + 'V' + (seam - n) + 'A' + n + ',' + n + ' 0 0 0 ' + W + ',' + (seam + n) + 'V' + (H - R) + 'A' + R + ',' + R + ' 0 0 1 ' + (W - R) + ',' + H + 'H' + R + 'A' + R + ',' + R + ' 0 0 1 0,' + (H - R) + 'V' + (seam + n) + 'A' + n + ',' + n + ' 0 0 0 0,' + (seam - n) + 'Z';
+    sv.innerHTML = '<path d="' + P + '" fill="#F2F0EB"/><line x1="' + (W / 2) + '" x2="' + (W / 2) + '" y1="' + (seam + 12) + '" y2="' + (H - 12) + '" stroke="#9A9AA3" stroke-width="1.5" stroke-dasharray="4 5"/><line x1="' + (n + 8) + '" x2="' + (W - n - 8) + '" y1="' + seam + '" y2="' + seam + '" stroke="#9A9AA3" stroke-width="1.6" stroke-dasharray="5 5"/>';
+  }
+
+  /* ---------------- render ---------------- */
+  function render(first) {
+    if (!S || !host) return;
+    const keep = {}; host.querySelectorAll('[data-in]').forEach(i => { if (document.activeElement === i) keep.k = i.getAttribute('data-in') + (i.getAttribute('data-k') || ''); });
+    const hw = host.clientWidth || 1358, k = Math.min(1, (hw - 32) / 1358);
+    const bodyHtml = S.mode === 'dados' ? viewDados() : S.mode === 'ler' ? viewLer() : viewDividir();
+    const x = '<span data-a="close" style="position:absolute;right:0;top:0;width:44px;height:44px;border-radius:50%;background:#F2F0EB;color:#0A0A0A;display:flex;align-items:center;justify-content:center;z-index:3;cursor:pointer;box-shadow:0 0 0 9px ' + (S.mode === 'dados' ? '#1C1C20' : '#111114') + '"><span data-xi style="display:flex;transition:transform .5s cubic-bezier(.65,0,.2,1)">' + svg('x', 18, 2.4) + '</span></span>';
+    const prevPn = host.querySelector('[data-pn]');
+    host.innerHTML = '<div data-bd style="position:absolute;inset:0;background:rgba(0,0,0,.72);' + (first ? 'animation:txfade .25s ease' : '') + '"></div>'
+      + '<style>@keyframes txfade{from{opacity:0}to{opacity:1}}@keyframes txin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}@keyframes txup{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}[data-pn] input::placeholder,[data-pn] textarea::placeholder{color:#51515C}</style>'
+      + '<div data-pn style="position:absolute;left:50%;top:50%;width:1358px;height:480px;margin:-240px 0 0 -679px;transform:scale(' + k + ');transform-origin:center;background:#111114;border:1px solid #2A2A2F;border-radius:30px;display:flex;font-family:Helvetica,Arial,sans-serif;color:#F2F0EB;' + (first ? 'animation:txup .4s ' + E : '') + '">' + bodyHtml + x + '</div>';
+    const pn = host.querySelector('[data-pn]');
+    if (S.mode === 'dados') ticket();
+    const ta = pn.querySelector('[data-in="obs"]'); if (ta) ta.value = S.obs;
+    const tt = pn.querySelector('[data-in="texto"]'); if (tt) tt.value = S.texto;
+    if (keep.k) { const el = [...pn.querySelectorAll('[data-in]')].find(i => i.getAttribute('data-in') + (i.getAttribute('data-k') || '') === keep.k); if (el) { el.focus(); try { const l = el.value.length; el.setSelectionRange(l, l); } catch (e) { } } }
+    wire(pn);
+    const xi = pn.querySelector('[data-xi]'); if (xi && first) { xi.style.transform = 'rotate(-180deg)'; requestAnimationFrame(() => requestAnimationFrame(() => { xi.style.transform = 'rotate(0deg)'; })); }
+    void prevPn;
+  }
+
+  /* ---------------- ações ---------------- */
+  function parseTexto(t) {
+    const out = [], re = /([^\n(]+?)\s*\(C[óo]digo:\s*[\w-]+\)\s*Qtde\.?:?\s*([\d.,]+)\s*UN:?\s*(\w+)\s*Vl\.?\s*Unit\.?:?\s*([\d.,]+)\s*Vl\.?\s*Total\s*([\d.,]+)/gi; let m;
+    while ((m = re.exec(t.replace(/\s+/g, ' ')))) out.push({ nome: m[1].trim().replace(/^[\d\s-]+(?=[A-Za-zÀ-ú])/, '').trim() || m[1].trim(), qtd: num(m[2]) || 1, un: m[3], valor: num(m[5]), catId: null });
+    return out;
+  }
+  function aceitarItens(its, url) {
+    if (!its.length) { S.msg = 'Não achei itens nesse texto. Confira se copiou a página inteira.'; render(); return; }
+    S.itens = its; S.nota = Object.assign({}, S.nota || {}, { url: url || (S.nota && S.nota.url) || null, total: its.reduce((a, i) => a + i.valor, 0) }); S.notaDirty = true; S.partes = []; S.partesDirty = true; S.msg = ''; S.mode = 'dividir'; render();
+  }
+  async function lerLink() {
+    const url = (S.link || '').trim(); if (!/^https?:\/\//i.test(url)) { S.msg = 'Cole o endereço completo do link da nota.'; render(); return; }
+    S.msg = 'Lendo a nota…'; render();
+    try {
+      const r = await KD.sb.functions.invoke('ler-nota', { body: { url } });
+      if (r.error || !r.data || !r.data.itens) throw r.error || new Error('sem dados');
+      S.nota = { url, chave_acesso: r.data.chave_acesso || null, emitente: r.data.emitente || null, cnpj: r.data.cnpj || null, emitida_em: r.data.emitida_em || null, total: r.data.total || null };
+      aceitarItens(r.data.itens.map(i => ({ nome: i.nome, qtd: i.quantidade || 1, un: i.unidade || '', valor: i.valor, catId: null })), url);
+    } catch (e) { S.msg = 'Ainda não leio o link direto. Abra o link, copie o texto da página e cole abaixo.'; render(); }
+  }
+  async function salvar() {
+    if (S.busy) return; S.busy = true; S.msg = ''; render();
+    S.partes = S.partes.filter(p => p.valor > 0);
+    const d = { id: S.row.id, nome: S.nome, obs: S.obs, iso: S.iso, cardId: S.cardId, accId: S.accId, catId: S.catId, notaDirty: S.notaDirty, partesDirty: S.partesDirty, nota: S.nota, itens: S.itens, partes: S.partes };
+    try { await KD.txSave(comp, d); TX.close(); }
+    catch (e) { console.error('[kontar] salvar transação', e); S.busy = false; S.msg = 'Não consegui salvar: ' + ((e && e.message) || 'erro'); render(); }
+  }
+
+  function wire(pn) {
+    pn.addEventListener('click', ev => {
+      const el = ev.target.closest('[data-a]'); if (!el || !S) { if (S && S.pop && !ev.target.closest('[data-pop]')) { S.pop = null; render(); } return; }
+      const a = el.getAttribute('data-a'), v = el.getAttribute('data-v');
+      if (a === 'close') TX.close();
+      else if (a === 'mode') { S.pop = null; S.msg = ''; S.mode = v; render(); }
+      else if (a === 'pop') { ev.stopPropagation(); S.pop = S.pop === v ? null : v; render(); }
+      else if (a === 'cat') { S.catId = catId(v); S.pop = null; render(); }
+      else if (a === 'meio') { const [t, id] = v.split(':'); S.cardId = t === 'c' ? id : null; S.accId = t === 'a' ? id : null; S.pop = null; render(); }
+      else if (a === 'save') salvar();
+      else if (a === 'confirm') { if (somaPartes() <= total() + 0.005) { S.partesDirty = true; salvar(); } }
+      else if (a === 'lerlink') lerLink();
+      else if (a === 'lertexto') aceitarItens(parseTexto(S.texto || ''), S.link);
+      else if (a === 'padd') { const used = new Set(S.partes.map(p => p.catId)), n = cats().find(c => !used.has(catId(c))) || 'Outros'; S.partes.push({ catId: catId(n), valor: Math.max(0, Math.round((total() - somaPartes()) * 100) / 100) || 0.01, rotulo: '', itens: [] }); S.sel = S.partes.length - 1; S.partesDirty = true; render(); }
+      else if (a === 'pdel') { ev.stopPropagation(); S.partes.splice(+v, 1); S.sel = 0; S.partesDirty = true; render(); }
+      else if (a === 'pcat') { ev.stopPropagation(); S.sel = +v; S.pop = S.pop === 'p' + v ? null : 'p' + v; render(); }
+      else if (a === 'pset') { S.partes[+el.getAttribute('data-k')].catId = catId(v); S.pop = null; S.partesDirty = true; render(); }
+      else if (a === 'sel') { if (!ev.target.closest('input')) { S.sel = +v; render(); } }
+      else if (a === 'item') assign(+v, S.sel);
+    });
+    pn.addEventListener('input', ev => {
+      const el = ev.target, k = el.getAttribute && el.getAttribute('data-in'); if (!k) return;
+      if (k === 'nome') { S.nome = el.value; const b = pn.querySelector('div[style*="font-size:64px"]'); if (b) b.textContent = S.nome || '—'; }
+      else if (k === 'obs') S.obs = el.value; else if (k === 'link') S.link = el.value; else if (k === 'texto') S.texto = el.value;
+      else if (k === 'iso') { S.iso = el.value; render(); }
+      else if (k === 'pv') { const p = S.partes[+el.getAttribute('data-k')]; if (p) { p.valor = num(el.value); S.partesDirty = true; } }
+    });
+    pn.addEventListener('change', ev => { const el = ev.target; if (el.getAttribute('data-in') === 'pv') render(); if (el.getAttribute('data-in') === 'foto') { S.msg = 'Leitura de foto chega na próxima etapa. Por enquanto use o link ou o texto da página.'; render(); } });
+    pn.addEventListener('dragstart', ev => { const d = ev.target.closest && ev.target.closest('[data-drag]'); if (d) { ev.dataTransfer.setData('text/plain', d.getAttribute('data-drag')); ev.dataTransfer.effectAllowed = 'move'; } });
+    pn.addEventListener('dragover', ev => { if (ev.target.closest && ev.target.closest('[data-drop]')) ev.preventDefault(); });
+    pn.addEventListener('drop', ev => { const t = ev.target.closest && ev.target.closest('[data-drop]'); if (!t) return; ev.preventDefault(); assign(+ev.dataTransfer.getData('text/plain'), +t.getAttribute('data-drop')); });
+  }
+  function assign(i, pi) {
+    if (!S.partes.length) { S.partes.push({ catId: S.catId, valor: 0, rotulo: '', itens: [] }); pi = 0; S.sel = 0; }
+    const p = S.partes[pi]; if (!p || !S.itens[i]) return;
+    S.partes.forEach(q => { q.itens = q.itens.filter(x => x !== i); });
+    p.itens.push(i); S.partes.forEach(q => { if (q.itens.length) q.valor = Math.round(q.itens.reduce((a, x) => a + S.itens[x].valor, 0) * 100) / 100; });
+    S.partesDirty = true; render();
+  }
+  window.addEventListener('keydown', e => { if (S && e.key === 'Escape') TX.close(); });
 })();
