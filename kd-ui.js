@@ -471,13 +471,18 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const somaPartes = () => S.partes.reduce((a, p) => a + p.valor, 0);
   const catAtual = () => catName(S.catId);
 
-  TX.open = function (c, row) {
-    comp = c; TX.close(true);
-    S = { row, mode: 'dados', nome: row.e, obs: row.obs || '', iso: row.iso, cardId: row.cardId, accId: row.accId, catId: row.catId || catId(row.c), pop: null,
+  function init(row) {
+    const S = { row, mode: 'dados', nome: row.e, obs: row.obs || '', iso: row.iso, cardId: row.cardId, accId: row.accId, catId: row.catId || catId(row.c), pop: null,
       link: row.nota && row.nota.url || '', texto: '', nota: row.nota ? { url: row.nota.url, chave_acesso: row.nota.chave_acesso, emitente: row.nota.emitente, cnpj: row.nota.cnpj, emitida_em: row.nota.emitida_em, total: row.nota.total } : null,
       itens: row.items.map(i => Object.assign({}, i)), partes: [], notaDirty: false, partesDirty: false, msg: '', busy: false, sel: 0 };
     const idx = {}; row.items.forEach((i, k) => { idx[i.id] = k; });
     S.partes = row.parts.filter(p => !p.auto).map(p => ({ catId: p.catId, valor: p.valor, rotulo: p.rotulo, itens: row.items.filter(i => i.partId === p.id).map(i => idx[i.id]) }));
+    return S;
+  }
+
+  TX.open = function (c, row) {
+    comp = c; TX.close(true);
+    S = init(row);
     const ab = document.querySelector('[data-tx-host]'); if (!ab) return;
     host = ab; host.style.pointerEvents = 'auto'; render(true);
   };
@@ -499,7 +504,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
 
   function header(eyebrow) {
     const cor = catCor(catAtual());
-    return '<div style="display:flex;justify-content:space-between;align-items:flex-end"><div style="min-width:0"><div style="font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9A9AA3">' + eyebrow + '</div><div style="font-size:64px;font-weight:700;letter-spacing:-.06em;line-height:.84;margin-top:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:820px">' + esc(S.nome || '—') + '</div></div>'
+    return '<div style="display:flex;justify-content:space-between;align-items:flex-end"><div style="min-width:0;overflow:visible;position:relative;z-index:1"><div style="font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9A9AA3">' + eyebrow + '</div><div style="font-size:64px;font-weight:700;letter-spacing:-.06em;line-height:1;margin:6px 0 -6px;white-space:nowrap;overflow:visible">' + esc(S.nome || '—') + '</div></div>'
       + '<div style="text-align:right;padding-right:' + (S.mode === 'dados' ? 0 : 54) + 'px"><div style="font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9A9AA3">' + (S.row.inn ? 'Total da entrada' : 'Total da compra') + '</div><div style="font-size:76px;font-weight:700;letter-spacing:-.065em;line-height:.8;margin-top:12px;color:' + cor + ';transition:color .3s ease">' + brl(total()) + '<small style="font-size:20px;color:#F2F0EB;letter-spacing:0;margin-left:8px">R$</small></div></div></div>';
   }
 
@@ -524,7 +529,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       + '<div style="display:flex;flex-direction:column;gap:10px;position:relative">' + lb('tag', 'Categoria') + '<div data-a="pop" data-v="cat" style="display:flex;align-items:center;gap:12px;border-radius:28px;padding:9px 12px 9px 10px;border:2px solid ' + cor + '8C;background:color-mix(in srgb,' + cor + ' 14%,#000);cursor:pointer">' + icDot(cn, 30) + '<b style="font-size:16px;flex:1">' + esc(cn) + '</b><span style="width:28px;height:28px;border-radius:50%;background:#0A0A0A;display:flex;align-items:center;justify-content:center;color:#F2F0EB">' + svg('chev', 14, 2.6) + '</span></div>' + (S.pop === 'cat' ? popCat() : '') + '</div>';
     const nf = S.itens.length ? S.itens.length + (S.itens.length === 1 ? ' item lido' : ' itens lidos') : 'Escaneie ou cole o link<br>pra ver os itens da compra';
     const rail = '<div style="width:331px;flex:none;background:#1C1C20;border-left:1px solid #3A3A40;border-radius:0 30px 30px 0;padding:78px 24px 24px 26px;display:flex;flex-direction:column;gap:14px;box-sizing:border-box">'
-      + '<div data-a="mode" data-v="dividir" style="height:54px;flex:none;display:flex;align-items:center;justify-content:center;gap:14px;padding:0 20px;white-space:nowrap;border:2px solid #2A2A2F;border-radius:28px;background:#000;cursor:pointer;transition:border-color .25s ease" onmouseover="this.style.borderColor=\'#51515C\'" onmouseout="this.style.borderColor=\'#2A2A2F\'"><span style="color:#F2F0EB;display:flex">' + svg('split', 30, 1.7) + '</span><div style="display:flex;flex-direction:column;line-height:1.15;align-items:flex-start"><span style="font-weight:900;letter-spacing:.06em;font-size:14px;text-transform:uppercase">Dividir transação</span><span style="font-size:12.5px;color:#9A9AA3">' + (S.partes.length ? S.partes.length + ' partes' : 'Separe em categorias') + '</span></div></div>'
+      + '<div data-a="mode" data-v="dividir" style="height:54px;flex:none;display:flex;align-items:center;justify-content:center;gap:14px;padding:0 20px;white-space:nowrap;border:2px solid #2A2A2F;border-radius:28px;background:#000;cursor:pointer;transition:border-color .25s ease" onmouseover="this.style.borderColor=\'#51515C\'" onmouseout="this.style.borderColor=\'#2A2A2F\'"><span style="color:#F2F0EB;display:flex">' + svg('split', 30, 1.7) + '</span><div style="display:flex;flex-direction:column;line-height:1.15;align-items:flex-start"><span style="font-weight:900;letter-spacing:.06em;font-size:14px;text-transform:uppercase">Dividir transação</span><span style="font-size:12.5px;color:#9A9AA3">' + (S.partes.length ? S.partes.length + (S.partes.length === 1 ? ' parte' : ' partes') : 'Separe em categorias') + '</span></div></div>'
       + '<div style="flex:1;min-height:0;position:relative"><svg data-tk style="position:absolute;inset:0;overflow:visible" width="280" height="308"></svg>'
       + '<div data-a="mode" data-v="ler" style="position:absolute;left:0;right:0;top:0;height:244px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;font-weight:900;letter-spacing:.06em;font-size:14px;text-transform:uppercase;cursor:pointer;color:#0A0A0A"><span style="display:flex">' + svg('qr', 60, 1.5, '#0A0A0A') + '</span><span>Nota fiscal</span><small style="font-size:12.5px;font-weight:500;letter-spacing:0;text-transform:none;color:#51515C;text-align:center;line-height:1.4;margin-top:-6px">' + nf + '</small></div>'
       + '<div data-a="save" style="position:absolute;left:0;top:244px;width:140px;height:64px;display:flex;align-items:center;justify-content:center;font-weight:900;letter-spacing:.06em;font-size:14px;text-transform:uppercase;color:#111114;cursor:pointer;opacity:' + (S.busy ? .5 : 1) + '">' + (S.busy ? 'Salvando…' : 'Salvar') + '</div>'
@@ -549,18 +554,29 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
 
   function viewDividir() {
     const t = total(), soma = somaPartes(), resto = Math.max(0, t - soma), over = soma > t + 0.005;
+    const nomeP = p => p.rotulo || catName(p.catId);
     const bar = S.partes.map(p => '<i style="flex:' + Math.max(p.valor, 0.01) + ';background:' + catCor(catName(p.catId)) + '"></i>').join('') + (resto > 0.004 ? '<i style="flex:' + resto + ';background:repeating-linear-gradient(135deg,#2A2A2F 0 6px,#1C1C20 6px 12px)"></i>' : '');
-    const rows = S.partes.map((p, k) => { const cn = catName(p.catId), cor = catCor(cn), on = S.sel === k;
-      return '<div data-a="sel" data-v="' + k + '" data-drop="' + k + '" style="display:flex;align-items:center;gap:12px;padding:8px 10px 8px 12px;border-radius:9999px;border:2px solid ' + (on ? cor : '#2A2A2F') + ';background:#000;cursor:pointer;transition:border-color .25s ease"><i style="width:12px;height:12px;border-radius:50%;background:' + cor + ';flex:none"></i><span data-a="pcat" data-v="' + k + '" style="font-size:15px;font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(cn) + '</span><span style="font-size:12px;color:#9A9AA3;white-space:nowrap">' + p.itens.length + (p.itens.length === 1 ? ' item' : ' itens') + '</span><span style="display:flex;align-items:center;gap:4px;padding:5px 12px;border-radius:9999px;background:#1C1C20;font-size:11px;color:#9A9AA3;font-weight:700">R$<input data-in="pv" data-k="' + k + '" value="' + brl(p.valor) + '" style="width:78px;background:transparent;border:0;outline:0;color:#F2F0EB;font-family:inherit;font-size:15px;font-weight:700;text-align:right"></span><span data-a="pdel" data-v="' + k + '" style="width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#9A9AA3">' + svg('x', 14, 2.4) + '</span></div>'
-        + (S.pop === 'p' + k ? '<div style="position:relative"><div data-pop style="position:absolute;z-index:6;left:0;top:6px;background:#151518;border:1px solid #2A2A2F;border-radius:20px;padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px;width:300px;box-shadow:0 24px 48px rgba(0,0,0,.6)">' + cats().map(n => '<span data-a="pset" data-k="' + k + '" data-v="' + esc(n) + '" style="display:flex;align-items:center;gap:10px;height:38px;border-radius:12px;border:1px solid ' + (n === cn ? '#F2F0EB' : '#2A2A2F') + ';background:#0D0D10;padding:0 10px;font-size:13.5px;font-weight:700;cursor:pointer;white-space:nowrap">' + icDot(n, 22) + esc(n) + '</span>').join('') + '</div></div>' : ''); }).join('');
-    const its = S.itens.map((it, k) => { const pi = S.partes.findIndex(p => p.itens.includes(k)), cor = pi >= 0 ? catCor(catName(S.partes[pi].catId)) : '#3A3A40';
-      return '<div draggable="true" data-a="item" data-v="' + k + '" data-drag="' + k + '" style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px dashed #2B2B30;cursor:grab"><i style="width:10px;height:10px;border-radius:50%;background:' + cor + ';flex:none"></i><span style="flex:1;min-width:0;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(it.nome) + '</span><span style="font-size:11px;color:#9A9AA3">R$</span><span style="font-size:14px;font-weight:700;font-variant-numeric:tabular-nums">' + brl(it.valor) + '</span></div>'; }).join('');
+    const rows = S.partes.map((p, k) => { const cor = catCor(catName(p.catId)), on = S.sel === k;
+      return '<div data-a="sel" data-v="' + k + '" data-drop="' + k + '" style="display:flex;align-items:center;gap:12px;padding:8px 10px 8px 14px;border-radius:9999px;border:2px solid ' + (on ? cor : '#2A2A2F') + ';background:#000;cursor:pointer;transition:border-color .25s ease;flex:none"><i style="width:12px;height:12px;border-radius:50%;background:' + cor + ';flex:none"></i><span style="font-size:15px;font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(nomeP(p)) + '</span><span style="font-size:12px;color:#9A9AA3;white-space:nowrap">' + p.itens.length + (p.itens.length === 1 ? ' item' : ' itens') + '</span><span style="display:flex;align-items:center;gap:8px;padding:6px 14px;border-radius:9999px;background:#1C1C20;font-size:11px;color:#9A9AA3;font-weight:700">R$<span style="font-size:15px;color:#F2F0EB;font-variant-numeric:tabular-nums">' + brl(p.valor) + '</span></span><span data-a="pdel" data-v="' + k + '" style="width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#9A9AA3">' + svg('x', 14, 2.4) + '</span></div>'; }).join('');
     const left = '<div style="display:flex;flex-direction:column;gap:14px;min-height:0;padding-right:34px"><div style="display:flex;height:14px;border-radius:9999px;overflow:hidden;gap:2px;flex:none">' + bar + '</div><div style="display:flex;flex-direction:column;gap:8px;overflow:auto;min-height:0;flex:1" class="kscroll">' + rows
-      + '<div data-a="padd" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:9999px;border:2px dashed #3A3A40;cursor:pointer;color:#9A9AA3;font-size:14px;font-weight:700"><span style="display:flex">' + svg('plus', 18, 2.4) + '</span>Adicionar parte<span style="font-weight:500;font-size:12.5px;margin-left:6px">o que sobrar vira parte “Outros” sozinho</span></div></div>'
+      + '<div data-a="padd" style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:9999px;border:2px dashed #3A3A40;cursor:pointer;color:#9A9AA3;font-size:14px;font-weight:700;flex:none"><span style="display:flex">' + svg('plus', 18, 2.4) + '</span>Adicionar parte<span style="font-weight:500;font-size:12.5px;margin-left:6px">o que sobrar vira parte “Outros” sozinho</span></div></div>'
       + '<div style="font-size:12.5px;color:' + (over ? '#FF6B5A' : '#9A9AA3') + ';flex:none">' + (over ? 'As partes passam do total em R$ ' + brl(soma - t) : 'A transação original continua intacta · R$ ' + brl(resto) + ' sem parte') + '</div></div>';
-    const right = '<div style="border-left:1px solid #3A3A40;padding-left:34px;display:flex;flex-direction:column;gap:10px;min-height:0"><div style="font-size:16px;font-weight:700">' + (S.itens.length ? 'Itens da nota <span style="color:#9A9AA3;font-weight:500;font-size:13px">(' + S.itens.length + ' · arraste pra uma parte)</span>' : 'Itens da nota') + '</div>'
-      + (S.itens.length ? '<div class="kscroll" style="overflow:auto;min-height:0;flex:1;-webkit-mask-image:linear-gradient(#0000,#000 14px,#000 calc(100% - 22px),#0000);mask-image:linear-gradient(#0000,#000 14px,#000 calc(100% - 22px),#0000)">' + its + '</div>' : '<div style="font-size:13px;color:#9A9AA3;line-height:1.5">Sem itens ainda. Leia a nota fiscal pra distribuir os itens, ou crie as partes só pelo valor.</div><span data-a="mode" data-v="ler" style="align-self:flex-start;margin-top:6px;display:flex;align-items:center;gap:10px;padding:10px 18px;border-radius:9999px;border:2px solid #2A2A2F;font-weight:900;letter-spacing:.06em;font-size:12px;text-transform:uppercase;cursor:pointer">' + svg('qr', 20, 1.7) + 'Ler nota fiscal</span>') + '</div>';
-    return '<div style="flex:1;min-width:0;padding:26px 34px 24px 30px;display:flex;flex-direction:column;gap:22px;box-sizing:border-box">' + header('Dividir transação') + '<div style="border-top:1px solid #3A3A40;display:grid;grid-template-columns:1fr 1fr;flex:1;min-height:0;padding:22px 0 0">' + left + right + '</div>' + footer(primaryBtn('confirm', S.busy ? 'Salvando…' : 'Confirmar divisão', over)) + '</div>';
+    const P = S.partes[S.sel];
+    let right;
+    if (!P) right = '<div style="border-left:1px solid #3A3A40;padding-left:34px;display:flex;flex-direction:column;gap:10px;font-size:13px;color:#9A9AA3;line-height:1.5">Adicione uma parte pra editar o título, a categoria e o valor dela.</div>';
+    else {
+      const cn = catName(P.catId), cor = catCor(cn);
+      const its = S.itens.map((it, k) => { const pi = S.partes.findIndex(q => q.itens.includes(k)), mine = pi === S.sel, c2 = pi >= 0 ? catCor(catName(S.partes[pi].catId)) : '#3A3A40';
+        return '<div draggable="true" data-a="item" data-v="' + k + '" data-drag="' + k + '" style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px dashed #2B2B30;cursor:pointer"><i style="width:10px;height:10px;border-radius:50%;background:' + c2 + ';flex:none;box-shadow:' + (mine ? '0 0 0 3px #111114,0 0 0 4px ' + c2 : 'none') + '"></i><span style="flex:1;min-width:0;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:' + (pi >= 0 && !mine ? .5 : 1) + '">' + esc(it.nome) + '</span><span style="font-size:11px;color:#9A9AA3">R$</span><span style="font-size:14px;font-weight:700;font-variant-numeric:tabular-nums">' + brl(it.valor) + '</span></div>'; }).join('');
+      right = '<div style="border-left:1px solid #3A3A40;padding-left:34px;display:flex;flex-direction:column;gap:14px;min-height:0;position:relative">'
+        + '<div style="display:grid;grid-template-columns:1fr 190px;gap:16px"><div style="display:flex;flex-direction:column;gap:8px;position:relative"><div style="font-size:14px;font-weight:700;color:#9A9AA3">Categoria</div><div data-a="pcat" style="display:flex;align-items:center;gap:12px;border-radius:9999px;padding:6px 10px 6px 8px;border:2px solid ' + cor + '8C;background:color-mix(in srgb,' + cor + ' 14%,#000);cursor:pointer;height:50px;box-sizing:border-box">' + icDot(cn, 30) + '<b style="font-size:15px;flex:1">' + esc(cn) + '</b><span style="width:28px;height:28px;border-radius:50%;background:#0A0A0A;display:flex;align-items:center;justify-content:center;color:#F2F0EB;transition:transform .3s ' + E + ';transform:rotate(' + (S.pop === 'pcat' ? 180 : 0) + 'deg)">' + svg('chev', 14, 2.6) + '</span></div>'
+        + (S.pop === 'pcat' ? '<div data-pop class="kscroll" style="position:absolute;z-index:8;left:0;right:0;top:calc(100% + 6px);max-height:172px;overflow-y:auto;background:#151518;border:1px solid #2A2A2F;border-radius:20px;padding:8px;display:flex;flex-direction:column;gap:4px;box-shadow:0 24px 48px rgba(0,0,0,.6);transform-origin:top;animation:txdrop .26s ' + E + '">' + cats().map(n => '<span data-a="pset" data-v="' + esc(n) + '" style="flex:none;display:flex;align-items:center;gap:10px;height:38px;border-radius:12px;border:1px solid ' + (n === cn ? '#F2F0EB' : 'transparent') + ';padding:0 10px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap" onmouseover="this.style.background=\'#1C1C20\'" onmouseout="this.style.background=\'\'">' + icDot(n, 22) + '<span style="flex:1">' + esc(n) + '</span>' + (n === cn ? '<span style="display:flex">' + svg('check', 14, 2.6) + '</span>' : '') + '</span>').join('') + '</div>' : '') + '</div>'
+        + '<div style="display:flex;flex-direction:column;gap:8px"><div style="font-size:14px;font-weight:700;color:#9A9AA3">Valor</div><div style="display:flex;align-items:center;gap:8px;height:50px;box-sizing:border-box;padding:0 18px;border-radius:9999px;border:2px solid #2A2A2F;background:#000;font-size:12px;font-weight:700;color:#9A9AA3">R$<input data-in="pv" value="' + brl(P.valor) + '" style="flex:1;min-width:0;background:transparent;border:0;outline:0;color:#F2F0EB;font-family:inherit;font-size:16px;font-weight:700;text-align:right"></div></div></div>'
+        + '<div style="display:flex;flex-direction:column;gap:8px"><div style="font-size:14px;font-weight:700;color:#9A9AA3">Título da parte <span style="font-weight:500">· opcional, ex.: Água, Luz</span></div><input data-in="ptit" maxlength="40" value="' + esc(P.rotulo || '') + '" placeholder="' + esc(cn) + '" style="' + fieldCss + 'border-radius:9999px;height:50px;padding:0 20px"></div>'
+        + (S.itens.length ? '<div style="font-size:13px;font-weight:700;color:#9A9AA3;margin-top:2px">Itens da nota <span style="font-weight:500">· clique ou arraste pra incluir nesta parte</span></div><div class="kscroll" style="overflow:auto;min-height:0;flex:1;-webkit-mask-image:linear-gradient(#0000,#000 8px,#000 calc(100% - 18px),#0000);mask-image:linear-gradient(#0000,#000 8px,#000 calc(100% - 18px),#0000)">' + its + '</div>' : '') + '</div>';
+    }
+    const ler = '<span data-a="mode" data-v="ler" style="height:46px;display:flex;align-items:center;gap:10px;padding:0 22px 0 16px;border-radius:9999px;border:2px solid #2A2A2F;font-weight:900;letter-spacing:.06em;font-size:13px;text-transform:uppercase;cursor:pointer"><span style="display:flex">' + svg('qr', 22, 1.7) + '</span>' + (S.itens.length ? 'Reler nota' : 'Ler nota fiscal') + '</span>';
+    return '<div style="flex:1;min-width:0;padding:26px 34px 24px 30px;display:flex;flex-direction:column;gap:22px;box-sizing:border-box">' + header('Dividir transação') + '<div style="border-top:1px solid #3A3A40;display:grid;grid-template-columns:1fr 1fr;flex:1;min-height:0;padding:22px 0 0">' + left + right + '</div>' + footer('<span style="display:flex;gap:10px">' + ler + primaryBtn('confirm', S.busy ? 'Salvando…' : 'Confirmar divisão', over) + '</span>') + '</div>';
   }
 
   /* bilhete (SVG): cantos, entalhes e perfuração */
@@ -579,9 +595,10 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const bodyHtml = S.mode === 'dados' ? viewDados() : S.mode === 'ler' ? viewLer() : viewDividir();
     const x = '<span data-a="close" style="position:absolute;right:0;top:0;width:44px;height:44px;border-radius:50%;background:#F2F0EB;color:#0A0A0A;display:flex;align-items:center;justify-content:center;z-index:3;cursor:pointer;box-shadow:0 0 0 9px ' + (S.mode === 'dados' ? '#1C1C20' : '#111114') + '"><span data-xi style="display:flex;transition:transform .5s cubic-bezier(.65,0,.2,1)">' + svg('x', 18, 2.4) + '</span></span>';
     const prevPn = host.querySelector('[data-pn]');
+    const modal = S.askBack ? '<div style="position:absolute;inset:0;z-index:9;background:rgba(0,0,0,.6);border-radius:30px;display:flex;align-items:center;justify-content:center;animation:txfade .2s ease"><div style="width:460px;background:#151518;border:1px solid #3A3A40;border-radius:28px;padding:28px;display:flex;flex-direction:column;gap:12px"><div style="font-size:22px;font-weight:700;letter-spacing:-.02em">Sair sem confirmar?</div><div style="font-size:14px;color:#9A9AA3;line-height:1.5">As alterações dessa divisão não foram salvas e vão se perder. Elas só valem quando você clica em Confirmar divisão.</div><div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px"><span data-a="keep" style="height:44px;display:flex;align-items:center;padding:0 22px;border-radius:9999px;border:2px solid #2A2A2F;font-weight:900;letter-spacing:.06em;font-size:12.5px;text-transform:uppercase;cursor:pointer">Continuar editando</span><span data-a="discard" style="height:44px;display:flex;align-items:center;padding:0 22px;border-radius:9999px;background:#FF6B5A;color:#0A0A0A;font-weight:900;letter-spacing:.06em;font-size:12.5px;text-transform:uppercase;cursor:pointer">Descartar</span></div></div></div>' : '';
     host.innerHTML = '<div data-bd style="position:absolute;inset:0;background:rgba(0,0,0,.72);' + (first ? 'animation:txfade .25s ease' : '') + '"></div>'
-      + '<style>@keyframes txfade{from{opacity:0}to{opacity:1}}@keyframes txin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}@keyframes txup{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}[data-pn] input::placeholder,[data-pn] textarea::placeholder{color:#51515C}</style>'
-      + '<div data-pn style="position:absolute;left:50%;top:50%;width:1358px;height:480px;margin:-240px 0 0 -679px;transform:scale(' + k + ');transform-origin:center;background:#111114;border:1px solid #2A2A2F;border-radius:30px;display:flex;font-family:Helvetica,Arial,sans-serif;color:#F2F0EB;' + (first ? 'animation:txup .4s ' + E : '') + '">' + bodyHtml + x + '</div>';
+      + '<style>@keyframes txfade{from{opacity:0}to{opacity:1}}@keyframes txin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}@keyframes txdrop{from{opacity:0;transform:translateY(-8px) scaleY(.9)}to{opacity:1;transform:none}}@keyframes txup{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}[data-pn] input::placeholder,[data-pn] textarea::placeholder{color:#51515C}</style>'
+      + '<div data-pn style="position:absolute;left:50%;top:50%;width:1358px;height:480px;margin:-240px 0 0 -679px;transform:scale(' + k + ');transform-origin:center;background:#111114;border:1px solid #2A2A2F;border-radius:30px;display:flex;font-family:Helvetica,Arial,sans-serif;color:#F2F0EB;' + (first ? 'animation:txup .4s ' + E : '') + '">' + bodyHtml + x + modal + '</div>';
     const pn = host.querySelector('[data-pn]');
     if (S.mode === 'dados') ticket();
     const ta = pn.querySelector('[data-in="obs"]'); if (ta) ta.value = S.obs;
@@ -612,40 +629,54 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       aceitarItens(r.data.itens.map(i => ({ nome: i.nome, qtd: i.quantidade || 1, un: i.unidade || '', valor: i.valor, catId: null })), url);
     } catch (e) { S.msg = 'Ainda não leio o link direto. Abra o link, copie o texto da página e cole abaixo.'; render(); }
   }
-  async function salvar() {
+  async function salvar(stay) {
     if (S.busy) return; S.busy = true; S.msg = ''; render();
     S.partes = S.partes.filter(p => p.valor > 0);
     const d = { id: S.row.id, nome: S.nome, obs: S.obs, iso: S.iso, cardId: S.cardId, accId: S.accId, catId: S.catId, notaDirty: S.notaDirty, partesDirty: S.partesDirty, nota: S.nota, itens: S.itens, partes: S.partes };
-    try { await KD.txSave(comp, d); TX.close(); }
+    try { await KD.txSave(comp, d); if (stay && S) { const r = KD.M.rowById[S.row.id]; if (r) { const m = S.mode; S = init(r); S.mode = 'dados'; void m; render(); } else TX.close(); } else TX.close(); }
     catch (e) { console.error('[kontar] salvar transação', e); S.busy = false; S.msg = 'Não consegui salvar: ' + ((e && e.message) || 'erro'); render(); }
   }
 
+  function recalc() { S.partes.forEach(q => { if (q.itens.length) q.valor = Math.round(q.itens.reduce((a, x) => a + S.itens[x].valor, 0) * 100) / 100; }); }
+  const snapNow = () => JSON.stringify({ p: S.partes, i: S.itens, n: S.nota, nd: S.notaDirty, pd: S.partesDirty });
+  function restoreSnap() { if (!S.snap) return; const o = JSON.parse(S.snap); S.partes = o.p; S.itens = o.i; S.nota = o.n; S.notaDirty = o.nd; S.partesDirty = o.pd; S.sel = 0; S.msg = ''; }
+  function goMode(v) {
+    S.pop = null; S.msg = '';
+    if (S.mode === 'dados' && v !== 'dados') { S.snap = snapNow(); S.from = 'dados'; }
+    else if (S.mode === 'dividir' && v === 'ler') S.from = 'dividir';
+    if (v === 'dados' && S.mode === 'dividir') { if (S.snap && snapNow() !== S.snap) { S.askBack = true; render(); return; } S.mode = 'dados'; render(); return; }
+    if (v === 'dados' && S.mode === 'ler') { if (S.from === 'dividir') { S.mode = 'dividir'; render(); return; } restoreSnap(); S.mode = 'dados'; render(); return; }
+    S.mode = v; render();
+  }
   function wire(pn) {
     pn.addEventListener('click', ev => {
       const el = ev.target.closest('[data-a]'); if (!el || !S) { if (S && S.pop && !ev.target.closest('[data-pop]')) { S.pop = null; render(); } return; }
       const a = el.getAttribute('data-a'), v = el.getAttribute('data-v');
       if (a === 'close') TX.close();
-      else if (a === 'mode') { S.pop = null; S.msg = ''; S.mode = v; render(); }
+      else if (a === 'mode') goMode(v);
+      else if (a === 'discard') { restoreSnap(); S.askBack = false; S.mode = 'dados'; render(); }
+      else if (a === 'keep') { S.askBack = false; render(); }
       else if (a === 'pop') { ev.stopPropagation(); S.pop = S.pop === v ? null : v; render(); }
       else if (a === 'cat') { S.catId = catId(v); S.pop = null; render(); }
       else if (a === 'meio') { const [t, id] = v.split(':'); S.cardId = t === 'c' ? id : null; S.accId = t === 'a' ? id : null; S.pop = null; render(); }
       else if (a === 'save') salvar();
-      else if (a === 'confirm') { if (somaPartes() <= total() + 0.005) { S.partesDirty = true; salvar(); } }
+      else if (a === 'confirm') { if (somaPartes() <= total() + 0.005) { S.partesDirty = true; salvar(true); } }
       else if (a === 'lerlink') lerLink();
       else if (a === 'lertexto') aceitarItens(parseTexto(S.texto || ''), S.link);
       else if (a === 'padd') { const used = new Set(S.partes.map(p => p.catId)), n = cats().find(c => !used.has(catId(c))) || 'Outros'; S.partes.push({ catId: catId(n), valor: Math.max(0, Math.round((total() - somaPartes()) * 100) / 100) || 0.01, rotulo: '', itens: [] }); S.sel = S.partes.length - 1; S.partesDirty = true; render(); }
       else if (a === 'pdel') { ev.stopPropagation(); S.partes.splice(+v, 1); S.sel = 0; S.partesDirty = true; render(); }
-      else if (a === 'pcat') { ev.stopPropagation(); S.sel = +v; S.pop = S.pop === 'p' + v ? null : 'p' + v; render(); }
-      else if (a === 'pset') { S.partes[+el.getAttribute('data-k')].catId = catId(v); S.pop = null; S.partesDirty = true; render(); }
+      else if (a === 'pcat') { ev.stopPropagation(); S.pop = S.pop === 'pcat' ? null : 'pcat'; render(); }
+      else if (a === 'pset') { if (S.partes[S.sel]) S.partes[S.sel].catId = catId(v); S.pop = null; S.partesDirty = true; render(); }
       else if (a === 'sel') { if (!ev.target.closest('input')) { S.sel = +v; render(); } }
-      else if (a === 'item') assign(+v, S.sel);
+      else if (a === 'item') { const q = S.partes[S.sel]; if (q && q.itens.includes(+v)) { q.itens = q.itens.filter(x => x !== +v); recalc(); S.partesDirty = true; render(); } else assign(+v, S.sel); }
     });
     pn.addEventListener('input', ev => {
       const el = ev.target, k = el.getAttribute && el.getAttribute('data-in'); if (!k) return;
       if (k === 'nome') { S.nome = el.value; const b = pn.querySelector('div[style*="font-size:64px"]'); if (b) b.textContent = S.nome || '—'; }
       else if (k === 'obs') S.obs = el.value; else if (k === 'link') S.link = el.value; else if (k === 'texto') S.texto = el.value;
       else if (k === 'iso') { S.iso = el.value; render(); }
-      else if (k === 'pv') { const p = S.partes[+el.getAttribute('data-k')]; if (p) { p.valor = num(el.value); S.partesDirty = true; } }
+      else if (k === 'pv') { const p = S.partes[S.sel]; if (p) { p.valor = num(el.value); S.partesDirty = true; } }
+      else if (k === 'ptit') { const p = S.partes[S.sel]; if (p) { p.rotulo = el.value; S.partesDirty = true; const lbl = pn.querySelector('[data-drop="' + S.sel + '"] span:nth-of-type(1)'); if (lbl) lbl.textContent = p.rotulo || catName(p.catId); } }
     });
     pn.addEventListener('change', ev => { const el = ev.target; if (el.getAttribute('data-in') === 'pv') render(); if (el.getAttribute('data-in') === 'foto') { S.msg = 'Leitura de foto chega na próxima etapa. Por enquanto use o link ou o texto da página.'; render(); } });
     pn.addEventListener('dragstart', ev => { const d = ev.target.closest && ev.target.closest('[data-drag]'); if (d) { ev.dataTransfer.setData('text/plain', d.getAttribute('data-drag')); ev.dataTransfer.effectAllowed = 'move'; } });
@@ -656,8 +687,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (!S.partes.length) { S.partes.push({ catId: S.catId, valor: 0, rotulo: '', itens: [] }); pi = 0; S.sel = 0; }
     const p = S.partes[pi]; if (!p || !S.itens[i]) return;
     S.partes.forEach(q => { q.itens = q.itens.filter(x => x !== i); });
-    p.itens.push(i); S.partes.forEach(q => { if (q.itens.length) q.valor = Math.round(q.itens.reduce((a, x) => a + S.itens[x].valor, 0) * 100) / 100; });
-    S.partesDirty = true; render();
+    p.itens.push(i); recalc(); S.partesDirty = true; render();
   }
   window.addEventListener('keydown', e => { if (S && e.key === 'Escape') TX.close(); });
 })();
