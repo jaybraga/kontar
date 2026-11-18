@@ -511,6 +511,17 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const limite = (teto ? teto.getBoundingClientRect().bottom : pw.getBoundingClientRect().top) + 28; // folga extra: o brilho pulsante do alerta sai um pouco da caixa
     const avail = pop.getBoundingClientRect().bottom - limite;
     pop.style.maxHeight = Math.max(120, Math.min(POPMAXH, avail)) + 'px';
+    const sc = pop.querySelector('[data-popscroll]');
+    if (sc) { syncFade(pop); sc.onscroll = () => syncFade(pop); }
+  }
+  // fade de topo/base: só aparece do lado pra onde ainda dá pra rolar (atualiza a cada scroll)
+  function syncFade(pop) {
+    const sc = pop.querySelector('[data-popscroll]'); if (!sc) return;
+    const top = pop.querySelector('[data-fadetop]'), bot = pop.querySelector('[data-fadebot]');
+    const scrollable = sc.scrollHeight > sc.clientHeight + 1;
+    const atTop = sc.scrollTop <= 1, atBot = sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 1;
+    if (top) top.style.opacity = (scrollable && !atTop) ? '1' : '0';
+    if (bot) bot.style.opacity = (scrollable && !atBot) ? '1' : '0';
   }
   const dirtyKey = () => JSON.stringify([S.nome, S.obs, S.iso, S.cardId, S.accId, S.catId, S.totalV, S.dir, S.meio, S.parc || 1, S.itens, S.partes, S.nota && S.nota.url]);
   const isDirty = () => !!S && S.base !== undefined && dirtyKey() !== S.base;
@@ -621,9 +632,15 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   }
   function popCat() {
     // tampa o campo inteiro (mesmo radius em todo canto, sem vão) em vez de emendar com cantos retos:
-    // assim o campo nunca precisa trocar de forma pra abrir/fechar (sem flicker de corner-radius)
-    return '<div data-pop class="kscroll" style="position:absolute;z-index:6;left:0;right:0;bottom:0;max-height:' + POPMAXH + 'px;overflow-y:auto;background:#151518;border:1px solid #2A2A2F;border-radius:' + PR + 'px;padding:10px;display:flex;flex-direction:column;gap:7px;box-shadow:0 24px 48px rgba(0,0,0,.6);-webkit-mask-image:linear-gradient(#0000,#000 10px,#000 calc(100% - 10px),#0000);mask-image:linear-gradient(#0000,#000 10px,#000 calc(100% - 10px),#0000);animation:txin .22s ' + E + '">'
-      + cats().map(n => { const on = catAtual() === n; return '<span data-a="cat" data-v="' + esc(n) + '" style="display:flex;align-items:center;gap:12px;height:46px;flex:none;border-radius:16px;border:1px solid ' + (on ? '#F2F0EB' : '#2A2A2F') + ';background:#0D0D10;padding:0 12px;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden">' + icDot(n, 26) + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis">' + esc(n) + '</span>' + (on ? '<span style="color:#F2F0EB;display:flex">' + svg('check', 15, 2.6) + '</span>' : '') + '</span>'; }).join('') + '</div>';
+    // assim o campo nunca precisa trocar de forma pra abrir/fechar (sem flicker de corner-radius).
+    // o fade de topo/base é um par de overlays fora do fluxo (não um mask na própria caixa): um mask
+    // junto com o box-shadow + corner-radius criava aquele recorte diagonal estranho no canto.
+    return '<div data-pop style="position:absolute;z-index:6;left:0;right:0;bottom:0;max-height:' + POPMAXH + 'px;overflow:hidden;background:#151518;border:1px solid #2A2A2F;border-radius:' + PR + 'px;box-shadow:0 24px 48px rgba(0,0,0,.6);display:flex;flex-direction:column;animation:txin .22s ' + E + '">'
+      + '<div class="kscroll" data-popscroll style="flex:1;min-height:0;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:7px">'
+      + cats().map(n => { const on = catAtual() === n; return '<span data-a="cat" data-v="' + esc(n) + '" style="display:flex;align-items:center;gap:12px;height:46px;flex:none;border-radius:16px;border:1px solid ' + (on ? '#F2F0EB' : '#2A2A2F') + ';background:#0D0D10;padding:0 12px;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden">' + icDot(n, 26) + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis">' + esc(n) + '</span>' + (on ? '<span style="color:#F2F0EB;display:flex">' + svg('check', 15, 2.6) + '</span>' : '') + '</span>'; }).join('') + '</div>'
+      + '<i data-fadetop style="position:absolute;left:0;right:0;top:0;height:40px;background:linear-gradient(#151518,rgba(21,21,24,0));pointer-events:none;opacity:0;transition:opacity .2s ease"></i>'
+      + '<i data-fadebot style="position:absolute;left:0;right:0;bottom:0;height:40px;background:linear-gradient(rgba(21,21,24,0),#151518);pointer-events:none;opacity:0;transition:opacity .2s ease"></i>'
+      + '</div>';
   }
   // "bank" vem do apelido pra cor (BANK, em kd.js: 'Itaú Azul', 'Nubank PJ'...) mas o acervo de logos
   // (Component.LGC) só tem a marca-mãe — sem esse mapa, essas variantes caíam num logo em branco.
@@ -631,7 +648,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const bankChip = (bank, cor) => {
     const key = bank ? (LOGOKEY[bank] || bank) : null;
     const url = key ? comp.constructor.lgcUrl(key) : '';
-    if (!url) return '<i style="width:10px;height:10px;border-radius:50%;background:' + cor + ';flex:none"></i>'; // sem asset de logo (ex.: Amazon): cai pro ponto de cor
+    if (!url) return '<i style="width:10px;height:10px;border-radius:50%;background:' + cor + ';flex:none"></i>'; // sem asset de logo: cai pro ponto de cor
     const mono = key === 'C6'; // svg sem cor própria (fill preto default); recolorido via mask pra aparecer no fundo escuro
     return mono
       ? '<span style="width:28px;height:28px;flex:none;display:flex;align-items:center;justify-content:center"><span style="display:block;width:100%;height:58%;background:#F2F0EB;-webkit-mask:url(\'' + url + '\') center/contain no-repeat;mask:url(\'' + url + '\') center/contain no-repeat"></span></span>'
@@ -640,9 +657,13 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   function popCard() {
     const opts = KD.M.cards.map(c => ({ k: 'c:' + c.id, n: c.nick || c.n, cor: c.cor, bank: c.bank })).concat(KD.M.accs.map(a => ({ k: 'a:' + a.id, n: a.nome, cor: a.cor, bank: a.bank })));
     const cur = S.cardId ? 'c:' + S.cardId : S.accId ? 'a:' + S.accId : '';
-    return '<div data-pop class="kscroll" style="position:absolute;z-index:6;left:0;right:0;bottom:0;background:#151518;border:1px solid #2A2A2F;border-radius:' + PR + 'px;padding:10px;display:flex;flex-direction:column;gap:7px;max-height:' + POPMAXH + 'px;overflow-y:auto;box-shadow:0 24px 48px rgba(0,0,0,.6);-webkit-mask-image:linear-gradient(#0000,#000 10px,#000 calc(100% - 10px),#0000);mask-image:linear-gradient(#0000,#000 10px,#000 calc(100% - 10px),#0000);animation:txin .22s ' + E + '">'
+    return '<div data-pop style="position:absolute;z-index:6;left:0;right:0;bottom:0;max-height:' + POPMAXH + 'px;overflow:hidden;background:#151518;border:1px solid #2A2A2F;border-radius:' + PR + 'px;box-shadow:0 24px 48px rgba(0,0,0,.6);display:flex;flex-direction:column;animation:txin .22s ' + E + '">'
+      + '<div class="kscroll" data-popscroll style="flex:1;min-height:0;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:7px">'
       + (S.isNew ? '<div style="display:flex;gap:6px;padding:2px 2px 6px;flex-wrap:wrap">' + [['pix', 'Pix'], ['debito', 'Débito'], ['boleto', 'Boleto'], ['dinheiro', 'Dinheiro']].map(m => '<span data-a="forma" data-v="' + m[0] + '" style="padding:6px 12px;border-radius:9999px;border:1px solid ' + (S.meio === m[0] && !S.cardId ? '#F2F0EB' : '#2A2A2F') + ';font-size:12px;font-weight:700;cursor:pointer">' + m[1] + '</span>').join('') + '</div>' : '')
-      + opts.map(o => '<span data-a="meio" data-v="' + o.k + '" style="flex:none;display:flex;align-items:center;gap:12px;height:46px;border-radius:16px;border:1px solid ' + (o.k === cur ? '#F2F0EB' : '#2A2A2F') + ';background:#0D0D10;padding:0 12px;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden">' + bankChip(o.bank, o.cor) + '<span style="overflow:hidden;text-overflow:ellipsis">' + esc(o.n) + '</span></span>').join('') + '</div>';
+      + opts.map(o => '<span data-a="meio" data-v="' + o.k + '" style="flex:none;display:flex;align-items:center;gap:12px;height:46px;border-radius:16px;border:1px solid ' + (o.k === cur ? '#F2F0EB' : '#2A2A2F') + ';background:#0D0D10;padding:0 12px;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden">' + bankChip(o.bank, o.cor) + '<span style="overflow:hidden;text-overflow:ellipsis">' + esc(o.n) + '</span></span>').join('') + '</div>'
+      + '<i data-fadetop style="position:absolute;left:0;right:0;top:0;height:40px;background:linear-gradient(#151518,rgba(21,21,24,0));pointer-events:none;opacity:0;transition:opacity .2s ease"></i>'
+      + '<i data-fadebot style="position:absolute;left:0;right:0;bottom:0;height:40px;background:linear-gradient(rgba(21,21,24,0),#151518);pointer-events:none;opacity:0;transition:opacity .2s ease"></i>'
+      + '</div>';
   }
 
   function viewDados() {
