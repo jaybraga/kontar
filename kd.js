@@ -99,7 +99,7 @@
     const cardByIdAll = Object.fromEntries(R.cards.map(c => [c.id, c]));
 
     /* contas */
-    M.accs = R.accs.filter(a => a.ativo !== false).sort((a, b) => a.ordem - b.ordem).map(a => ({ id: a.id, nome: a.nome, saldo: Number(a.saldo) || 0, em: a.saldo_em ? pd(a.saldo_em) : T, tipo: a.tipo, funcao: a.funcao, cor: colorOf(a.nome, a.instituicao, a.cor)[0] }));
+    M.accs = R.accs.filter(a => a.ativo !== false).sort((a, b) => a.ordem - b.ordem).map(a => ({ id: a.id, nome: a.nome, saldo: Number(a.saldo) || 0, em: a.saldo_em ? pd(a.saldo_em) : T, tipo: a.tipo, funcao: a.funcao, cor: colorOf(a.nome, a.instituicao, a.cor)[0], bank: bankOf(a.nome, a.instituicao) }));
 
     /* estabelecimentos (por chave) */
     M.maByChave = Object.fromEntries(R.ma.map(m => [m.chave, m]));
