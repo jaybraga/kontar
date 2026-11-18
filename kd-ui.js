@@ -582,6 +582,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     host = ab; host.style.pointerEvents = 'auto'; render(true);
   };
   TX.requestClose = function () { if (!S) return; if (isDirty()) { S.askClose = true; S.askBack = false; render(); return; } TX.close(); };
+  TX.isOpen = function (id) { return !!(S && S.row && S.row.id === id); };
   let pendingDone = null;
   TX.close = function (quick) {
     if (pendingDone) { const f = pendingDone; pendingDone = null; clearTimers(); f(); }   // fecha de vez o painel que ainda estava animando saída
@@ -618,6 +619,10 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const pill = (t, extra) => '<div style="' + fieldCss + 'border-radius:9999px;text-align:center;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' + (extra || '') + '">' + t + '</div>';
   const PR = 26; // raio compartilhado entre o campo e seu dropdown: o dropdown tampa o campo inteiro, mesmo radius, sem troca de forma
   const POPMAXH = 260;
+  // css mínimo do inline reduzido: as mesmas keyframes/alertas do painel completo, sem repetir o resto
+  const REDUCED_CSS = '<style>@keyframes txin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}[data-pw] .txtot:empty:before{content:"0,00";color:#51515C}'
+    + '@keyframes txAlertPulse{0%,100%{border-color:#FFC24A;box-shadow:0 0 0 0 rgba(255,194,74,.4)}50%{border-color:#FFE29A;box-shadow:0 0 16px 2px rgba(255,194,74,.4)}}@keyframes txAlertGlow{0%,100%{text-shadow:0 0 0 rgba(255,194,74,0)}50%{text-shadow:0 0 20px rgba(255,194,74,.85)}}.txalert-box{animation:txAlertPulse 1.7s ease-in-out infinite}.txalert-text{animation:txAlertGlow 1.7s ease-in-out infinite}'
+    + '@media (prefers-reduced-motion:reduce){.txalert-box,.txalert-text{animation:none!important;border-color:#FFC24A!important}.txalert-text{text-shadow:0 0 16px rgba(255,194,74,.85)!important}}</style>';
 
   function header(eyebrow) {
     const cor = S.catId ? catCor(catAtual()) : '#F2F0EB';
@@ -742,9 +747,43 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     sv.innerHTML = '<path d="' + P + '" fill="#FFFFFF"/><path d="' + P2 + '" fill="#414045"/><line x1="' + (W / 2) + '" x2="' + (W / 2) + '" y1="' + (seam + 12) + '" y2="' + (H - 12) + '" stroke="#6A6A72" stroke-width="1" stroke-dasharray="3 4"/><line x1="' + (n + 8) + '" x2="' + (W - n - 8) + '" y1="' + seam + '" y2="' + seam + '" stroke="#0A0A0A" stroke-width="1.4" stroke-dasharray="4 3"/>';
   }
 
+  /* ---------------- inline reduzido (clicar na linha): só o essencial pra corrigir rápido, sem abrir o painel inteiro.
+     "Editar" promove pro overlay completo (ver a === 'full' em wire()). O inline completo antigo (ticket/mask/goo,
+     mais abaixo em render()) fica no bundle mas não é mais chamado por nada — pra reativar, é só tirar esse branch. */
+  async function salvarReduzido() {
+    if (!S) return;
+    const r = S.row;
+    const d = { id: r.id, nome: r.e, obs: r.obs || '', iso: r.iso, cardId: S.cardId, accId: S.accId, catId: S.catId, totalV: S.totalV, dir: S.dir, notaDirty: false, partesDirty: false, itens: r.items, partes: [] };
+    try { await KD.txSave(comp, d); if (S) S.base = dirtyKey(); } catch (e) { }
+  }
+  function renderReduced(first) {
+    const keep = {}; host.querySelectorAll('[data-in]').forEach(i => { if (document.activeElement === i) keep.k = i.getAttribute('data-in'); });
+    const cn = catAtual(), cor = catCor(cn);
+    const meioObj = S.cardId ? KD.M.cardById[S.cardId] : S.accId ? KD.M.accs.find(a => a.id === S.accId) : null;
+    const meio = meioObj ? (meioObj.nick || meioObj.n || meioObj.nome) : '—';
+    const valorBit = editavelValor()
+      ? '<div style="display:flex;align-items:center;gap:10px;flex:none">' + dirToggle() + '<div style="display:flex;align-items:baseline;gap:4px"><span data-in="total" data-alert-target="total" class="txtot ' + (S.alertField === 'total' ? 'txalert-text' : '') + '" contenteditable="plaintext-only" inputmode="decimal" spellcheck="false" style="display:block;outline:0;font-family:inherit;font-size:22px;font-weight:700;letter-spacing:-.03em;color:' + cor + ';min-width:56px;cursor:text;white-space:nowrap">' + (S.totalV ? brl(S.totalV) : '') + '</span><small style="font-size:12px;color:#9A9AA3">R$</small></div></div>'
+      : '<div style="font-size:22px;font-weight:700;letter-spacing:-.03em;color:' + cor + ';flex:none">' + brl(total()) + '<small style="font-size:12px;color:#9A9AA3;margin-left:4px">R$</small></div>';
+    // o chip visível é só do tamanho do conteúdo, mas o dropdown precisa de uma âncora mais larga
+    // (senão herda a largura mínima do chip e os nomes/logos ficam espremidos) — âncora invisível de 240px,
+    // o dropdown cresce bottom:0 a partir dela, igual ao padrão usado no painel completo.
+    const catChip = '<div style="position:relative;width:240px;flex:none"><div data-a="pop" data-v="cat" style="display:inline-flex;align-items:center;gap:10px;border-radius:9999px;padding:7px 14px 7px 8px;border:2px solid ' + cor + '8C;background:color-mix(in srgb,' + cor + ' 14%,#000);cursor:pointer;max-width:100%">' + icDot(cn, 24) + '<b style="font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(cn) + '</b></div>' + (S.pop === 'cat' ? popCat() : '') + '</div>';
+    const cardChip = '<div style="position:relative;width:240px;flex:none"><div data-a="pop" data-v="card" style="display:inline-flex;align-items:center;gap:10px;border-radius:9999px;padding:7px 14px 7px 8px;border:2px solid #2A2A2F;background:#000;cursor:pointer;max-width:100%">' + bankChip(meioObj && meioObj.bank, (meioObj || {}).cor || '#3A3A40') + '<b style="font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(meio) + '</b></div>' + (S.pop === 'card' ? popCard() : '') + '</div>';
+    const editBtn = '<span data-a="full" style="margin-left:auto;flex:none;height:38px;display:flex;align-items:center;padding:0 20px;border-radius:9999px;background:#F2F0EB;color:#0A0A0A;font-weight:900;letter-spacing:.06em;font-size:11.5px;text-transform:uppercase;cursor:pointer">Editar</span>';
+    // a linha some atrás do inline reduzido (mesma regra css que esconde a linha no inline completo),
+    // então o fechar precisa viver aqui dentro — não tem mais "clicar na linha de novo" visível pra isso
+    const closeBtn = '<span data-a="close" title="Fechar" style="flex:none;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#6A6A72;cursor:pointer">' + svg('x', 15, 2.2) + '</span>';
+    host.innerHTML = REDUCED_CSS + '<div data-pw' + (S.settled ? ' data-settled="1"' : '') + ' style="position:relative;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:16px 20px;font-family:Helvetica,Arial,sans-serif;color:#F2F0EB;border-radius:20px;background:#111114;border:1px solid #2A2A2F' + (first ? ';animation:txin .22s ' + E : '') + '">' + valorBit + catChip + cardChip + editBtn + closeBtn + '</div>';
+    const pw = host.querySelector('[data-pw]');
+    if (keep.k) { const el = pw.querySelector('[data-in="' + keep.k + '"]'); if (el) { el.focus(); try { const l = el.textContent.length; const rg = document.createRange(); rg.selectNodeContents(el); rg.collapse(false); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg); } catch (e) { } } }
+    const pop = pw.querySelector('[data-pop]');
+    if (pop) { pop.style.maxHeight = POPMAXH + 'px'; const sc = pop.querySelector('[data-popscroll]'); if (sc) { syncFade(pop); sc.onscroll = () => syncFade(pop); } }
+    wire(pw);
+  }
   /* ---------------- render ---------------- */
   function render(first) {
     if (!S || !host) return;
+    if (S.inline) { renderReduced(first); return; }
     const keep = {}; host.querySelectorAll('[data-in]').forEach(i => { if (document.activeElement === i) keep.k = i.getAttribute('data-in') + (i.getAttribute('data-k') || ''); });
     // mantém a posição das listas roláveis: render() troca o painel inteiro, o que por padrão zera o scroll
     const scrollKeep = [...host.querySelectorAll('.kscroll')].map(e => e.scrollTop);
@@ -923,7 +962,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     S.mode = v; render();
   }
   function wire(pn) {
-    pn.addEventListener('focusout', ev => { if (S && ev.target.getAttribute && ev.target.getAttribute('data-in') === 'total') { if (S.pd) S.dirty = true; else render(); } });
+    pn.addEventListener('focusout', ev => { if (S && ev.target.getAttribute && ev.target.getAttribute('data-in') === 'total') { if (S.inline) { render(); if (S.totalV > 0) salvarReduzido(); } else if (S.pd) S.dirty = true; else render(); } });
     pn.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.getAttribute && ev.target.getAttribute('data-in') === 'total') { ev.preventDefault(); ev.target.blur(); } });
     pn.addEventListener('pointerdown', () => { if (S) S.pd = true; });
     pn.addEventListener('click', ev => {
@@ -940,11 +979,12 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       else if (a === 'domerge') { const m = S.merge; S.merge = null; if (m && S.partes[m.from] && S.partes[m.to]) { const A = S.partes[m.from], B = S.partes[m.to]; B.valor = Math.round((A.valor + B.valor) * 100) / 100; B.itens = B.itens.concat(A.itens); S.partes.splice(m.from, 1); S.sel = Math.min(m.to > m.from ? m.to - 1 : m.to, S.partes.length - 1); S.partesDirty = true; } render(); }
       else if (a === 'anotar') anotar();
       else if (a === 'goest') { const n = S.row.e; TX.close(true); comp.goEst(n); }
+      else if (a === 'full') { const r = S.row; TX.open(comp, r); }
       else if (a === 'parc') { S.parc = (S.parc || 1) % 12 + 1; render(); }
-      else if (a === 'dir') { S.dir = v; render(); }
+      else if (a === 'dir') { S.dir = v; render(); if (S.inline) salvarReduzido(); }
       else if (a === 'forma') { ev.stopPropagation(); S.meio = v; S.cardId = null; render(); }
-      else if (a === 'cat') { S.catId = catId(v); S.pop = null; render(); }
-      else if (a === 'meio') { const [t, id] = v.split(':'); if (t !== 'c') S.parc = 1; S.cardId = t === 'c' ? id : null; S.accId = t === 'a' ? id : null; S.pop = null; if (S.alertField === 'card') S.alertField = null; render(); }
+      else if (a === 'cat') { S.catId = catId(v); S.pop = null; render(); if (S.inline) salvarReduzido(); }
+      else if (a === 'meio') { const [t, id] = v.split(':'); if (t !== 'c') S.parc = 1; S.cardId = t === 'c' ? id : null; S.accId = t === 'a' ? id : null; S.pop = null; if (S.alertField === 'card') S.alertField = null; render(); if (S.inline) salvarReduzido(); }
       else if (a === 'save') salvar();
       else if (a === 'confirm') { if (somaPartes() <= total() + 0.005) { S.partesDirty = true; salvar(true); } }
       else if (a === 'lerlink') lerLink();
