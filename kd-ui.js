@@ -435,6 +435,12 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (d.iso && d.iso !== r.iso) p.data_compra = d.iso;
     if (d.cardId !== (r.cardId || null) || d.accId !== (r.accId || null)) { p.card_id = d.cardId || null; p.account_id = d.cardId ? null : (d.accId || null); }
     if (d.catId && d.catId !== r.catId) { p.category_id = d.catId; p.status = 'confirmado'; p.categoria_origem = 'usuario'; }
+    // valor e direção só são editáveis (no painel) pra lançamento manual; mesmo assim confere de novo aqui.
+    if (r.origem === 'manual') {
+      const dirAtual = (r.amt < 0 || r.out > 0) ? 'saida' : 'entrada';
+      if (d.totalV > 0 && Math.round(d.totalV * 100) !== Math.round(r.total * 100)) p.valor_total = Math.round(d.totalV * 100) / 100;
+      if (d.dir && d.dir !== dirAtual) p.direcao = d.dir;
+    }
     if (Object.keys(p).length) ck(await c.from('transactions').update(p).eq('id', id));
     }
     let ids = (r.items || []).map(i => i.id);
@@ -485,7 +491,10 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   // no meio (é exatamente por isso que o ícone nunca aparecia dentro do painel de transação).
   const catIc = (n, col) => "url('" + comp.constructor.uri(comp.icSvg(n), col || '#000') + "')";
   const icDot = (n, sz, bg) => '<span style="width:' + sz + 'px;height:' + sz + 'px;flex:none;border-radius:50%;background:' + (bg || catCor(n)) + ';display:flex;align-items:center;justify-content:center"><span style="display:block;width:' + Math.round(sz * .55) + 'px;height:' + Math.round(sz * .55) + 'px;background-image:' + catIc(n) + ';background-size:contain;background-repeat:no-repeat;background-position:center"></span></span>';
-  const total = () => S.isNew ? S.totalV : S.row.total;
+  // lançamento manual (criado aqui ou importado como "manual") sempre pode ter valor/direção corrigidos;
+  // só lançamentos vindos de extrato/Open Finance ficam travados nesses dois campos.
+  const editavelValor = () => S.isNew || S.row.origem === 'manual';
+  const total = () => editavelValor() ? S.totalV : S.row.total;
   const somaPartes = () => S.partes.reduce((a, p) => a + p.valor, 0);
   const catAtual = () => S.catId ? catName(S.catId) : (S.isNew ? 'Sem categoria' : 'Outros');
 
@@ -496,6 +505,13 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     // evita que, nesse caso raro, o título invada o valor ou a barra lateral.
     if (w > avail && avail > 0) t.style.fontSize = Math.max(40, Math.floor(64 * avail / w)) + 'px';
   }
+  function fitPop(pw) {   // o dropdown (categoria/cartão) tampa o campo e cresce pra cima; encurta antes de bater no valor lá em cima
+    const pop = pw.querySelector('[data-pop]'); if (!pop) return;
+    const teto = pw.querySelector('[data-tot]'); // bloco do valor: a referência real, não o topo do painel (o valor fica bem abaixo dele)
+    const limite = (teto ? teto.getBoundingClientRect().bottom : pw.getBoundingClientRect().top) + 28; // folga extra: o brilho pulsante do alerta sai um pouco da caixa
+    const avail = pop.getBoundingClientRect().bottom - limite;
+    pop.style.maxHeight = Math.max(120, Math.min(POPMAXH, avail)) + 'px';
+  }
   const dirtyKey = () => JSON.stringify([S.nome, S.obs, S.iso, S.cardId, S.accId, S.catId, S.totalV, S.dir, S.meio, S.parc || 1, S.itens, S.partes, S.nota && S.nota.url]);
   const isDirty = () => !!S && S.base !== undefined && dirtyKey() !== S.base;
   function init(row) {
@@ -504,6 +520,9 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       itens: row.items.map(i => Object.assign({}, i)), partes: [], notaDirty: false, partesDirty: false, msg: '', alertField: null, busy: false, sel: 0 };
     const idx = {}; row.items.forEach((i, k) => { idx[i.id] = k; });
     S.partes = row.parts.filter(p => !p.auto).map(p => ({ catId: p.catId, valor: p.valor, rotulo: p.rotulo, itens: row.items.filter(i => i.partId === p.id).map(i => idx[i.id]) }));
+    // valor/direção de um lançamento existente: totalV é sempre o módulo (valor_total), dir vem do sinal
+    S.totalV = row.total || 0;
+    S.dir = (row.amt < 0 || row.out > 0) ? 'saida' : 'entrada';
     return S;
   }
 
@@ -586,14 +605,14 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const lb = (ic, t) => '<div style="display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700;white-space:nowrap;color:#F2F0EB"><span style="color:#9A9AA3;display:flex">' + svg(ic, 22, 2) + '</span>' + t + '</div>';
   const fieldCss = 'background:#000;border:2px solid #2A2A2F;border-radius:28px;padding:15px 20px;font-size:16px;font-weight:500;color:#F2F0EB;font-family:inherit;outline:0;width:100%;box-sizing:border-box;';
   const pill = (t, extra) => '<div style="' + fieldCss + 'border-radius:9999px;text-align:center;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' + (extra || '') + '">' + t + '</div>';
-  const PR = 26; // raio compartilhado entre o campo (fechado) e seu dropdown (aberto), pra parecer uma extensão direta do campo
-  const fieldRad = (open) => open ? '0 0 ' + PR + 'px ' + PR + 'px' : PR + 'px';
+  const PR = 26; // raio compartilhado entre o campo e seu dropdown: o dropdown tampa o campo inteiro, mesmo radius, sem troca de forma
+  const POPMAXH = 260;
 
   function header(eyebrow) {
     const cor = S.catId ? catCor(catAtual()) : '#F2F0EB';
     return '<div style="display:flex;justify-content:space-between;align-items:flex-end;height:92px;flex:none"><div style="min-width:0;overflow:visible;position:relative;z-index:1"><div style="font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9A9AA3">' + eyebrow + '</div><div data-ttl style="font-size:64px;font-weight:700;letter-spacing:-.06em;line-height:1;margin:6px 0 -6px;white-space:nowrap;overflow:visible">' + esc(S.nome || (S.isNew ? 'Nova transação' : '—')) + '</div></div>'
-      + (S.isNew ? '<div style="display:flex;align-items:flex-end;gap:18px">' + dirToggle() + '<div style="display:flex;align-items:flex-end;gap:8px"><span data-in="total" data-alert-target="total" class="txtot ' + (S.alertField === 'total' ? 'txalert-text' : '') + '" contenteditable="plaintext-only" inputmode="decimal" spellcheck="false" style="display:block;min-width:150px;outline:0;text-align:right;font-family:inherit;font-size:96px;font-weight:700;letter-spacing:-.065em;line-height:.8;height:78px;white-space:nowrap;cursor:text;color:' + cor + '">' + (S.totalV ? brl(S.totalV) : '') + '</span><small style="font-size:20px;color:#F2F0EB;margin-bottom:2px">R$</small></div></div>'
-      : '<div style="text-align:right;padding-right:' + 0 + 'px"><div style="font-size:76px;font-weight:700;letter-spacing:-.065em;line-height:.8;margin-top:12px;color:' + cor + ';transition:color .3s ease">' + brl(total()) + '<small style="font-size:20px;color:#F2F0EB;letter-spacing:0;margin-left:8px">R$</small></div></div>') + '</div>';
+      + (editavelValor() ? '<div data-tot style="display:flex;align-items:flex-end;gap:18px">' + dirToggle() + '<div style="display:flex;align-items:flex-end;gap:8px"><span data-in="total" data-alert-target="total" class="txtot ' + (S.alertField === 'total' ? 'txalert-text' : '') + '" contenteditable="plaintext-only" inputmode="decimal" spellcheck="false" style="display:block;min-width:150px;outline:0;text-align:right;font-family:inherit;font-size:96px;font-weight:700;letter-spacing:-.065em;line-height:.8;height:78px;white-space:nowrap;cursor:text;color:' + cor + '">' + (S.totalV ? brl(S.totalV) : '') + '</span><small style="font-size:20px;color:#F2F0EB;margin-bottom:2px">R$</small></div></div>'
+      : '<div data-tot style="text-align:right;padding-right:' + 0 + 'px"><div style="font-size:76px;font-weight:700;letter-spacing:-.065em;line-height:.8;margin-top:12px;color:' + cor + ';transition:color .3s ease">' + brl(total()) + '<small style="font-size:20px;color:#F2F0EB;letter-spacing:0;margin-left:8px">R$</small></div></div>') + '</div>';
   }
 
   function dirToggle() {
@@ -601,22 +620,27 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     return '<div style="display:flex;flex-direction:column;gap:2px;padding:3px;border-radius:9999px;border:2px solid #2A2A2F;background:#000;flex:none;margin-bottom:3px">' + mk('entrada', '<path d="M12 5v14M5 12h14"/>', '#6AFF2A') + mk('saida', '<path d="M5 12h14"/>', '#FF5A4A') + '</div>';
   }
   function popCat() {
-    // emendado ao campo (mesmo radius, sem vão), largura igual ao campo, 1 coluna só, rolável com gradiente nas pontas
-    return '<div data-pop class="kscroll" style="position:absolute;z-index:6;left:0;right:0;bottom:100%;max-height:280px;overflow-y:auto;background:#151518;border:1px solid #2A2A2F;border-bottom:none;border-radius:' + PR + 'px ' + PR + 'px 0 0;padding:10px;display:flex;flex-direction:column;gap:7px;box-shadow:0 24px 48px rgba(0,0,0,.6);-webkit-mask-image:linear-gradient(#0000,#000 10px,#000 calc(100% - 10px),#0000);mask-image:linear-gradient(#0000,#000 10px,#000 calc(100% - 10px),#0000);animation:txin .22s ' + E + '">'
+    // tampa o campo inteiro (mesmo radius em todo canto, sem vão) em vez de emendar com cantos retos:
+    // assim o campo nunca precisa trocar de forma pra abrir/fechar (sem flicker de corner-radius)
+    return '<div data-pop class="kscroll" style="position:absolute;z-index:6;left:0;right:0;bottom:0;max-height:' + POPMAXH + 'px;overflow-y:auto;background:#151518;border:1px solid #2A2A2F;border-radius:' + PR + 'px;padding:10px;display:flex;flex-direction:column;gap:7px;box-shadow:0 24px 48px rgba(0,0,0,.6);-webkit-mask-image:linear-gradient(#0000,#000 10px,#000 calc(100% - 10px),#0000);mask-image:linear-gradient(#0000,#000 10px,#000 calc(100% - 10px),#0000);animation:txin .22s ' + E + '">'
       + cats().map(n => { const on = catAtual() === n; return '<span data-a="cat" data-v="' + esc(n) + '" style="display:flex;align-items:center;gap:12px;height:46px;flex:none;border-radius:16px;border:1px solid ' + (on ? '#F2F0EB' : '#2A2A2F') + ';background:#0D0D10;padding:0 12px;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden">' + icDot(n, 26) + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis">' + esc(n) + '</span>' + (on ? '<span style="color:#F2F0EB;display:flex">' + svg('check', 15, 2.6) + '</span>' : '') + '</span>'; }).join('') + '</div>';
   }
+  // "bank" vem do apelido pra cor (BANK, em kd.js: 'Itaú Azul', 'Nubank PJ'...) mas o acervo de logos
+  // (Component.LGC) só tem a marca-mãe — sem esse mapa, essas variantes caíam num logo em branco.
+  const LOGOKEY = { 'Itaú Azul': 'Itaú', 'Nubank PJ': 'Nubank', 'Nubank Pessoal': 'Nubank', 'CDB Mercado Pago': 'Mercado Pago' };
   const bankChip = (bank, cor) => {
-    if (!bank) return '<i style="width:10px;height:10px;border-radius:50%;background:' + cor + ';flex:none"></i>';
-    const url = comp.constructor.lgcUrl(bank);
-    const mono = bank === 'C6'; // svg sem cor própria (fill preto default); recolorido via mask pra aparecer no fundo escuro
+    const key = bank ? (LOGOKEY[bank] || bank) : null;
+    const url = key ? comp.constructor.lgcUrl(key) : '';
+    if (!url) return '<i style="width:10px;height:10px;border-radius:50%;background:' + cor + ';flex:none"></i>'; // sem asset de logo (ex.: Amazon): cai pro ponto de cor
+    const mono = key === 'C6'; // svg sem cor própria (fill preto default); recolorido via mask pra aparecer no fundo escuro
     return mono
-      ? '<span style="width:26px;height:26px;flex:none;display:flex;align-items:center;justify-content:center"><span style="display:block;width:100%;height:58%;background:#F2F0EB;-webkit-mask:url(\'' + url + '\') center/contain no-repeat;mask:url(\'' + url + '\') center/contain no-repeat"></span></span>'
-      : '<span style="width:26px;height:26px;flex:none;background-image:url(\'' + url + '\');background-size:contain;background-repeat:no-repeat;background-position:center"></span>';
+      ? '<span style="width:28px;height:28px;flex:none;display:flex;align-items:center;justify-content:center"><span style="display:block;width:100%;height:58%;background:#F2F0EB;-webkit-mask:url(\'' + url + '\') center/contain no-repeat;mask:url(\'' + url + '\') center/contain no-repeat"></span></span>'
+      : '<span style="width:28px;height:28px;flex:none;background-image:url(\'' + url + '\');background-size:contain;background-repeat:no-repeat;background-position:center"></span>';
   };
   function popCard() {
     const opts = KD.M.cards.map(c => ({ k: 'c:' + c.id, n: c.nick || c.n, cor: c.cor, bank: c.bank })).concat(KD.M.accs.map(a => ({ k: 'a:' + a.id, n: a.nome, cor: a.cor, bank: a.bank })));
     const cur = S.cardId ? 'c:' + S.cardId : S.accId ? 'a:' + S.accId : '';
-    return '<div data-pop class="kscroll" style="position:absolute;z-index:6;left:0;right:0;bottom:100%;background:#151518;border:1px solid #2A2A2F;border-bottom:none;border-radius:' + PR + 'px ' + PR + 'px 0 0;padding:10px;display:flex;flex-direction:column;gap:7px;max-height:280px;overflow-y:auto;box-shadow:0 24px 48px rgba(0,0,0,.6);-webkit-mask-image:linear-gradient(#0000,#000 10px,#000 calc(100% - 10px),#0000);mask-image:linear-gradient(#0000,#000 10px,#000 calc(100% - 10px),#0000);animation:txin .22s ' + E + '">'
+    return '<div data-pop class="kscroll" style="position:absolute;z-index:6;left:0;right:0;bottom:0;background:#151518;border:1px solid #2A2A2F;border-radius:' + PR + 'px;padding:10px;display:flex;flex-direction:column;gap:7px;max-height:' + POPMAXH + 'px;overflow-y:auto;box-shadow:0 24px 48px rgba(0,0,0,.6);-webkit-mask-image:linear-gradient(#0000,#000 10px,#000 calc(100% - 10px),#0000);mask-image:linear-gradient(#0000,#000 10px,#000 calc(100% - 10px),#0000);animation:txin .22s ' + E + '">'
       + (S.isNew ? '<div style="display:flex;gap:6px;padding:2px 2px 6px;flex-wrap:wrap">' + [['pix', 'Pix'], ['debito', 'Débito'], ['boleto', 'Boleto'], ['dinheiro', 'Dinheiro']].map(m => '<span data-a="forma" data-v="' + m[0] + '" style="padding:6px 12px;border-radius:9999px;border:1px solid ' + (S.meio === m[0] && !S.cardId ? '#F2F0EB' : '#2A2A2F') + ';font-size:12px;font-weight:700;cursor:pointer">' + m[1] + '</span>').join('') + '</div>' : '')
       + opts.map(o => '<span data-a="meio" data-v="' + o.k + '" style="flex:none;display:flex;align-items:center;gap:12px;height:46px;border-radius:16px;border:1px solid ' + (o.k === cur ? '#F2F0EB' : '#2A2A2F') + ';background:#0D0D10;padding:0 12px;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden">' + bankChip(o.bank, o.cor) + '<span style="overflow:hidden;text-overflow:ellipsis">' + esc(o.n) + '</span></span>').join('') + '</div>';
   }
@@ -628,8 +652,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const left = '<div style="display:flex;flex-direction:column;gap:10px"><div>' + lb('home', 'Estabelecimento') + '</div>' + (S.isNew ? '<input data-in="nome" data-alert-target="nome" placeholder="Onde foi? Ex.: Padaria Central" value="' + esc(S.nome) + '" style="' + fieldCss + '" class="' + (S.alertField === 'nome' ? 'txalert-box' : '') + '">' : '<div style="display:flex;gap:10px;align-items:stretch"><div style="' + fieldCss + 'flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(S.nome) + '</div><span data-a="goest" title="Editar o estabelecimento" style="width:54px;flex:none;border-radius:9999px;border:2px solid #2A2A2F;background:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#F2F0EB;transition:border-color .25s ease,background .25s ease" onmouseover="this.style.borderColor=\'#51515C\';this.style.background=\'#151518\'" onmouseout="this.style.borderColor=\'#2A2A2F\';this.style.background=\'#000\'">' + svg('pencil', 22, 1.9) + '</span></div>') + '</div>'
       + '<div style="display:flex;flex-direction:column;gap:10px;flex:1;min-height:0">' + lb('lines', 'Observação') + '<textarea data-in="obs" placeholder="Adicionar observação" style="' + fieldCss + 'flex:1;resize:none;font-family:inherit"></textarea></div>';
     const mid = '<div style="display:flex;flex-direction:column;gap:10px">' + lb('cal', 'Data') + '<label style="position:relative;display:block">' + pill(dfmt(S.iso), 'pointer-events:none') + '<input data-in="iso" type="date" value="' + esc(S.iso) + '" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%"></label></div>'
-      + '<div style="display:flex;flex-direction:column;gap:10px">' + lb('card', 'Cartão / Conta') + '<div style="display:flex;gap:8px;align-items:flex-start"><div style="position:relative;flex:1;min-width:0"><div data-a="pop" data-v="card" data-alert-target="card" style="' + fieldCss + 'border-radius:' + fieldRad(S.pop === 'card') + ';flex:1;min-width:0;display:flex;align-items:center;gap:10px;cursor:pointer" class="' + (S.alertField === 'card' ? 'txalert-box' : '') + '">' + bankChip(meioObj && meioObj.bank, (meioObj || {}).cor || '#3A3A40') + '<span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700">' + esc(meio) + '</span></div>' + (S.pop === 'card' ? popCard() : '') + '</div>' + (S.isNew && S.cardId ? '<div data-a="parc" title="Parcelas" style="flex:none;width:74px">' + pill((S.parc || 1) + 'x') + '</div>' : '') + '</div></div>'
-      + '<div style="display:flex;flex-direction:column;gap:10px;position:relative">' + lb('tag', 'Categoria') + '<div data-a="pop" data-v="cat" style="display:flex;align-items:center;gap:12px;border-radius:' + fieldRad(S.pop === 'cat') + ';padding:9px 12px 9px 10px;border:2px solid ' + cor + '8C;background:color-mix(in srgb,' + cor + ' 14%,#000);cursor:pointer">' + icDot(cn, 30) + '<b style="font-size:16px;flex:1">' + esc(cn) + '</b><span style="width:28px;height:28px;border-radius:50%;background:#0A0A0A;display:flex;align-items:center;justify-content:center;color:#F2F0EB">' + svg('chev', 14, 2.6) + '</span></div>' + (S.pop === 'cat' ? popCat() : '') + '</div>';
+      + '<div style="display:flex;flex-direction:column;gap:10px">' + lb('card', 'Cartão / Conta') + '<div style="display:flex;gap:8px;align-items:flex-start"><div style="position:relative;flex:1;min-width:0"><div data-a="pop" data-v="card" data-alert-target="card" style="' + fieldCss + 'border-radius:' + PR + 'px;flex:1;min-width:0;display:flex;align-items:center;gap:10px;cursor:pointer" class="' + (S.alertField === 'card' ? 'txalert-box' : '') + '">' + bankChip(meioObj && meioObj.bank, (meioObj || {}).cor || '#3A3A40') + '<span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700">' + esc(meio) + '</span></div>' + (S.pop === 'card' ? popCard() : '') + '</div>' + (S.isNew && S.cardId ? '<div data-a="parc" title="Parcelas" style="flex:none;width:74px">' + pill((S.parc || 1) + 'x') + '</div>' : '') + '</div></div>'
+      + '<div style="display:flex;flex-direction:column;gap:10px;position:relative">' + lb('tag', 'Categoria') + '<div data-a="pop" data-v="cat" style="display:flex;align-items:center;gap:12px;border-radius:' + PR + 'px;padding:9px 12px 9px 10px;border:2px solid ' + cor + '8C;background:color-mix(in srgb,' + cor + ' 14%,#000);cursor:pointer">' + icDot(cn, 30) + '<b style="font-size:16px;flex:1">' + esc(cn) + '</b><span style="width:28px;height:28px;border-radius:50%;background:#0A0A0A;display:flex;align-items:center;justify-content:center;color:#F2F0EB">' + svg('chev', 14, 2.6) + '</span></div>' + (S.pop === 'cat' ? popCat() : '') + '</div>';
     const nf = S.itens.length ? S.itens.length + (S.itens.length === 1 ? ' item lido' : ' itens lidos') : 'Escaneie ou cole o link<br>pra ver os itens da compra';
     const rail = '<div style="width:331px;flex:none;background:#1C1C20;border-left:1px solid #3A3A40;border-radius:0 30px 30px 0;padding:66px 24px 24px 26px;display:flex;flex-direction:column;box-sizing:border-box;position:relative">'
       + '<div data-a="mode" data-v="dividir" style="height:54px;flex:none;display:flex;align-items:center;justify-content:center;gap:14px;padding:0 20px;white-space:nowrap;border:2px solid #2A2A2F;border-radius:28px;background:#000;cursor:pointer;transition:border-color .25s ease" onmouseover="this.style.borderColor=\'#51515C\'" onmouseout="this.style.borderColor=\'#2A2A2F\'"><span style="color:#F2F0EB;display:flex">' + svg('split', 30, 1.7) + '</span><div style="display:flex;flex-direction:column;line-height:1.15;align-items:flex-start"><span style="font-weight:900;letter-spacing:.06em;font-size:14px;text-transform:uppercase">Dividir transação</span><span style="font-size:12.5px;color:#9A9AA3">' + (S.partes.length ? S.partes.length + (S.partes.length === 1 ? ' parte' : ' partes') : 'Separe em categorias') + '</span></div></div>'
@@ -734,6 +758,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (keep.k) { const el = [...pn.querySelectorAll('[data-in]')].find(i => i.getAttribute('data-in') + (i.getAttribute('data-k') || '') === keep.k); if (el) { el.focus(); try { const l = el.value.length; el.setSelectionRange(l, l); } catch (e) { } } }
     pn.querySelectorAll('.kscroll').forEach((e, i) => { if (scrollKeep[i] != null) e.scrollTop = scrollKeep[i]; });
     fitTitle(host.querySelector('[data-pw]'));
+    fitPop(host.querySelector('[data-pw]'));
     wire(host.querySelector('[data-pw]'));
     const xi = host.querySelector('[data-xi]'); if (xi && first) { xi.style.transform = 'rotate(-180deg)'; requestAnimationFrame(() => requestAnimationFrame(() => { xi.style.transform = 'rotate(0deg)'; })); }
     void prevPn;
@@ -849,6 +874,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (S.isNew) {
       const field = !(S.nome || '').trim() ? 'nome' : !(S.totalV > 0) ? 'total' : (!S.cardId && !S.accId) ? 'card' : '';
       if (field) { S.alertField = field; S.msg = ''; S.mode = 'dados'; render(); const el = host.querySelector('[data-alert-target="' + field + '"]'); if (el) el.scrollIntoView({ block: 'center' }); return; }
+    } else if (editavelValor() && !(S.totalV > 0)) {
+      S.alertField = 'total'; S.msg = ''; S.mode = 'dados'; render(); const el = host.querySelector('[data-alert-target="total"]'); if (el) el.scrollIntoView({ block: 'center' }); return;
     }
     S.busy = true; S.msg = ''; render();
     S.partes = S.partes.filter(p => p.valor > 0);
