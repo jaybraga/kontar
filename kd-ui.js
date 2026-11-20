@@ -660,7 +660,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const root = pn.querySelector(':scope > div[style*="padding:26px 34px"]'), rail = pn.querySelector(':scope > div[style*="width:331px"]');
     if (!root) return;
     const hdr = root.children[0], grid = root.children[1], cols = grid ? [...grid.children] : [];
-    anim(pn.firstElementChild, [{ opacity: 0 }, { opacity: 1 }], { delay: b, duration: 400 });          // a linha horizontal
+    anim(pn.querySelector(':scope > div[style*="height:1px"]'), [{ opacity: 0 }, { opacity: 1 }], { delay: b, duration: 400 });   // a linha horizontal
     upIn(hdr.children[0], b, 10, 420);                                                                   // título
     const tot = pn.querySelector('[data-tot]');
     if (tot) {
@@ -1103,13 +1103,17 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       + '@media (prefers-reduced-motion:reduce){.txalert-box,.txalert-text{animation:none!important;border-color:#FFC24A!important}.txalert-text{text-shadow:0 0 16px rgba(255,194,74,.85)!important}}</style>';
     const pos = S.inline ? 'position:absolute;left:0;top:' + TOPI + 'px;width:' + W + 'px;height:480px;transform:scale(' + k + ');transform-origin:top left;' : 'position:absolute;left:50%;top:50%;width:' + W + 'px;height:480px;margin:-240px 0 0 -' + (W / 2) + 'px;transform:scale(' + k + ');transform-origin:center;';
     host.innerHTML = (S.inline ? '' : '<div data-bd style="position:absolute;inset:0;background:rgba(0,0,0,.72);' + (first ? 'animation:txfade .25s ease' : '') + '"></div>') + css
-      + '<div data-pw' + (S.settled ? ' data-settled="1"' : '') + ' style="' + pos + 'font-family:Helvetica,Arial,sans-serif;color:#F2F0EB;' + (first ? 'animation:txup .4s ' + E + (S.inline ? ' .1s backwards' : '') : '') + '">' + (S.inline ? '<div style="position:absolute;inset:0;border-radius:30px;box-shadow:0 30px 54px -16px rgba(0,0,0,.42),0 10px 26px -6px rgba(0,0,0,.22);pointer-events:none"></div>' : '') + '<div data-pn style="position:absolute;inset:0;background:#111114;border:1px solid #2A2A2F;border-radius:30px;display:flex;overflow:visible;-webkit-mask:' + maskUrl + ' 0 0/100% 100% no-repeat;mask:' + maskUrl + ' 0 0/100% 100% no-repeat">'
+      + '<div data-pw' + (S.settled ? ' data-settled="1"' : '') + ' style="' + pos + 'font-family:Helvetica,Arial,sans-serif;color:#F2F0EB;' + (first ? 'animation:txup .4s ' + E + (S.inline ? ' .1s backwards' : '') : '') + '">' + (S.inline ? '<div style="position:absolute;inset:0;border-radius:30px;box-shadow:0 30px 54px -16px rgba(0,0,0,.42),0 10px 26px -6px rgba(0,0,0,.22);pointer-events:none"></div>' : '') + '<div data-pn style="position:absolute;inset:0;padding:1px;box-sizing:border-box;border-radius:30px;display:flex;overflow:visible">'
+      // o recorte do canto (onde fica o X) vale só pro fundo/contorno e pra coluna lateral — não pro painel inteiro:
+      // com a máscara no painel todo, os dropdowns ficavam presos dentro dele e não conseguiam abrir centrados na opção.
+      + '<div data-pbg style="position:absolute;inset:0;background:#111114;border:1px solid #2A2A2F;border-radius:30px;pointer-events:none;-webkit-mask:' + maskUrl + ' 0 0/100% 100% no-repeat;mask:' + maskUrl + ' 0 0/100% 100% no-repeat;-webkit-mask-origin:border-box;mask-origin:border-box"></div>'
       // a linha precisa estar dentro de data-pn: a mask cria um contexto de empilhamento próprio,
       // então um z-index fora dele (irmão) nunca compara com o z-index dos dropdowns (popCat/popCard) lá dentro
       + '<div style="position:absolute;left:0;right:0;top:140px;height:1px;background:#3A3A40;z-index:1;pointer-events:none"></div>'
       + bodyHtml + modal + '</div>'
       + goo + x + '</div>';
     const pn = host.querySelector('[data-pn]');
+    { const rl = pn.querySelector(':scope > div[style*="width:331px"]'); if (rl) { const m = maskUrl + ' ' + (-(W - 332)) + 'px -1px/' + W + 'px 480px no-repeat'; rl.style.webkitMask = m; rl.style.mask = m; } }
     if (S.mode === 'dados') ticket();
     const ta = pn.querySelector('[data-in="obs"]'); if (ta) ta.value = S.obs;
     const tt = pn.querySelector('[data-in="texto"]'); if (tt) tt.value = S.texto;
