@@ -1496,7 +1496,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   async function lerTexto(file) {
     const buf = await file.arrayBuffer();
     let t = new TextDecoder('utf-8').decode(buf);
-    if (t.indexOf('�') >= 0 || /CHARSET:\s*1252/i.test(t.slice(0, 600))) t = new TextDecoder('windows-1252').decode(buf);
+    if (t.indexOf('�') >= 0) t = new TextDecoder('windows-1252').decode(buf);
     return t.replace(/^﻿/, '');
   }
   const num = s => { let t = String(s == null ? '' : s).trim().replace(/[^\d.,-]/g, ''); if (!t) return NaN; const c = t.lastIndexOf(','), p = t.lastIndexOf('.'); if (c >= 0 && p >= 0) t = c > p ? t.replace(/\./g, '').replace(',', '.') : t.replace(/,/g, ''); else if (c >= 0) t = t.replace(',', '.'); return Number(t); };
@@ -1594,7 +1594,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     L.innerHTML = '<div style="padding:26px 70px 60px;max-width:1500px;margin:0 auto">'
       + '<div style="display:flex;align-items:flex-end;gap:24px"><div><div style="font-size:10px;letter-spacing:.18em;color:#8a8a90">REVISAR IMPORTAÇÃO · ' + esc(String(S.file).toUpperCase()) + '</div><div style="font-size:58px;font-weight:800;letter-spacing:-.03em;line-height:1">Revisar extrato</div></div>'
       + '<div style="margin-left:auto;display:flex;gap:10px;align-items:center"><span data-a="cancel" style="border:1px solid #555;border-radius:99px;padding:13px 24px;font-size:11px;font-weight:800;letter-spacing:.12em;cursor:pointer">CANCELAR</span>'
-      + '<span data-a="go" style="background:#fff;color:#000;border-radius:99px;padding:13px 26px;font-size:11px;font-weight:800;letter-spacing:.12em;cursor:' + (inc.length && !S.busy ? 'pointer' : 'default') + ';opacity:' + (inc.length && !S.busy ? 1 : .4) + '">' + (S.busy ? 'IMPORTANDO…' : 'IMPORTAR ' + inc.length + ' TRANSAÇÕES') + '</span></div></div>'
+      + '<span data-a="go" style="background:#fff;color:#000;border-radius:99px;padding:13px 26px;font-size:11px;font-weight:800;letter-spacing:.12em;cursor:' + (inc.length && !S.busy ? 'pointer' : 'default') + ';opacity:' + (inc.length && !S.busy ? 1 : .4) + '">' + (S.busy ? 'IMPORTANDO…' : 'IMPORTAR ' + inc.length + (inc.length === 1 ? ' TRANSAÇÃO' : ' TRANSAÇÕES')) + '</span></div></div>'
       + '<div style="display:flex;gap:8px;margin-top:16px;align-items:center;flex-wrap:wrap"><span style="font-size:11px;letter-spacing:.14em;color:#8a8a90;margin-right:4px">IMPORTAR PARA</span>' + tg + '</div>'
       + '<div style="display:flex;gap:12px;margin-top:14px;flex-wrap:wrap">' + chip(rs.length + ' LINHAS NO ARQUIVO', '#222', '#fff') + (S.per ? chip('PERÍODO ' + ddmm(S.per[0]) + ' – ' + ddmm(S.per[1]), '#222', '#fff') : '') + chip(inc.length + ' SERÃO IMPORTADAS', '#1c3b27', GR) + chip(need + ' PRECISAM DE VOCÊ', '#4a3a12', AM) + chip(G.skip.length + ' DESCARTADAS', '#2a2a2a', '#aaa') + '</div>'
       + (S.err ? '<div style="margin-top:14px;color:#FF8A7C;font-size:13px">' + esc(S.err) + '</div>' : '')
