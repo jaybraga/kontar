@@ -1478,17 +1478,21 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   };
 })();
 
-/* Kontar · importador de extrato (OFX e CSV) + tela de revisão em lote (mockup 2A)
-   Fluxo: arquivo → linhas → duplicatas (KD.dup) e categorias conhecidas → três grupos → importar.
-   Cada importação vira um import_batches; as transações gravam batch_id e external_id (id do banco no arquivo). */
+/* Kontar · importador de extrato (OFX e CSV) + tela de revisão em lote (layout A: coluna lateral + cards)
+   Fluxo: arquivo → linhas → duplicatas (KD.dup), transferências entre contas próprias e categorias conhecidas
+   → quatro cards (Precisam de você · Entre suas contas · Confiantes · Descartadas) → importar.
+   Cada importação vira um import_batches; as transações gravam batch_id e external_id (id do banco no arquivo).
+   Transferência: as duas pernas ficam ligadas por transfers/transfer_id e saem dos totais de gasto e renda
+   (os saldos das contas continuam se movendo). Uma perna sozinha fica pendente até o outro extrato entrar. */
 (function () {
   'use strict';
   const KD = window.KD, IMP = (KD.imp = {});
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const brl = n => (Math.round(n * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const MES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const brl0 = n => Math.round(n).toLocaleString('pt-BR');
   const ddmm = iso => iso.slice(8, 10) + '/' + iso.slice(5, 7);
-  const AM = '#F0C24B', GR = '#7EE2A0';
+  const AM = '#F0C24B', GR = '#6AFF2A', RD = '#FF5A4A', XF = '#78788A', INK = '#0A0A0A', FG = '#F2F0EB', MU = '#8A8A90';
+  const E = 'cubic-bezier(.2,.7,.2,1)';
   const PREFIX = /^(compra no d[eé]bito|compra no cr[eé]dito|transfer[eê]ncia (enviada|recebida)( pelo pix)?|pagamento de boleto efetuado|pix (enviado|recebido))\s*[-–:]\s*/i;
   const FATURA = /pagamento (recebido|da fatura|de fatura)|desconto antecipa|estorno de/i;
 
@@ -1541,88 +1545,239 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   }
   const limpo = s => { let n = String(s || '').replace(/\s+/g, ' ').trim(); const m = n.match(PREFIX); if (m) { n = n.slice(m[0].length); n = n.split(/\s+[-–]\s+/)[0]; } return n.replace(/^\*+/, '').trim() || String(s || '').trim(); };
 
+  /* ---------- transferências entre contas próprias ---------- */
+  const cents = n => Math.round(Math.abs(Number(n) || 0) * 100);
+  const dayNum = iso => { const p = String(iso || '').slice(0, 10).split('-').map(Number); return Date.UTC(p[0], p[1] - 1, p[2]) / 864e5; };
+  const toks = s => KD.norm(s).replace(/[^a-z0-9]+/g, ' ').split(' ').filter(w => w.length >= 3);
+  // um nome bate quando todas as palavras dele (3+ letras) aparecem na descrição: "Jay Braga" acha "PIX ENVIADO JAY P BRAGA"
+  const temNome = (raw, nomes) => { const T = new Set(toks(raw)); return nomes.find(n => { const N = toks(n); return N.length && N.every(w => T.has(w)); }) || null; };
+  const accName = id => (KD.M.accs.find(a => a.id === id) || {}).nome || 'outra conta';
+  const transfCat = () => (KD.M.catByName['Transferência'] || {}).id || null;
+
   /* ---------- classificação ---------- */
   function classificar(S) {
     const M = KD.M, hist = {};
-    M.rows.forEach(r => { const k = KD.norm(r.e); if (r.catId && !(k in hist)) hist[k] = r.catId; });
-    const usados = new Set();
+    M.rows.forEach(r => { const k = KD.norm(r.e); if (r.catId && !KD.isTransf(r) && !(k in hist)) hist[k] = r.catId; });
+    const usados = new Set(), pares = new Set();
     S.rows.forEach(r => {
-      r.why = ''; r.grp = 'ok'; r.dup = null; r.dupChoice = null; r.include = true;
-      r.catId = hist[KD.norm(r.nome)] || null;
+      r.why = ''; r.grp = 'ok'; r.dup = null; r.par = null; r.porNome = null;
+      if (!r.catUser) r.catId = hist[KD.norm(r.nome)] || null;
       if (!r.catId) { const k = Object.keys(hist).find(h => h.length >= 4 && (h.startsWith(KD.norm(r.nome)) || KD.norm(r.nome).startsWith(h))); if (k) r.catId = hist[k]; }
-      if (S.known.has(r.fitid) && r.fitid) { r.grp = 'skip'; r.why = 'Já importada antes'; r.include = false; return; }
-      if (FATURA.test(r.raw)) { r.grp = 'skip'; r.why = 'Pagamento de fatura (não conta como gasto)'; r.include = false; return; }
+      const inc = v => { if (r.incUser == null) r.include = v; };
+      if (!r.unskip && S.known.has(r.fitid) && r.fitid) { r.grp = 'skip'; r.why = 'Já importada antes'; return; }
+      if (!r.unskip && FATURA.test(r.raw)) { r.grp = 'skip'; r.why = 'Pagamento de fatura · não conta como gasto'; return; }
       const f = KD.dup.find({ nome: r.nome, valor: r.amt, dir: r.dir, iso: r.iso, cardId: S.cardId, accId: S.accId }, M.rows, { skip: usados });
-      if (f.length) { r.dup = f[0]; usados.add(f[0].row.id); r.grp = 'need'; r.include = false; r.why = (f[0].conf === 'provavel' ? 'Provável' : 'Possível') + ' duplicata de "' + f[0].row.e + '" (' + (f[0].row.origem === 'manual' ? 'lançada à mão' : 'já no extrato') + ')'; return; }
-      if (!r.catId) { r.grp = 'need'; r.include = false; r.why = 'Sem categoria'; return; }
-      if (r.amt >= 1000) { r.grp = 'need'; r.include = false; r.why = 'Valor alto, confira'; }
+      if (f.length) { r.dup = f[0]; usados.add(f[0].row.id); r.grp = 'need'; inc(r.dupChoice === 'other'); r.why = (f[0].conf === 'provavel' ? 'Provável' : 'Possível') + ' duplicata'; return; }
+      // transferência: só em extrato de conta. Par = mesmo valor, direção oposta, até 3 dias, em outra conta sua.
+      if (S.accId && !r.xferOff) {
+        const v = cents(r.amt), d0 = dayNum(r.iso), opp = r.dir === 'saida' ? 'entrada' : 'saida';
+        const par = M.rows.filter(x => x.accId && !x.cardId && x.accId !== S.accId && !pares.has(x.id) && cents(x.total) === v && (x.amt > 0 ? 'entrada' : 'saida') === opp && Math.abs(dayNum(x.iso) - d0) <= 3)
+          .sort((a, b) => (b.xfer ? 1 : 0) - (a.xfer ? 1 : 0) || Math.abs(dayNum(a.iso) - d0) - Math.abs(dayNum(b.iso) - d0))[0];
+        const nome = temNome(r.raw, S.nomes);
+        if (par || nome) {
+          r.grp = 'xfer'; r.par = par || null; r.porNome = nome; if (par) pares.add(par.id); inc(true);
+          const de = r.dir === 'saida' ? S.tgLabel : (par ? accName(par.accId) : 'Sua outra conta'), para = r.dir === 'saida' ? (par ? accName(par.accId) : 'sua outra conta') : S.tgLabel;
+          r.why = de + ' → ' + para + (par ? ' · par encontrado em ' + ddmm(par.iso) : ' · seu nome na descrição');
+          return;
+        }
+      }
+      if (!r.catId) { r.grp = 'need'; inc(false); r.why = 'Sem categoria'; return; }
+      if (r.amt >= 1000) { r.grp = 'need'; inc(true); r.why = 'Valor alto'; return; }
+      inc(true);
     });
   }
-  const grp = r => (r.dupChoice === 'same' ? 'skip' : r.grp);
-  const whyOf = r => (r.dupChoice === 'same' ? 'Marcada como a mesma · nada será criado' : r.why);
+  const ativa = r => r.grp !== 'skip' && r.dupChoice !== 'same';
+  const vai = r => ativa(r) && r.include;
 
-  /* ---------- tela ---------- */
+  /* ---------- peças visuais ---------- */
   let L = null, S = null, input = null;
-  const catOpts = sel => Object.values(KD.M.catById).sort((a, b) => a.ordem - b.ordem).map(c => '<option value="' + c.id + '"' + (c.id === sel ? ' selected' : '') + '>' + esc(c.nome) + '</option>').join('');
-  const chip = (t, bg, fg) => '<span style="background:' + bg + ';color:' + fg + ';border-radius:99px;padding:8px 14px;font-size:12px;letter-spacing:.08em">' + t + '</span>';
-  function rowHtml(r) {
-    const cat = r.catId ? KD.M.catById[r.catId] : null, need = grp(r) === 'need';
-    const catCell = need && !r.dup ? '<select data-cat="' + r.i + '" style="background:#000;color:' + AM + ';border:1px dashed ' + AM + ';border-radius:99px;padding:6px 10px;font-size:12px;max-width:150px"><option value="">Escolher ▾</option>' + catOpts(r.catId) + '</select>'
-      : '<span style="font-size:12px;border:1px solid ' + (cat ? (cat.cor || '#888') : '#666') + ';color:' + (cat ? (cat.cor || '#ddd') : '#999') + ';border-radius:99px;padding:5px 12px;min-width:80px;text-align:center">' + esc(cat ? cat.nome : '—') + '</span>';
-    const q = r.dup && !r.dupChoice && grp(r) === 'need' ? ' <span data-ch="' + r.i + ':same" style="cursor:pointer;text-decoration:underline">É a mesma</span> · <span data-ch="' + r.i + ':other" style="cursor:pointer;text-decoration:underline">É outra</span>' : r.dupChoice === 'other' ? ' <span data-ch="' + r.i + ':" style="cursor:pointer;text-decoration:underline;color:#888">desfazer</span>' : '';
-    return '<div style="display:flex;align-items:center;gap:16px;padding:11px 0;border-bottom:1px dashed #333">'
-      + (grp(r) === 'skip' ? '<span style="width:18px;flex:none"></span>' : '<span data-ck="' + r.i + '" style="width:18px;height:18px;border-radius:5px;flex:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#000;font-size:13px;font-weight:900;' + (r.include ? 'background:#fff' : 'border:2px solid #666') + '">' + (r.include ? '✓' : '') + '</span>')
-      + '<span style="font-size:10px;letter-spacing:.1em;border:1px solid #555;border-radius:99px;padding:3px 9px;color:#aaa;width:34px;text-align:center;flex:none">' + (r.dir === 'entrada' ? 'ENT' : r.meioT) + '</span>'
-      + '<div style="width:300px;flex:none;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b style="font-size:15px">' + esc(r.nome) + '</b> <span style="font-size:12px;color:#8a8a90">' + ddmm(r.iso) + '</span></div>'
-      + '<div style="flex:1;font-size:12px;color:' + (grp(r) === 'skip' ? '#8a8a90' : AM) + ';min-width:0">' + esc(whyOf(r)) + q + '</div>' + catCell
-      + '<b style="width:110px;text-align:right;font-size:15px;flex:none">' + (r.dir === 'entrada' ? '+ ' : '– ') + 'R$ ' + brl(r.amt) + '</b></div>';
+  const comp = () => KD.comp;
+  const catCor = n => comp().cor(n);
+  const icDot = (n, sz) => '<span style="width:' + sz + 'px;height:' + sz + 'px;flex:none;border-radius:50%;background:' + catCor(n) + ';display:flex;align-items:center;justify-content:center"><span style="display:block;width:' + Math.round(sz * .55) + 'px;height:' + Math.round(sz * .55) + 'px;background-image:url(\'' + comp().constructor.uri(comp().icSvg(n), '#000') + '\');background-size:contain;background-repeat:no-repeat;background-position:center"></span></span>';
+  const chev = (sz, col) => '<svg width="' + sz + '" height="' + sz + '" viewBox="0 0 24 24" fill="none" stroke="' + (col || 'currentColor') + '" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex:none"><path d="m6 9 6 6 6-6"/></svg>';
+  const checkSvg = col => '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="' + col + '" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+  const LOGOKEY = { 'Itaú Azul': 'Itaú', 'Nubank PJ': 'Nubank', 'Nubank Pessoal': 'Nubank', 'CDB Mercado Pago': 'Mercado Pago' };
+  const bankChip = (bank, cor) => {
+    const key = bank ? (LOGOKEY[bank] || bank) : null, url = key ? comp().constructor.lgcUrl(key) : '';
+    if (!url) return '<i style="width:10px;height:10px;border-radius:50%;background:' + cor + ';flex:none"></i>';
+    return key === 'C6'
+      ? '<span style="width:28px;height:28px;flex:none;display:flex;align-items:center;justify-content:center"><span style="display:block;width:100%;height:58%;background:' + FG + ';-webkit-mask:url(\'' + url + '\') center/contain no-repeat;mask:url(\'' + url + '\') center/contain no-repeat"></span></span>'
+      : '<span style="width:28px;height:28px;flex:none;background-image:url(\'' + url + '\');background-size:contain;background-repeat:no-repeat;background-position:center"></span>';
+  };
+  const popShell = (inner, w) => '<div data-pop data-dd style="position:absolute;z-index:6;left:0;' + (w ? 'width:' + w + 'px' : 'right:0') + ';top:0;max-height:320px;overflow:hidden;background:#151518;border:1px solid #2A2A2F;border-radius:22px;box-shadow:0 24px 48px rgba(0,0,0,.6);display:flex;flex-direction:column">'
+    + '<div class="kscroll" data-popscroll style="flex:1;min-height:0;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px">' + inner + '</div></div>';
+  const optCss = on => 'display:flex;align-items:center;gap:12px;height:44px;flex:none;border-radius:14px;border:1px solid ' + (on ? FG : '#2A2A2F') + ';background:#0D0D10;padding:0 12px;font-size:14px;font-weight:700;color:' + FG + ';cursor:pointer;white-space:nowrap;overflow:hidden';
+  function popCat(r) {
+    const cur = r.catId ? (KD.M.catById[r.catId] || {}).nome : null;
+    return popShell(comp().cats().filter(n => n !== 'Transferência').map(n => '<span data-pick="cat" data-v="' + esc(n) + '"' + (n === cur ? ' data-dd-on="1"' : '') + ' style="' + optCss(n === cur) + '">' + icDot(n, 24) + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis">' + esc(n) + '</span>' + (n === cur ? checkSvg(FG) : '') + '</span>').join(''), 230);
   }
-  function group(key, title, sub, col, rows, open) {
-    const lim = key === 'ok' ? 6 : 99, show = S.open[key] ? rows : rows.slice(0, key === 'skip' ? 0 : lim), more = rows.length - show.length;
-    return '<div data-grp style="margin-top:22px"><div style="display:flex;align-items:baseline;gap:12px"><span style="width:10px;height:10px;border-radius:50%;background:' + col + ';flex:none;align-self:center"></span><b style="font-size:20px">' + title + '</b><span style="font-size:12px;color:#8a8a90;letter-spacing:.06em">' + sub + '</span><span style="margin-left:auto;font-size:26px;font-weight:800">' + rows.length + '</span></div>'
-      + show.map(rowHtml).join('')
-      + (more > 0 ? '<div data-more="' + key + '" style="padding:11px 0 0 34px;font-size:12px;color:#8a8a90;cursor:pointer;text-decoration:underline">' + (key === 'skip' ? 'ver lista' : '+ ' + more + ' linhas · mostrar todas') + '</div>' : '')
-      + (key === 'ok' && rows.length > lim && S.open.ok ? '' : '') + '</div>';
+  function popTarget() {
+    return popShell(S.targets.map(t => '<span data-pick="tg" data-v="' + t.k + '"' + (t.k === S.tk ? ' data-dd-on="1"' : '') + ' style="' + optCss(t.k === S.tk) + '">' + bankChip(t.bank, t.cor) + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis">' + esc(t.label) + '</span><span style="font-size:10px;letter-spacing:.12em;color:' + MU + '">' + (t.card ? 'CARTÃO' : 'CONTA') + '</span></span>').join(''));
   }
+  const meioTag = (r, dark) => '<span style="justify-self:start;font-size:10px;font-weight:800;letter-spacing:.12em;border:1.5px solid ' + (dark ? '#3A3A40' : 'rgba(10,10,10,.55)') + ';border-radius:99px;padding:4px 10px;color:' + (dark ? '#B4B4BA' : INK) + ';white-space:nowrap">' + r.meioT + '</span>';
+  const valor = (r, dark) => '<b style="text-align:right;font-size:16px;letter-spacing:-.02em;white-space:nowrap;color:' + (r.dir === 'entrada' ? (dark ? GR : '#1E6B0C') : (dark ? RD : '#B3261E')) + '">' + (r.dir === 'entrada' ? '+ ' : '– ') + 'R$ ' + brl(r.amt) + '</b>';
+  const ck = (on, dark, attr) => '<span ' + attr + ' style="width:20px;height:20px;border-radius:6px;box-sizing:border-box;flex:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s ease,border-color .2s ease;'
+    + (on ? 'background:' + (dark ? FG : INK) + ';border:2px solid ' + (dark ? FG : INK) : 'border:2px solid ' + (dark ? '#55555C' : 'rgba(10,10,10,.55)')) + '">' + (on ? checkSvg(dark ? INK : AM) : '') + '</span>';
+  const link = (attr, t, col) => '<span ' + attr + ' style="cursor:pointer;text-decoration:underline;text-underline-offset:3px;color:' + col + ';white-space:nowrap">' + t + '</span>';
+
+  function catCell(r, dark) {
+    const open = S.pop && S.pop.k === 'cat' && S.pop.i === r.i, n = r.catId ? (KD.M.catById[r.catId] || {}).nome : null;
+    let pill;
+    if (!n) pill = '<div data-a="pcat" data-i="' + r.i + '" style="height:38px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:8px;border-radius:99px;border:2px dashed ' + (dark ? AM : INK) + ';color:' + (dark ? AM : INK) + ';font-size:13px;font-weight:800;cursor:pointer">Escolher categoria ' + chev(13) + '</div>';
+    else if (dark) { const c = catCor(n); pill = '<div data-a="pcat" data-i="' + r.i + '" style="height:38px;box-sizing:border-box;display:flex;align-items:center;gap:9px;border-radius:99px;padding:0 6px 0 5px;border:2px solid ' + c + '8C;background:color-mix(in srgb,' + c + ' 14%,#000);cursor:pointer">' + icDot(n, 24) + '<b style="font-size:13px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(n) + '</b><span style="width:22px;height:22px;border-radius:50%;background:' + INK + ';display:flex;align-items:center;justify-content:center;color:' + FG + '">' + chev(11) + '</span></div>'; }
+    else pill = '<div data-a="pcat" data-i="' + r.i + '" style="height:38px;box-sizing:border-box;display:flex;align-items:center;gap:9px;border-radius:99px;padding:0 6px 0 5px;border:2px solid ' + INK + ';background:rgba(10,10,10,.08);color:' + INK + ';cursor:pointer">' + icDot(n, 24) + '<b style="font-size:13px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(n) + '</b><span style="width:22px;height:22px;border-radius:50%;background:' + INK + ';display:flex;align-items:center;justify-content:center;color:' + AM + '">' + chev(11) + '</span></div>';
+    return '<div style="position:relative;' + (open ? 'z-index:30' : '') + '">' + pill + (open ? popCat(r) : '') + '</div>';
+  }
+  const COLS = 'grid-template-columns:20px 78px minmax(0,1fr) auto 196px 130px';
+  function rowHtml(r, g) {
+    const dark = g !== 'need', line = dark ? '#232327' : 'rgba(10,10,10,.16)', off = r.dupChoice === 'same';
+    let why = '', cat = '', box = '';
+    if (g === 'skip') {
+      box = '<span></span>';
+      why = '<span style="color:' + MU + '">' + esc(r.why) + '</span>';
+      cat = '<span data-a="incluir" data-i="' + r.i + '" style="justify-self:stretch;height:38px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:99px;border:1.5px solid #55555C;font-size:11px;font-weight:800;letter-spacing:.12em;cursor:pointer">INCLUIR</span>';
+    } else if (g === 'xfer') {
+      box = ck(r.include, true, 'data-ck="' + r.i + '"');
+      why = '<span style="color:#B4B4BA">' + esc(r.why) + '</span> · ' + link('data-a="naoxfer" data-i="' + r.i + '"', 'Não é entre contas', MU);
+      cat = '<div style="height:38px;box-sizing:border-box;display:flex;align-items:center;gap:9px;border-radius:99px;padding:0 12px 0 5px;border:2px solid ' + XF + '8C;background:color-mix(in srgb,' + XF + ' 14%,#000)">' + icDot('Transferência', 24) + '<b style="font-size:13px">Transferência</b></div>';
+    } else {
+      box = off ? '<span></span>' : ck(r.include, dark, 'data-ck="' + r.i + '"');
+      if (r.dup) {
+        const d = r.dup.row;
+        why = off ? '<span>Marcada como a mesma de "' + esc(d.e) + '" · nada será criado</span> · ' + link('data-ch="' + r.i + ':"', 'desfazer', INK)
+          : r.dupChoice === 'other' ? '<span>Marcada como outra · será criada</span> · ' + link('data-ch="' + r.i + ':"', 'desfazer', INK)
+          : '<span title="' + esc(d.e + ' · ' + ddmm(d.iso) + ' · ' + (d.origem === 'manual' ? 'lançada à mão' : 'já no extrato')) + '">' + esc(r.why) + ' de <b>' + esc(d.e) + '</b> ' + ddmm(d.iso) + '</span> · ' + link('data-ch="' + r.i + ':same"', 'É a mesma', INK) + ' · ' + link('data-ch="' + r.i + ':other"', 'É outra', INK);
+      } else if (g === 'need' && r.why && !(r.why === 'Sem categoria' && r.catId)) why = '<span>' + esc(r.why) + '</span>';
+      cat = off ? '<span></span>' : catCell(r, dark);
+    }
+    return '<div data-row="' + r.i + '" style="display:grid;' + COLS + ';gap:16px;align-items:center;min-height:58px;padding:8px 0;border-top:1px solid ' + line + ';opacity:' + (off ? .45 : 1) + ';transition:opacity .3s ease">'
+      + box + meioTag(r, dark)
+      + '<div style="min-width:0;display:flex;align-items:baseline;gap:10px"><b style="font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(r.nome) + '</b><span style="font-size:12px;color:' + (dark ? MU : 'rgba(10,10,10,.6)') + ';flex:none">' + ddmm(r.iso) + '</span></div>'
+      + '<div style="font-size:12px;max-width:360px;text-align:right;line-height:1.35;color:' + (dark ? '#B4B4BA' : INK) + '">' + why + '</div>'
+      + cat + valor(r, dark) + '</div>';
+  }
+  const GDEF = {
+    need: { t: 'Precisam de você', sub: 'DUPLICATA, SEM CATEGORIA OU VALOR ALTO', bg: AM, fg: INK, rule: INK, bul: INK, bulFg: AM },
+    xfer: { t: 'Entre suas contas', sub: 'NÃO ENTRA NOS TOTAIS DE GASTO NEM DE RENDA', bg: '#141416', fg: FG, rule: XF, bul: XF, bulFg: FG },
+    ok: { t: 'Confiantes', sub: 'CATEGORIA E ESTABELECIMENTO RECONHECIDOS', bg: '#141416', fg: FG, rule: GR, bul: GR, bulFg: INK },
+    skip: { t: 'Descartadas', sub: 'NADA É APAGADO · DÁ PARA INCLUIR DE VOLTA', bg: '#141416', fg: FG, rule: '#3A3A40', bul: '#3A3A40', bulFg: FG }
+  };
+  const bullet = (g, n, sz) => '<span style="width:' + sz + 'px;height:' + sz + 'px;border-radius:50%;background:' + GDEF[g].bul + ';color:' + GDEF[g].bulFg + ';display:flex;align-items:center;justify-content:center;flex:none;font-weight:800;font-size:' + Math.round(sz * (String(n).length > 2 ? .36 : .44)) + 'px;letter-spacing:-.03em">' + n + '</span>';
+  function card(g, rows) {
+    const D = GDEF[g], dark = g !== 'need', open = !!S.open[g], lim = g === 'ok' ? 8 : 999;
+    const show = g === 'skip' ? (open ? rows : []) : (open ? rows : rows.slice(0, lim)), more = rows.length - show.length;
+    const sel = rows.filter(ativa), all = sel.length && sel.every(r => r.include);
+    const head = '<div style="display:flex;align-items:center;gap:14px">' + bullet(g, rows.length, 40) + '<b style="font-size:26px;letter-spacing:-.04em">' + D.t + '</b><span style="font-size:10px;font-weight:700;letter-spacing:.14em;color:' + (dark ? MU : 'rgba(10,10,10,.62)') + '">' + D.sub + '</span>'
+      + (g === 'skip' ? '<span data-a="more" data-g="skip" style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;letter-spacing:.14em;cursor:pointer;color:' + FG + '">' + (open ? 'FECHAR' : 'VER') + '<span style="display:flex;transition:transform .35s ' + E + ';transform:rotate(' + (open ? 180 : 0) + 'deg)">' + chev(14) + '</span></span>' : '') + '</div>'
+      + '<div style="height:4px;border-radius:2px;background:' + D.rule + ';margin:16px 0 ' + (g === 'skip' && !open ? 0 : 4) + 'px"></div>';
+    const selAll = g === 'skip' || !sel.length ? '' : '<div style="display:grid;' + COLS + ';gap:16px;align-items:center;height:44px">' + ck(all, dark, 'data-all="' + g + '"') + '<span data-all="' + g + '" style="grid-column:2 / 4;font-size:11px;font-weight:800;letter-spacing:.14em;cursor:pointer">' + (all ? 'DESMARCAR TODAS' : 'SELECIONAR TODAS') + '</span></div>';
+    return '<section data-grp="' + g + '" style="background:' + D.bg + ';color:' + D.fg + ';border-radius:28px;padding:22px 28px ' + (g === 'skip' && !open ? 22 : 14) + 'px;' + (dark ? 'border:1px solid #232327;' : '') + 'overflow:visible">'
+      + head + selAll + '<div data-rows>' + show.map(r => rowHtml(r, g)).join('') + '</div>'
+      + (more > 0 && g !== 'skip' ? '<div data-a="more" data-g="' + g + '" style="border-top:1px solid #232327;padding:14px 0 4px;font-size:11px;font-weight:800;letter-spacing:.14em;color:' + MU + ';cursor:pointer">+ ' + more + (more === 1 ? ' LINHA' : ' LINHAS') + ' · MOSTRAR TODAS</div>' : '')
+      + '</section>';
+  }
+  function side(G) {
+    const t = S.targets.find(x => x.k === S.tk), inc = S.rows.filter(vai), entra = inc.filter(r => r.dir === 'entrada' && r.grp !== 'xfer').reduce((a, r) => a + r.amt, 0), sai = inc.filter(r => r.dir === 'saida' && r.grp !== 'xfer').reduce((a, r) => a + r.amt, 0);
+    const tgOpen = S.pop && S.pop.k === 'tg';
+    const lbl = t => '<div style="font-size:10px;font-weight:700;letter-spacing:.16em;color:' + MU + ';margin-bottom:10px">' + t + '</div>';
+    const sum = ['need', 'xfer', 'ok', 'skip'].filter(g => G[g].length).map(g => '<div data-a="goto" data-g="' + g + '" style="display:flex;align-items:center;gap:12px;height:36px;cursor:pointer;font-size:15px;font-weight:700">' + bullet(g, G[g].length, 28) + GDEF[g].t + '</div>').join('');
+    const nomes = S.nomes.map((n, k) => '<span style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 6px 0 12px;border-radius:99px;border:1.5px solid #3A3A40;font-size:12px;font-weight:700">' + esc(n) + '<span data-a="rmnome" data-k="' + k + '" title="Remover" style="width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:' + MU + ';font-size:14px">×</span></span>').join('')
+      + (S.addNome ? '<input data-nome placeholder="Nome ou razão social" style="height:28px;box-sizing:border-box;border-radius:99px;border:1.5px solid ' + FG + ';background:#000;color:' + FG + ';padding:0 12px;font:700 12px Helvetica,Arial,sans-serif;outline:0;width:100%">'
+        : '<span data-a="addnome" style="display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:99px;border:1.5px dashed #55555C;font-size:12px;font-weight:700;color:' + MU + ';cursor:pointer">+ nome</span>');
+    return '<aside data-side style="position:sticky;top:0;align-self:start;height:calc(100vh - 68px);box-sizing:border-box;padding:26px 28px 24px;display:flex;flex-direction:column;min-height:0">'
+      + '<div data-s style="flex:none"><div style="font-size:10.5px;font-weight:700;letter-spacing:.14em;color:' + MU + '">↘ REVISAR IMPORTAÇÃO</div>'
+      + '<div style="font-size:52px;font-weight:700;letter-spacing:-.06em;line-height:.95;margin:8px 0 10px">Revisar<br>extrato</div>'
+      + '<div style="font-size:12px;color:' + MU + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + esc(S.file) + '">' + esc(S.file) + (S.per ? ' · ' + ddmm(S.per[0]) + ' – ' + ddmm(S.per[1]) : '') + ' · ' + S.rows.length + (S.rows.length === 1 ? ' linha' : ' linhas') + '</div></div>'
+      + '<div data-s style="flex:none;margin-top:22px">' + lbl('IMPORTAR PARA') + '<div style="position:relative;' + (tgOpen ? 'z-index:30' : '') + '"><div data-a="ptg" style="height:54px;box-sizing:border-box;background:#000;border:2px solid #2A2A2F;border-radius:22px;padding:0 14px;display:flex;align-items:center;gap:12px;cursor:pointer">' + bankChip(t.bank, t.cor) + '<b style="flex:1;min-width:0;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(t.label) + '</b><span style="color:' + MU + '">' + chev(16) + '</span></div>' + (tgOpen ? popTarget() : '') + '</div></div>'
+      + '<div data-s style="flex:none;margin-top:22px">' + sum + '</div>'
+      + (S.accId ? '<div data-s style="flex:none;margin-top:20px">' + lbl('SEUS NOMES · PRA ACHAR TRANSFERÊNCIAS') + '<div style="display:flex;flex-wrap:wrap;gap:6px">' + nomes + '</div></div>' : '')
+      + '<div data-s style="flex:none;margin-top:auto;padding-top:18px"><div style="height:4px;border-radius:2px;background:' + FG + ';margin-bottom:14px"></div>' + lbl('SERÃO IMPORTADAS')
+      + '<div style="font-size:64px;font-weight:700;letter-spacing:-.06em;line-height:.85">' + inc.length + '</div>'
+      + '<div style="display:flex;gap:14px;margin-top:10px;font-size:13px;font-weight:800"><span style="color:' + GR + '">+ R$ ' + brl0(entra) + '</span><span style="color:' + RD + '">– R$ ' + brl0(sai) + '</span>' + (G.xfer.some(vai) ? '<span style="color:' + MU + '">⇄ ' + G.xfer.filter(vai).length + '</span>' : '') + '</div>'
+      + (S.err ? '<div style="margin-top:12px;color:#FF8A7C;font-size:12px;line-height:1.4">' + esc(S.err) + '</div>' : '')
+      + '<span data-a="go" style="margin-top:16px;height:54px;display:flex;align-items:center;justify-content:center;border-radius:99px;background:' + FG + ';color:' + INK + ';font-size:12px;font-weight:900;letter-spacing:.12em;cursor:' + (inc.length && !S.busy ? 'pointer' : 'default') + ';opacity:' + (inc.length && !S.busy ? 1 : .4) + ';transition:opacity .25s ease">' + (S.busy ? 'IMPORTANDO…' : 'IMPORTAR ' + inc.length) + '</span>'
+      + '<span data-a="cancel" style="display:block;text-align:center;margin-top:12px;font-size:11px;font-weight:800;letter-spacing:.14em;color:' + MU + ';cursor:pointer">CANCELAR</span></div></aside>';
+  }
+
+  /* ---------- render (com altura animada dos cards e fade das linhas novas) ---------- */
   function render(first) {
     if (!L) return;
-    const rs = S.rows, G = { ok: [], need: [], skip: [] }; rs.forEach(r => G[grp(r)].push(r));
-    const inc = rs.filter(r => r.include && grp(r) !== 'skip'), need = G.need.length;
-    const pillSel = (on) => 'border-radius:99px;padding:8px 14px;font-size:12px;letter-spacing:.06em;cursor:pointer;' + (on ? 'background:#fff;color:#000;font-weight:800' : 'border:1px solid #444;color:#ddd');
-    const tg = S.targets.map(t => '<span data-tg="' + t.k + '" style="' + pillSel(t.k === S.tk) + '">' + esc(t.label) + '</span>').join('');
-    const keepScroll = L.scrollTop;
-    L.innerHTML = '<div style="padding:26px 70px 60px;max-width:1500px;margin:0 auto">'
-      + '<div style="display:flex;align-items:flex-end;gap:24px"><div><div style="font-size:10px;letter-spacing:.18em;color:#8a8a90">REVISAR IMPORTAÇÃO · ' + esc(String(S.file).toUpperCase()) + '</div><div style="font-size:58px;font-weight:800;letter-spacing:-.03em;line-height:1">Revisar extrato</div></div>'
-      + '<div style="margin-left:auto;display:flex;gap:10px;align-items:center"><span data-a="cancel" style="border:1px solid #555;border-radius:99px;padding:13px 24px;font-size:11px;font-weight:800;letter-spacing:.12em;cursor:pointer">CANCELAR</span>'
-      + '<span data-a="go" style="background:#fff;color:#000;border-radius:99px;padding:13px 26px;font-size:11px;font-weight:800;letter-spacing:.12em;cursor:' + (inc.length && !S.busy ? 'pointer' : 'default') + ';opacity:' + (inc.length && !S.busy ? 1 : .4) + '">' + (S.busy ? 'IMPORTANDO…' : 'IMPORTAR ' + inc.length + (inc.length === 1 ? ' TRANSAÇÃO' : ' TRANSAÇÕES')) + '</span></div></div>'
-      + '<div style="display:flex;gap:8px;margin-top:16px;align-items:center;flex-wrap:wrap"><span style="font-size:11px;letter-spacing:.14em;color:#8a8a90;margin-right:4px">IMPORTAR PARA</span>' + tg + '</div>'
-      + '<div style="display:flex;gap:12px;margin-top:14px;flex-wrap:wrap">' + chip(rs.length + ' LINHAS NO ARQUIVO', '#222', '#fff') + (S.per ? chip('PERÍODO ' + ddmm(S.per[0]) + ' – ' + ddmm(S.per[1]), '#222', '#fff') : '') + chip(inc.length + ' SERÃO IMPORTADAS', '#1c3b27', GR) + chip(need + ' PRECISAM DE VOCÊ', '#4a3a12', AM) + chip(G.skip.length + ' DESCARTADAS', '#2a2a2a', '#aaa') + '</div>'
-      + (S.err ? '<div style="margin-top:14px;color:#FF8A7C;font-size:13px">' + esc(S.err) + '</div>' : '')
-      + group('ok', 'Confiantes', 'CATEGORIA E ESTABELECIMENTO RECONHECIDOS · MARCADAS PARA IMPORTAR', GR, G.ok)
-      + group('need', 'Precisam de você', 'SEM CATEGORIA, VALOR ALTO OU POSSÍVEL DUPLICATA', AM, G.need)
-      + group('skip', 'Descartadas', 'DUPLICATAS CERTAS · NADA É APAGADO, DÁ PARA RECUPERAR', '#777', G.skip) + '</div>';
-    L.scrollTop = keepScroll;
-    if (first) { const gs = [...L.querySelectorAll('[data-grp]')]; gs.forEach(g => { g.style.transition = 'none'; g.style.opacity = '0'; g.style.transform = 'translateY(12px)'; }); void L.offsetHeight; requestAnimationFrame(() => gs.forEach((g, k) => { g.style.transition = 'opacity .5s ease ' + (0.15 + k * .14) + 's, transform .7s cubic-bezier(.2,.7,.2,1) ' + (0.15 + k * .14) + 's'; g.style.opacity = '1'; g.style.transform = 'none'; })); }
+    const G = { need: [], xfer: [], ok: [], skip: [] }; S.rows.forEach(r => G[r.grp].push(r));
+    const old = {}, oldRows = new Set();
+    if (!first) { L.querySelectorAll('[data-grp]').forEach(c => { old[c.dataset.grp] = c.getBoundingClientRect().height; }); L.querySelectorAll('[data-row]').forEach(x => oldRows.add(x.closest('[data-grp]').dataset.grp + ':' + x.dataset.row)); }
+    const keep = L.scrollTop;
+    L.innerHTML = '<div style="display:grid;grid-template-columns:330px minmax(0,1fr);max-width:1680px;margin:0 auto;min-height:100%">' + side(G)
+      + '<main style="padding:22px 32px 80px 4px;display:flex;flex-direction:column;gap:16px">' + ['need', 'xfer', 'ok', 'skip'].filter(g => G[g].length).map(g => card(g, G[g])).join('') + '</main></div>';
+    L.scrollTop = keep;
+    const inp = L.querySelector('[data-nome]'); if (inp) inp.focus();
+    if (first) {
+      const els = [...L.querySelectorAll('[data-s],[data-grp]')];
+      els.forEach(g => { g.style.transition = 'none'; g.style.opacity = '0'; g.style.transform = 'translateY(14px)'; }); void L.offsetHeight;
+      requestAnimationFrame(() => els.forEach((g, k) => { g.style.transition = 'opacity .5s ease ' + (0.1 + k * .07) + 's, transform .75s ' + E + ' ' + (0.1 + k * .07) + 's'; g.style.opacity = '1'; g.style.transform = 'none'; }));
+      return;
+    }
+    // linhas que acabaram de chegar num card: fade + subida curta
+    const novas = [...L.querySelectorAll('[data-row]')].filter(x => !oldRows.has(x.closest('[data-grp]').dataset.grp + ':' + x.dataset.row));
+    novas.forEach(x => { x.style.transition = 'none'; x.style.opacity = '0'; x.style.transform = 'translateY(8px)'; });
+    // cards que mudaram de altura: animam da altura velha pra nova; cards novos entram em fade
+    const cards = [...L.querySelectorAll('[data-grp]')];
+    cards.forEach(c => { const h0 = old[c.dataset.grp]; if (h0 == null) { c.style.transition = 'none'; c.style.opacity = '0'; c.style.transform = 'translateY(10px)'; } else { const h1 = c.getBoundingClientRect().height; if (Math.abs(h1 - h0) > 1) { c.dataset.h1 = h1; c.style.transition = 'none'; c.style.height = h0 + 'px'; c.style.overflow = 'hidden'; } } });
+    void L.offsetHeight;
+    requestAnimationFrame(() => {
+      cards.forEach(c => {
+        if (c.dataset.h1) { c.style.transition = 'height .5s ' + E; c.style.height = c.dataset.h1 + 'px'; const done = () => { c.style.height = ''; c.style.overflow = 'visible'; c.style.transition = ''; delete c.dataset.h1; }; c.addEventListener('transitionend', function f(e) { if (e.target === c) { c.removeEventListener('transitionend', f); done(); } }); setTimeout(done, 700); }
+        else if (old[c.dataset.grp] == null) { c.style.transition = 'opacity .45s ease .1s, transform .6s ' + E + ' .1s'; c.style.opacity = '1'; c.style.transform = 'none'; }
+      });
+      novas.forEach((x, k) => { const dl = Math.min(k, 12) * .03 + .12; x.style.transition = 'opacity .4s ease ' + dl + 's, transform .55s ' + E + ' ' + dl + 's'; x.style.opacity = '1'; x.style.transform = 'none'; });
+    });
   }
-  function recalc() { const t = S.targets.find(x => x.k === S.tk); S.cardId = t && t.card ? t.id : null; S.accId = t && !t.card ? t.id : null; S.rows.forEach(r => { r.meioT = t && t.card ? 'CRÉD' : /pix/i.test(r.raw) ? 'PIX' : /boleto/i.test(r.raw) ? 'BOL' : 'DÉB'; }); classificar(S); }
+  // fecha o dropdown aberto com fade antes de redesenhar
+  function closePop(then) {
+    const p = L && L.querySelector('[data-pop]'); S.pop = null;
+    if (!p) return then ? then() : render();
+    p.style.transition = 'opacity .16s ease'; p.style.opacity = '0'; setTimeout(() => (then ? then() : render()), 160);
+  }
+
+  function recalc() {
+    const t = S.targets.find(x => x.k === S.tk); S.cardId = t && t.card ? t.id : null; S.accId = t && !t.card ? t.id : null; S.tgLabel = t ? t.label : '';
+    S.rows.forEach(r => { r.meioT = S.cardId ? (r.dir === 'entrada' ? 'ESTORNO' : 'CRÉD') : /pix/i.test(r.raw) ? 'PIX' : /boleto/i.test(r.raw) ? 'BOLETO' : /\b(ted|doc|transf)/i.test(r.raw) || r.dir === 'entrada' ? 'TRANSF' : 'DÉBITO'; });
+    classificar(S);
+  }
   async function conhecidos(ids) {
     const set = new Set(), list = ids.filter(Boolean);
     for (let i = 0; i < list.length; i += 150) { const q = await KD.sb.from('transactions').select('external_id').in('external_id', list.slice(i, i + 150)); (q.data || []).forEach(x => set.add(x.external_id)); }
     return set;
   }
   function close() {
-    if (!L) return; const el = L; L = null; S = null; el.style.opacity = '0'; setTimeout(() => el.remove(), 260);
+    if (!L) return; const el = L; L = null; S = null; el.style.opacity = '0'; setTimeout(() => el.remove(), 320);
   }
+  async function salvarNomes() {
+    const p = KD.M.profile; if (p) p.nomes_titular = S.nomes.slice();
+    if (KD.isDemo()) return;
+    const q = await KD.sb.from('profiles').update({ nomes_titular: S.nomes }).eq('user_id', KD.user.id);
+    if (q.error) console.error('[kontar] nomes', q.error);
+  }
+  const MEIO_DB = { 'CRÉD': 'cartao', 'ESTORNO': 'cartao', PIX: 'pix', BOLETO: 'boleto', 'DÉBITO': 'debito', TRANSF: 'transferencia' };
   async function importar() {
     if (!S || S.busy) return;
-    const sel = S.rows.filter(r => r.include && grp(r) !== 'skip'); if (!sel.length) return;
+    const sel = S.rows.filter(vai); if (!sel.length) return;
     if (KD.isDemo()) { S.err = 'Esta é a conta de demonstração: importar fica travado para todo mundo poder testar.'; render(); return; }
     S.busy = true; S.err = ''; render();
     try {
-      const uid = KD.user.id, per = S.per;
-      const b = await KD.sb.from('import_batches').insert({ user_id: uid, origem: 'extrato_' + S.ext, arquivo: S.file, status: 'aprovado', total_linhas: S.rows.length, duplicatas_detectadas: S.rows.filter(r => grp(r) === 'skip' || r.dup).length }).select('id').single();
+      const uid = KD.user.id, tcat = transfCat();
+      const b = await KD.sb.from('import_batches').insert({ user_id: uid, origem: 'extrato_' + S.ext, arquivo: S.file, status: 'aprovado', total_linhas: S.rows.length, duplicatas_detectadas: S.rows.filter(r => r.dup || r.grp === 'skip').length }).select('id').single();
       if (b.error) throw b.error; const bid = b.data.id;
-      const rows = sel.map(r => ({ user_id: uid, estabelecimento: r.nome, valor_total: Math.round(r.amt * 100) / 100, direcao: r.dir, meio: S.cardId ? 'cartao' : (r.meioT === 'PIX' ? 'pix' : r.meioT === 'BOL' ? 'boleto' : 'debito'), data_compra: r.iso, card_id: S.cardId || null, account_id: S.cardId ? null : (S.accId || null), category_id: r.catId || null, parcelas_total: 1, origem: 'import', status: r.catId ? 'confirmado' : 'pendente_revisao', categoria_origem: r.catId ? 'usuario' : null, batch_id: bid, external_id: r.fitid || null }));
+      // transferências: reaproveita o vínculo da perna que já estava esperando; senão cria um novo
+      for (const r of sel.filter(x => x.grp === 'xfer')) {
+        if (r.par && r.par.xfer) { r.tid = r.par.xfer; await KD.sb.from('transfers').update({ status: 'confirmada' }).eq('id', r.tid); continue; }
+        const t = await KD.sb.from('transfers').insert({ user_id: uid, status: r.par ? 'confirmada' : 'pendente', origem: 'importador' }).select('id').single();
+        if (t.error) throw t.error; r.tid = t.data.id;
+        if (r.par) { const u = await KD.sb.from('transactions').update({ transfer_id: r.tid }).eq('id', r.par.id); if (u.error) throw u.error; }
+      }
+      const rows = sel.map(r => {
+        const x = r.grp === 'xfer', cat = x ? tcat : r.catId || null;
+        return { user_id: uid, estabelecimento: r.nome, valor_total: Math.round(r.amt * 100) / 100, direcao: r.dir, meio: MEIO_DB[r.meioT] || 'debito', data_compra: r.iso, card_id: S.cardId || null, account_id: S.cardId ? null : (S.accId || null), category_id: cat, parcelas_total: 1, origem: 'import', status: cat ? 'confirmado' : 'pendente_revisao', categoria_origem: cat ? 'usuario' : null, batch_id: bid, external_id: r.fitid || null, transfer_id: x ? r.tid : null };
+      });
       for (let i = 0; i < rows.length; i += 100) { const q = await KD.sb.from('transactions').insert(rows.slice(i, i + 100)); if (q.error) throw q.error; }
       await KD.refresh(KD.comp); close();
     } catch (e) { console.error('[kontar] importar', e); if (S) { S.busy = false; S.err = 'Não consegui importar: ' + ((e && e.message) || 'erro') + '. Se algo entrou pela metade, a importação inteira pode ser desfeita.'; render(); } }
@@ -1633,28 +1788,54 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (ext === 'pdf' || ext === 'xlsx' || ext === 'xls') return alerta('Esse formato ainda não é lido. Exporte o extrato em OFX ou CSV no app do banco.');
     try { const t = await lerTexto(file); raw = /<STMTTRN>/i.test(t) ? parseOfx(t) : parseCsv(t); } catch (e) { raw = []; }
     if (!raw.length) return alerta('Não achei lançamentos nesse arquivo. Use o extrato em OFX ou CSV exportado pelo banco.');
-    const targets = KD.M.cards.map(c => ({ k: 'c' + c.id, id: c.id, card: true, label: c.nick || c.n })).concat(KD.M.accs.map(a => ({ k: 'a' + a.id, id: a.id, card: false, label: a.nome })));
+    const targets = KD.M.accs.map(a => ({ k: 'a' + a.id, id: a.id, card: false, label: a.nome, bank: a.bank, cor: a.cor })).concat(KD.M.cards.map(c => ({ k: 'c' + c.id, id: c.id, card: true, label: c.nick || c.n, bank: c.bank, cor: c.cor })));
     if (!targets.length) return alerta('Cadastre um cartão ou conta antes de importar.');
-    const fn = KD.norm(file.name); let tk = (targets.find(t => fn.indexOf(KD.norm(t.label).split(' ')[0]) >= 0) || targets[0]).k;
-    const rows = raw.map((r, i) => ({ i, iso: r.iso, raw: r.raw, nome: limpo(r.raw), amt: Math.abs(r.amt), dir: r.amt < 0 ? 'saida' : 'entrada', fitid: r.fitid || '' })).filter(r => r.amt > 0);
-    const isos = rows.map(r => r.iso).sort();
-    S = { file: file.name, ext, rows, targets, tk, open: {}, known: await conhecidos(rows.map(r => r.fitid)), per: isos.length ? [isos[0], isos[isos.length - 1]] : null, busy: false, err: '' };
+    const fn = KD.norm(file.name), isCard = /fatura|cartao|card|credit/.test(fn);
+    let tk = (targets.find(t => fn.indexOf(KD.norm(t.label).split(' ')[0]) >= 0 && t.card === isCard) || targets.find(t => fn.indexOf(KD.norm(t.label).split(' ')[0]) >= 0) || targets[0]).k;
+    const rows = raw.map((r, i) => ({ i, iso: r.iso, raw: r.raw, nome: limpo(r.raw), amt: Math.abs(r.amt), dir: r.amt < 0 ? 'saida' : 'entrada', fitid: r.fitid || '', include: false, incUser: null })).filter(r => r.amt > 0);
+    rows.forEach((r, k) => { r.i = k; });
+    const isos = rows.map(r => r.iso).sort(), prof = KD.M.profile || {};
+    const nomes = (prof.nomes_titular && prof.nomes_titular.length) ? prof.nomes_titular.slice() : (prof.nome_exibicao && prof.nome_exibicao.trim().length >= 4 ? [prof.nome_exibicao.trim()] : []);
+    S = { file: file.name, ext, rows, targets, tk, open: {}, known: await conhecidos(rows.map(r => r.fitid)), per: isos.length ? [isos[0], isos[isos.length - 1]] : null, busy: false, err: '', nomes, pop: null };
     recalc();
     L = document.createElement('div');
-    L.setAttribute('data-imp', '1'); L.style.cssText = 'position:fixed;left:0;right:0;top:68px;bottom:0;background:#000;z-index:99990;font-family:Helvetica,Arial,sans-serif;color:#F2F0EB;overflow:auto;opacity:0;transition:opacity .35s ease';
+    L.setAttribute('data-imp', '1'); L.className = 'kscroll'; L.style.cssText = 'position:fixed;left:0;right:0;top:68px;bottom:0;background:#000;z-index:99990;font-family:Helvetica,Arial,sans-serif;color:' + FG + ';overflow:auto;opacity:0;transition:opacity .35s ease';
     document.body.appendChild(L); render(true); requestAnimationFrame(() => { if (L) L.style.opacity = '1'; });
-    L.addEventListener('click', ev => {
-      const el = ev.target.closest('[data-a],[data-ck],[data-tg],[data-more],[data-ch]'); if (!el || !S) return;
-      if (el.dataset.a === 'cancel') return close();
-      if (el.dataset.a === 'go') return importar();
-      if (el.dataset.tg) { S.tk = el.dataset.tg; recalc(); return render(); }
-      if (el.dataset.more) { S.open[el.dataset.more] = true; return render(); }
-      if (el.dataset.ck != null) { const r = S.rows[+el.dataset.ck]; r.include = !r.include; return render(); }
-      if (el.dataset.ch != null) { const [i, v] = el.dataset.ch.split(':'), r = S.rows[+i]; r.dupChoice = v || null; r.include = v === 'other'; return render(); }
+    L.addEventListener('click', onClick);
+    L.addEventListener('keydown', ev => {
+      const el = ev.target.closest('[data-nome]'); if (!el || !S) return;
+      if (ev.key === 'Enter') { const v = el.value.trim(); S.addNome = false; if (v.length >= 3 && !S.nomes.some(n => KD.norm(n) === KD.norm(v))) { S.nomes.push(v); salvarNomes(); recalc(); } render(); }
+      if (ev.key === 'Escape') { ev.stopPropagation(); S.addNome = false; render(); }
     });
-    L.addEventListener('change', ev => { const el = ev.target.closest('[data-cat]'); if (!el || !S) return; const r = S.rows[+el.dataset.cat]; r.catId = el.value || null; if (r.catId) r.include = true; render(); });
+    L.addEventListener('focusout', ev => { if (ev.target.matches && ev.target.matches('[data-nome]') && S && S.addNome) setTimeout(() => { if (S && S.addNome && !L.contains(document.activeElement)) { S.addNome = false; render(); } }, 0); });
   }
-  function alerta(msg) { const n = document.createElement('div'); n.textContent = msg; n.style.cssText = 'position:fixed;left:50%;top:84px;transform:translateX(-50%);background:#1b1b1d;color:#F2F0EB;border:1px solid ' + AM + ';border-radius:16px;padding:14px 22px;font:14px Helvetica,Arial,sans-serif;z-index:99999;opacity:0;transition:opacity .3s ease'; document.body.appendChild(n); requestAnimationFrame(() => { n.style.opacity = '1'; }); setTimeout(() => { n.style.opacity = '0'; setTimeout(() => n.remove(), 320); }, 4200); }
+  function onClick(ev) {
+    if (!S) return;
+    const pick = ev.target.closest('[data-pick]');
+    if (pick) {
+      const v = pick.dataset.v, P = S.pop;
+      if (pick.dataset.pick === 'cat') { const r = S.rows[P.i], c = KD.M.catByName[v]; if (c) { r.catId = c.id; r.catUser = true; if (r.incUser == null) r.include = true; } }
+      if (pick.dataset.pick === 'tg' && v !== S.tk) { S.tk = v; S.rows.forEach(r => { r.incUser = null; }); recalc(); }
+      return closePop();
+    }
+    if (S.pop && !ev.target.closest('[data-pop]')) return closePop();
+    const el = ev.target.closest('[data-a],[data-ck],[data-ch],[data-all]'); if (!el) return;
+    const a = el.dataset.a, i = el.dataset.i != null ? +el.dataset.i : null;
+    if (a === 'cancel') return close();
+    if (a === 'go') return importar();
+    if (a === 'pcat') { S.pop = { k: 'cat', i }; return render(); }
+    if (a === 'ptg') { S.pop = { k: 'tg' }; return render(); }
+    if (a === 'more') { S.open[el.dataset.g] = !S.open[el.dataset.g]; return render(); }
+    if (a === 'goto') { const c = L.querySelector('[data-grp="' + el.dataset.g + '"]'); if (c) L.scrollTo({ top: Math.max(0, c.offsetTop - 22), behavior: 'smooth' }); return; }
+    if (a === 'incluir') { const r = S.rows[i]; r.unskip = true; r.dupChoice = r.dupChoice === 'same' ? null : r.dupChoice; r.incUser = null; classificar(S); if (r.grp !== 'skip' && r.grp !== 'need') { r.include = true; r.incUser = true; } return render(); }
+    if (a === 'naoxfer') { const r = S.rows[i]; r.xferOff = true; r.incUser = null; classificar(S); return render(); }
+    if (a === 'addnome') { S.addNome = true; return render(); }
+    if (a === 'rmnome') { S.nomes.splice(+el.dataset.k, 1); salvarNomes(); recalc(); return render(); }
+    if (el.dataset.ck != null) { const r = S.rows[+el.dataset.ck]; r.include = !r.include; r.incUser = r.include; return render(); }
+    if (el.dataset.all) { const rs = S.rows.filter(r => r.grp === el.dataset.all && ativa(r)), on = !rs.every(r => r.include); rs.forEach(r => { r.include = on; r.incUser = on; }); return render(); }
+    if (el.dataset.ch != null) { const [k, v] = el.dataset.ch.split(':'), r = S.rows[+k]; r.dupChoice = v || null; r.include = v === 'other'; r.incUser = r.include; return render(); }
+  }
+  function alerta(msg) { const n = document.createElement('div'); n.textContent = msg; n.style.cssText = 'position:fixed;left:50%;top:84px;transform:translateX(-50%);background:#1b1b1d;color:' + FG + ';border:1px solid ' + AM + ';border-radius:16px;padding:14px 22px;font:14px Helvetica,Arial,sans-serif;z-index:99999;opacity:0;transition:opacity .3s ease'; document.body.appendChild(n); requestAnimationFrame(() => { n.style.opacity = '1'; }); setTimeout(() => { n.style.opacity = '0'; setTimeout(() => n.remove(), 320); }, 4200); }
   IMP.open = abrir;
 
   /* ---------- botão "Importar" na barra de cima, ao lado de "Nova" ---------- */
@@ -1669,5 +1850,5 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     nova.parentElement.insertBefore(b, nova);
   }
   new MutationObserver(() => { try { mountButton(); } catch (e) {} }).observe(document.documentElement, { childList: true, subtree: true });
-  window.addEventListener('keydown', e => { if (e.key === 'Escape' && L && !S.busy) close(); });
+  window.addEventListener('keydown', e => { if (e.key !== 'Escape' || !L || !S || S.busy) return; if (S.pop) return closePop(); close(); });
 })();

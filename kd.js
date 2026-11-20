@@ -65,7 +65,7 @@
   KD.load = async function (sb, user) {
     KD.sb = sb; KD.user = user;
     const [lanc, tx, inst, cards, cyc, accs, cats, ma, goals, prefs, prof, parts, items, notas] = await Promise.all([
-      all(sb, 'v_lancamento'), all(sb, 'transactions', 'id,card_id,account_id,category_id,categoria_origem,fora_do_comum,chave,created_at'),
+      all(sb, 'v_lancamento'), all(sb, 'transactions', 'id,card_id,account_id,category_id,categoria_origem,fora_do_comum,chave,created_at,transfer_id'),
       all(sb, 'installments', 'transaction_id,numero,valor,data_caixa'), all(sb, 'cards'), all(sb, 'card_cycles'), all(sb, 'accounts'),
       all(sb, 'categories'), all(sb, 'merchant_aliases'), all(sb, 'goals'), all(sb, 'user_prefs'), all(sb, 'profiles'),
       all(sb, 'transaction_parts').catch(() => []), all(sb, 'transaction_items').catch(() => []), all(sb, 'transaction_notas').catch(() => [])
@@ -113,13 +113,14 @@
       return { id: l.id, dt, d: ddmm(dt), y: dt.getFullYear(), mi: mIdx(dt), t: METH[l.meio] || 'Pix', meio: l.meio, e: l.nome || l.apelido_global || l.nome_fatura || '—', chave: l.chave,
         sub: !!l.assinatura, atyp: !!t.fora_do_comum, c: (t.category_id && M.catById[t.category_id] ? M.catById[t.category_id].nome : l.categoria) || 'Outros', catId: t.category_id || null, k, card, cardId: t.card_id || null, accId: t.account_id || null,
         v: signed(amt), amt, out: amt < 0 ? -amt : 0, inn: amt > 0 ? amt : 0, pend: l.status === 'pendente_revisao', trab: !!l.trabalho, x: Number(l.parcelas_total) || 1,
-        obs: l.observacao || '', dom: l.dominio || null, logo: l.logo_url || null, created: t.created_at || '', iso: String(l.data_compra).slice(0, 10), total: Number(l.valor_total), origem: l.origem || '',
+        obs: l.observacao || '', dom: l.dominio || null, logo: l.logo_url || null, created: t.created_at || '', iso: String(l.data_compra).slice(0, 10), xfer: t.transfer_id || null, total: Number(l.valor_total), origem: l.origem || '',
         parts: (partsBy[l.id] || []).sort((a, b) => a.ordem - b.ordem).map(p => ({ id: p.id, catId: p.category_id, valor: Number(p.valor), auto: !!p.automatica, rotulo: p.rotulo || '' })),
         items: (itemsBy[l.id] || []).sort((a, b) => a.ordem - b.ordem).map(i => ({ id: i.id, nome: i.nome, qtd: Number(i.quantidade) || 1, un: i.unidade || '', valor: Number(i.valor), catId: i.category_id, partId: i.part_id })),
         nota: notaBy[l.id] || null };
     }).sort((a, b) => b.dt - a.dt || (b.created < a.created ? -1 : b.created > a.created ? 1 : 0));
     M.rowById = Object.fromEntries(M.rows.map(r => [r.id, r]));
-    const isTransf = r => r.c === 'Transferência';
+    // regra única (igual às visões do banco): meio transferência, vínculo de transferência ou categoria Transferência
+    const isTransf = (KD.isTransf = r => r.c === 'Transferência' || r.meio === 'transferencia' || !!r.xfer);
 
     /* "Fora do comum": bem acima do habitual da categoria (§4.11, proposta).
        Mais de 3× a mediana dos 6 meses anteriores da mesma categoria, mínimo R$ 100,
@@ -188,7 +189,7 @@
   KD.month = function (mi) {
     if (KD._mc[mi]) return KD._mc[mi];
     const M = KD.M, T = KD.today, isCur = mi === M.CUR, start = mStart(mi), end = mEnd(mi), ref = isCur ? T : end, nd = daysIn(mi), td = isCur ? T.getDate() : nd;
-    const inMi = r => r.mi === mi, isTransf = r => r.c === 'Transferência';
+    const inMi = r => r.mi === mi, isTransf = KD.isTransf;
     const rowsMi = M.rows.filter(inMi);
     const out = { mi, isCur };
 
@@ -323,7 +324,7 @@
     /* tetos ≥ 80% no mês atual */
     cur.TET.filter(t => t.v / t.t >= 0.8).forEach(t => { const nd = daysIn(M.CUR) - T.getDate(); N.push({ id: 'teto:' + t.n + ':' + M.CUR, g: 'antes', c: (M.catByName[t.n] || {}).cor || CAT_DEF[t.n] || '#78788A', i: 'gauge', ic: '#000000', t: '', title: t.n + ' passou de ' + (t.v >= t.t ? '100%' : '80%') + ' do teto', body: brl0(t.v) + ' de ' + brl0(t.t) + ' · faltam ' + nd + (nd === 1 ? ' dia' : ' dias') + ' no mês.', w: Math.min(100, Math.round(t.v / t.t * 100)) + '%' }); });
     /* última entrada e última assinatura */
-    const inn = M.rows.find(r => r.inn && r.c !== 'Transferência' && r.dt <= T);
+    const inn = M.rows.find(r => r.inn && !KD.isTransf(r) && r.dt <= T);
     if (inn) N.push({ id: 'ent:' + inn.id, g: daysBetween(inn.dt, T) < 1 ? 'hoje' : 'antes', c: '#6AFF2A', i: 'entrada', ic: '#000000', t: when(inn.dt), title: 'Entrou dinheiro', body: inn.e + ' · ' + inn.k, val: '+ ' + brl0(inn.inn), valInk: '#6AFF2A', dt: inn.dt });
     const sub = M.rows.find(r => r.sub && r.out && r.dt <= T);
     if (sub) N.push({ id: 'assin:' + sub.id, g: daysBetween(sub.dt, T) < 1 ? 'hoje' : 'antes', c: '#FF3D8B', i: 'repeat', ic: '#000000', t: when(sub.dt), title: 'Assinatura renovada', body: sub.e + ' · ' + sub.k, val: '– ' + brl2(sub.out), valInk: '#FFFFFF', dt: sub.dt });
