@@ -681,6 +681,19 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       }
     }
   }
+  // clicar num item da nota cria a primeira parte: os campos (categoria e título) descem com fade e a lista de itens
+  // desliza pra baixo até o lugar novo (FLIP), em vez de a coluna trocar de uma vez.
+  function revealParte(pn, preTop) {
+    if (REDUCE()) return;
+    const root = pn.querySelector(':scope > div[style*="padding:26px 34px"]'), rc = root && root.children[1] && root.children[1].children[1];
+    if (!rc) return;
+    const pw = pn.closest('[data-pw]'), sc = (pw.getBoundingClientRect().width / pw.offsetWidth) || 1;
+    const f = rc.children[0];
+    [...f.children].forEach((c, i) => anim(c, [{ opacity: 0, transform: 'translateY(-18px)' }, { opacity: 1, transform: 'none' }], { delay: 40 + i * 70, duration: 520, easing: SNAP }));
+    const it = rc.querySelector('[data-a="item"]'), rest = [...rc.children].slice(1);
+    const d = (preTop != null && it) ? (preTop - it.getBoundingClientRect().top) / sc : -40;
+    rest.forEach(e => anim(e, [{ opacity: 0, transform: 'translateY(' + d + 'px)' }, { opacity: 1, transform: 'none' }], { delay: 0, duration: 560, easing: EH }));
+  }
   function enterView(pn, b) {
     if (REDUCE()) return;
     if (S.mode === 'dados') { enterDados(pn, b); return; }
@@ -1084,6 +1097,12 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const bodyHtml = S.mode === 'dados' ? viewDados() : S.mode === 'ler' ? viewLer() : viewDividir();
     const x = '<span data-a="close" style="position:absolute;right:0;top:0;width:44px;height:44px;border-radius:50%;background:#F2F0EB;color:#0A0A0A;display:flex;align-items:center;justify-content:center;z-index:3;cursor:pointer;"><span data-xi style="display:flex;transition:transform .5s cubic-bezier(.65,0,.2,1)">' + svg('x', 18, 2.4) + '</span></span>';
     const prevPn = host.querySelector('[data-pn]');
+    // Dividir com itens de nota lidos: o card cresce (~30%) pra dar respiro à lista; sai desse modo e volta ao normal.
+    // Como o painel é redesenhado a cada render, a altura anterior é lida do DOM e animada até a nova (FLIP).
+    const prevPw = host.querySelector('[data-pw]'), prevH = prevPw && !S.inline ? prevPw.offsetHeight : 0;
+    const Ht = S.inline ? 480 : (S.mode === 'dividir' && S.itens.length) ? Math.min(624, Math.max(480, Math.floor(((host.clientHeight || 0) - 48) / k))) : 480;
+    const Hs = (prevH && !first) ? prevH : Ht;
+    const preItem = (S.mode === 'dividir' && S._hadP === false) ? (() => { const e = host.querySelector('[data-a="item"]'); return e ? e.getBoundingClientRect().top : null; })() : null;
     const modal = S.askDel ? '<div data-modal style="position:absolute;inset:0;z-index:9;background:rgba(0,0,0,.6);border-radius:30px;display:flex;align-items:center;justify-content:center;animation:txfade .2s ease"><div style="width:460px;background:#151518;border:1px solid #3A3A40;border-radius:28px;padding:28px;display:flex;flex-direction:column;gap:12px">'
         + '<div style="display:flex;align-items:center;gap:12px"><span style="width:40px;height:40px;flex:none;border-radius:50%;background:rgba(255,107,90,.14);color:#FF6B5A;display:flex;align-items:center;justify-content:center">' + svg('trash', 18, 2.2) + '</span><div style="font-size:22px;font-weight:700;letter-spacing:-.02em">Excluir transação?</div></div>'
         + '<div style="font-size:14px;color:#9A9AA3;line-height:1.5"><b style="color:#F2F0EB">' + esc(S.row.e || 'Sem nome') + '</b> · R$ ' + brl(S.row.total || 0) + ' · ' + dfmt(S.row.iso) + '<br>Ela some do extrato e dos totais, junto com a nota e a divisão em categorias, se tiver.</div>'
@@ -1101,12 +1120,14 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const css = '<style>@keyframes txfade{from{opacity:0}to{opacity:1}}@keyframes txin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}@keyframes txdrop{from{opacity:0;transform:translateY(-8px) scaleY(.9)}to{opacity:1;transform:none}}@keyframes txup{from{opacity:0;translate:0 18px}to{opacity:1;translate:0 0}}[data-pw] .txsv,[data-pw] .txcn{transition:background .25s ease,color .25s ease}[data-pw] .txsv:hover,[data-pw] .txcn:hover{background:rgba(255,255,255,.1)}[data-pw] .txnf:hover{transform:translateY(-3px)}[data-pw] .txnf svg{transition:transform .35s cubic-bezier(.2,.7,.2,1)}[data-pw] .txnf:hover svg{transform:scale(1.1)}[data-pw] .txtot:empty:before{content:"0,00";color:#51515C}[data-x-e]:has(>[data-tx-in] [data-pw][data-settled])>:not([data-tx-in]){display:none!important}[data-pw] input::placeholder,[data-pw] textarea::placeholder{color:#51515C}'
       + '@keyframes txAlertPulse{0%,100%{border-color:#FFC24A;box-shadow:0 0 0 0 rgba(255,194,74,.4)}50%{border-color:#FFE29A;box-shadow:0 0 16px 2px rgba(255,194,74,.4)}}@keyframes txAlertGlow{0%,100%{text-shadow:0 0 0 rgba(255,194,74,0)}50%{text-shadow:0 0 20px rgba(255,194,74,.85)}}.txalert-box{animation:txAlertPulse 1.7s ease-in-out infinite}.txalert-text{animation:txAlertGlow 1.7s ease-in-out infinite}'
       + '@media (prefers-reduced-motion:reduce){.txalert-box,.txalert-text{animation:none!important;border-color:#FFC24A!important}.txalert-text{text-shadow:0 0 16px rgba(255,194,74,.85)!important}}</style>';
-    const pos = S.inline ? 'position:absolute;left:0;top:' + TOPI + 'px;width:' + W + 'px;height:480px;transform:scale(' + k + ');transform-origin:top left;' : 'position:absolute;left:50%;top:50%;width:' + W + 'px;height:480px;margin:-240px 0 0 -' + (W / 2) + 'px;transform:scale(' + k + ');transform-origin:center;';
+    // máscara do canto: o desenho tem altura fixa (480) no topo; o resto (quando o card cresce) fica inteiro
+    const maskPbg = maskUrl + ' 0 0/100% 480px no-repeat,linear-gradient(#000,#000) 0 480px/100% calc(100% - 480px) no-repeat';
+    const pos = S.inline ? 'position:absolute;left:0;top:' + TOPI + 'px;width:' + W + 'px;height:480px;transform:scale(' + k + ');transform-origin:top left;' : 'position:absolute;left:50%;top:50%;width:' + W + 'px;height:' + Hs + 'px;margin:-' + (Hs / 2) + 'px 0 0 -' + (W / 2) + 'px;transform:scale(' + k + ');transform-origin:center;';
     host.innerHTML = (S.inline ? '' : '<div data-bd style="position:absolute;inset:0;background:rgba(0,0,0,.72);' + (first ? 'animation:txfade .25s ease' : '') + '"></div>') + css
       + '<div data-pw' + (S.settled ? ' data-settled="1"' : '') + ' style="' + pos + 'font-family:Helvetica,Arial,sans-serif;color:#F2F0EB;' + (first ? 'animation:txup .4s ' + E + (S.inline ? ' .1s backwards' : '') : '') + '">' + (S.inline ? '<div style="position:absolute;inset:0;border-radius:30px;box-shadow:0 30px 54px -16px rgba(0,0,0,.42),0 10px 26px -6px rgba(0,0,0,.22);pointer-events:none"></div>' : '') + '<div data-pn style="position:absolute;inset:0;padding:1px;box-sizing:border-box;isolation:isolate;border-radius:30px;display:flex;overflow:visible">'
       // o recorte do canto (onde fica o X) vale só pro fundo/contorno e pra coluna lateral — não pro painel inteiro:
       // com a máscara no painel todo, os dropdowns ficavam presos dentro dele e não conseguiam abrir centrados na opção.
-      + '<div data-pbg style="position:absolute;inset:0;z-index:-1;background:#111114;border:1px solid #2A2A2F;border-radius:30px;pointer-events:none;-webkit-mask:' + maskUrl + ' 0 0/100% 100% no-repeat;mask:' + maskUrl + ' 0 0/100% 100% no-repeat;-webkit-mask-origin:border-box;mask-origin:border-box"></div>'
+      + '<div data-pbg style="position:absolute;inset:0;z-index:-1;background:#111114;border:1px solid #2A2A2F;border-radius:30px;pointer-events:none;-webkit-mask:' + maskPbg + ';mask:' + maskPbg + ';-webkit-mask-origin:border-box;mask-origin:border-box"></div>'
       // a linha precisa estar dentro de data-pn: a mask cria um contexto de empilhamento próprio,
       // então um z-index fora dele (irmão) nunca compara com o z-index dos dropdowns (popCat/popCard) lá dentro
       + '<div style="position:absolute;left:0;right:0;top:140px;height:1px;background:#3A3A40;z-index:1;pointer-events:none"></div>'
@@ -1114,6 +1135,12 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       + goo + x + '</div>';
     const pn = host.querySelector('[data-pn]');
     { const rl = pn.querySelector(':scope > div[style*="width:331px"]'); if (rl) { const m = maskUrl + ' ' + (-(W - 332)) + 'px -1px/' + W + 'px 480px no-repeat'; rl.style.webkitMask = m; rl.style.mask = m; } }
+    if (Hs !== Ht) { const pwE = host.querySelector('[data-pw]'); void pwE.offsetHeight; pwE.style.transition = 'height .5s ' + EH + ',margin-top .5s ' + EH; pwE.style.height = Ht + 'px'; pwE.style.marginTop = (-Ht / 2) + 'px'; }
+    if (S.mode === 'dividir') {
+      const hasP = !!S.partes[S.sel];
+      if (S._hadP === false && hasP) revealParte(pn, preItem);
+      S._hadP = hasP;
+    } else S._hadP = undefined;
     if (S.mode === 'dados') ticket();
     const ta = pn.querySelector('[data-in="obs"]'); if (ta) ta.value = S.obs;
     const tt = pn.querySelector('[data-in="texto"]'); if (tt) tt.value = S.texto;
