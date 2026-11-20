@@ -649,7 +649,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
      (estabelecimento+data, depois observação+cartão+categoria) → coluna lateral: "Dividir" e a nota saindo da
      maquininha (20px de descida revelada por uma fenda fixa, botões junto). Ler nota e Dividir: blocos em
      sequência + valor rolando; no Dividir a barra de progresso é a última, crescendo da esquerda. */
-  const SNAP = 'cubic-bezier(.16,1,.3,1)';
+  const SNAP = 'cubic-bezier(.16,1,.3,1)', LONG = 'cubic-bezier(.55,0,.1,1)';   // LONG: ease acentuado das peças que abrem primeiro e fecham por último
   const anim = (el, kf, o) => { if (el && el.animate) el.animate(kf, Object.assign({ easing: E, fill: 'backwards' }, o)); };
   const upIn = (el, d, px, dur) => anim(el, [{ opacity: 0, transform: 'translateY(' + px + 'px)' }, { opacity: 1, transform: 'none' }], { delay: d, duration: dur || 460 });
   function rollValue(pn, d) {
@@ -676,8 +676,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (rail) {
       const dv = rail.querySelector('[data-a="mode"][data-v="dividir"]'), tk = dv && dv.nextElementSibling;   // (o link Excluir, quando existe, é outro filho da coluna)
       upIn(rail.querySelector('[data-a="askdel"]'), b + 280, 8, 420); upIn(dv, b + 280, 12, 460);
-      if (tk) {   // a nota sai da fenda: desce 36px e é revelada de cima pra baixo (a fenda fica parada), junto com os botões
-        anim(tk, [{ opacity: 0, transform: 'translateY(-36px)', clipPath: 'inset(36px -40px -40px -40px)' }, { opacity: 1, offset: .45, transform: 'translateY(-17px)', clipPath: 'inset(17px -40px -40px -40px)' }, { opacity: 1, transform: 'none', clipPath: 'inset(0px -40px -40px -40px)' }], { delay: b + 720, duration: 1150, easing: SNAP });
+      if (tk) {   // a nota sai da fenda: desce 36px e é revelada de cima pra baixo (a fenda fica parada), junto com os botões. Começa JUNTO com o título e termina depois de todo o resto: a ordem parece intencional e nada fica esperando
+        anim(tk, [{ opacity: 0, transform: 'translateY(-36px)', clipPath: 'inset(36px -40px -40px -40px)' }, { opacity: 1, offset: .3, transform: 'translateY(-26px)', clipPath: 'inset(26px -40px -40px -40px)' }, { opacity: 1, transform: 'none', clipPath: 'inset(0px -40px -40px -40px)' }], { delay: b, duration: 1500, easing: LONG });
       }
     }
   }
@@ -687,7 +687,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     let bl = viewBlocks(pn), bar = null;
     if (S.mode === 'dividir') { bar = pn.querySelector('[style*="height:14px"][style*="overflow:hidden"]'); bl = bl.filter(e => e !== bar); }
     stagger(bl, b, 45); rollValue(pn, b + 60);
-    if (bar) anim(bar, [{ opacity: 0, clipPath: 'inset(0 100% 0 0 round 9999px)' }, { opacity: 1, clipPath: 'inset(0 0 0 0 round 9999px)' }], { delay: b + Math.min(bl.length * 45, 420) + 140, duration: 780, easing: EH });
+    if (bar) anim(bar, [{ opacity: 0, clipPath: 'inset(0 100% 0 0 round 9999px)' }, { opacity: 1, clipPath: 'inset(0 0 0 0 round 9999px)' }], { delay: b, duration: 1500, easing: LONG });
   }
   const dirtyKey = () => JSON.stringify([S.nome, S.obs, S.iso, S.cardId, S.accId, S.catId, S.totalV, S.dir, S.meio, S.parc || 1, S.itens, S.partes, S.nota && S.nota.url]);
   const isDirty = () => !!S && S.base !== undefined && dirtyKey() !== S.base;
