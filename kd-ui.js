@@ -1579,7 +1579,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
         if (par || nome) {
           r.grp = 'xfer'; r.par = par || null; r.porNome = nome; if (par) pares.add(par.id); inc(true);
           const de = r.dir === 'saida' ? S.tgLabel : (par ? accName(par.accId) : 'Sua outra conta'), para = r.dir === 'saida' ? (par ? accName(par.accId) : 'sua outra conta') : S.tgLabel;
-          r.why = de + ' → ' + para + (par ? ' · par encontrado em ' + ddmm(par.iso) : ' · seu nome na descrição');
+          r.why = de + ' → ' + para; r.why2 = par ? 'par em ' + ddmm(par.iso) : 'seu nome na descrição';
           return;
         }
       }
@@ -1640,7 +1640,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       cat = '<span data-a="incluir" data-i="' + r.i + '" style="justify-self:stretch;height:38px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:99px;border:1.5px solid #55555C;font-size:11px;font-weight:800;letter-spacing:.12em;cursor:pointer">INCLUIR</span>';
     } else if (g === 'xfer') {
       box = ck(r.include, true, 'data-ck="' + r.i + '"');
-      why = '<span style="color:#B4B4BA">' + esc(r.why) + '</span> · ' + link('data-a="naoxfer" data-i="' + r.i + '"', 'Não é entre contas', MU);
+      why = '<span style="color:' + FG + ';white-space:nowrap">' + esc(r.why) + '</span><br><span style="color:' + MU + '">' + esc(r.why2) + '</span> · ' + link('data-a="naoxfer" data-i="' + r.i + '"', 'Não é entre contas', MU);
       cat = '<div style="height:38px;box-sizing:border-box;display:flex;align-items:center;gap:9px;border-radius:99px;padding:0 12px 0 5px;border:2px solid ' + XF + '8C;background:color-mix(in srgb,' + XF + ' 14%,#000)">' + icDot('Transferência', 24) + '<b style="font-size:13px">Transferência</b></div>';
     } else {
       box = off ? '<span></span>' : ck(r.include, dark, 'data-ck="' + r.i + '"');
@@ -1655,7 +1655,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     return '<div data-row="' + r.i + '" style="display:grid;' + COLS + ';gap:16px;align-items:center;min-height:58px;padding:8px 0;border-top:1px solid ' + line + ';opacity:' + (off ? .45 : 1) + ';transition:opacity .3s ease">'
       + box + meioTag(r, dark)
       + '<div style="min-width:0;display:flex;align-items:baseline;gap:10px"><b style="font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(r.nome) + '</b><span style="font-size:12px;color:' + (dark ? MU : 'rgba(10,10,10,.6)') + ';flex:none">' + ddmm(r.iso) + '</span></div>'
-      + '<div style="font-size:12px;max-width:360px;text-align:right;line-height:1.35;color:' + (dark ? '#B4B4BA' : INK) + '">' + why + '</div>'
+      + '<div style="font-size:12px;max-width:280px;text-align:right;line-height:1.35;color:' + (dark ? '#B4B4BA' : INK) + '">' + why + '</div>'
       + cat + valor(r, dark) + '</div>';
   }
   const GDEF = {
