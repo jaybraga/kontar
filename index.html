@@ -562,7 +562,7 @@ a{color:#1a1a1a}a:hover{color:#5B3DF5}
         <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:#9A9AA3"><span>Origem · <b style="color:#F2F0EB">{{ r.orig }}</b></span><span>Pagamento · <b style="color:#F2F0EB">{{ r.k }}</b></span><sc-if value="{{ r.hasNota }}" hint-placeholder-val="{{ false }}"><span>Nota · <b style="color:#F2F0EB">{{ r.notaTxt }}</b></span></sc-if><span onClick="{{ r.txEdit }}" style="margin-left:auto;height:34px;display:flex;align-items:center;padding:0 18px;border-radius:9999px;background:#F2F0EB;color:#0A0A0A;font-weight:900;letter-spacing:.06em;font-size:11.5px;text-transform:uppercase;cursor:pointer">Editar</span></div>
         <sc-if value="{{ r.hasObs }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px;line-height:1.5;color:#D8D6E4">{{ r.obsTxt }}</div></sc-if>
         <sc-if value="{{ r.hasItems }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-direction:column"><sc-for list="{{ r.xitems }}" as="it" hint-placeholder-count="3"><div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed #2B2B30;font-size:13px"><i style="width:9px;height:9px;border-radius:50%;background:{{ it.cc }};flex:none"></i><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ it.nome }}</span><span style="color:#9A9AA3;font-size:11px">R$</span><span style="font-weight:700;font-variant-numeric:tabular-nums">{{ it.v }}</span></div></sc-for></div></sc-if>
-              </div></div></div><div data-tx-in="{{ r.id }}" style="position:relative;margin:0 -20px"></div>
+              </div></div></div><div data-tx-in="{{ r.id }}" style="position:relative"></div>
       </div>
       </sc-for>
     </div>
