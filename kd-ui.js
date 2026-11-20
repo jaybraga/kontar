@@ -1648,7 +1648,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
         const d = r.dup.row;
         why = off ? '<span>Marcada como a mesma de "' + esc(d.e) + '" · nada será criado</span> · ' + link('data-ch="' + r.i + ':"', 'desfazer', INK)
           : r.dupChoice === 'other' ? '<span>Marcada como outra · será criada</span> · ' + link('data-ch="' + r.i + ':"', 'desfazer', INK)
-          : '<span title="' + esc(d.e + ' · ' + ddmm(d.iso) + ' · ' + (d.origem === 'manual' ? 'lançada à mão' : 'já no extrato')) + '">' + esc(r.why) + ' de <b>' + esc(d.e) + '</b> ' + ddmm(d.iso) + '</span> · ' + link('data-ch="' + r.i + ':same"', 'É a mesma', INK) + ' · ' + link('data-ch="' + r.i + ':other"', 'É outra', INK);
+          : '<span title="' + esc('Igual a "' + d.e + '" de ' + ddmm(d.iso) + ' · ' + (d.origem === 'manual' ? 'lançada à mão' : 'já no extrato')) + '" style="white-space:nowrap">' + esc(r.why) + ' de ' + ddmm(d.iso) + '</span><br>' + link('data-ch="' + r.i + ':same"', 'É a mesma', INK) + ' · ' + link('data-ch="' + r.i + ':other"', 'É outra', INK);
       } else if (g === 'need' && r.why && !(r.why === 'Sem categoria' && r.catId)) why = '<span>' + esc(r.why) + '</span>';
       cat = off ? '<span></span>' : catCell(r, dark);
     }
@@ -1692,7 +1692,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       + '<div style="font-size:12px;color:' + MU + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + esc(S.file) + '">' + esc(S.file) + (S.per ? ' · ' + ddmm(S.per[0]) + ' – ' + ddmm(S.per[1]) : '') + ' · ' + S.rows.length + (S.rows.length === 1 ? ' linha' : ' linhas') + '</div></div>'
       + '<div data-s style="flex:none;margin-top:22px">' + lbl('IMPORTAR PARA') + '<div style="position:relative;' + (tgOpen ? 'z-index:30' : '') + '"><div data-a="ptg" style="height:54px;box-sizing:border-box;background:#000;border:2px solid #2A2A2F;border-radius:22px;padding:0 14px;display:flex;align-items:center;gap:12px;cursor:pointer">' + bankChip(t.bank, t.cor) + '<b style="flex:1;min-width:0;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(t.label) + '</b><span style="color:' + MU + '">' + chev(16) + '</span></div>' + (tgOpen ? popTarget() : '') + '</div></div>'
       + '<div data-s style="flex:none;margin-top:22px">' + sum + '</div>'
-      + (S.accId ? '<div data-s style="flex:none;margin-top:20px">' + lbl('SEUS NOMES · PRA ACHAR TRANSFERÊNCIAS') + '<div style="display:flex;flex-wrap:wrap;gap:6px">' + nomes + '</div></div>' : '')
+      + (S.accId ? '<div data-s style="flex:none;margin-top:20px">' + lbl('SEUS NOMES PF / PJ') + '<div style="display:flex;flex-wrap:wrap;gap:6px">' + nomes + '</div></div>' : '')
       + '<div data-s style="flex:none;margin-top:auto;padding-top:18px"><div style="height:4px;border-radius:2px;background:' + FG + ';margin-bottom:14px"></div>' + lbl('SERÃO IMPORTADAS')
       + '<div style="font-size:64px;font-weight:700;letter-spacing:-.06em;line-height:.85">' + inc.length + '</div>'
       + '<div style="display:flex;gap:14px;margin-top:10px;font-size:13px;font-weight:800"><span style="color:' + GR + '">+ R$ ' + brl0(entra) + '</span><span style="color:' + RD + '">– R$ ' + brl0(sai) + '</span>' + (G.xfer.some(vai) ? '<span style="color:' + MU + '">⇄ ' + G.xfer.filter(vai).length + '</span>' : '') + '</div>'
@@ -1709,7 +1709,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (!first) { L.querySelectorAll('[data-grp]').forEach(c => { old[c.dataset.grp] = c.getBoundingClientRect().height; }); L.querySelectorAll('[data-row]').forEach(x => oldRows.add(x.closest('[data-grp]').dataset.grp + ':' + x.dataset.row)); }
     const keep = L.scrollTop;
     L.innerHTML = '<div style="display:grid;grid-template-columns:330px minmax(0,1fr);max-width:1680px;margin:0 auto;min-height:100%">' + side(G)
-      + '<main style="padding:22px 32px 80px 4px;display:flex;flex-direction:column;gap:16px">' + ['need', 'xfer', 'ok', 'skip'].filter(g => G[g].length).map(g => card(g, G[g])).join('') + '</main></div>';
+      + '<main style="padding:22px 32px 80px 4px;display:flex;flex-direction:column;gap:16px">' + ['need', 'xfer', 'ok', 'skip'].filter(g => G[g].length || old[g] != null).map(g => G[g].length ? card(g, G[g]) : card(g, []).replace('<section ', '<section data-gone ')).join('') + '</main></div>';
     L.scrollTop = keep;
     const inp = L.querySelector('[data-nome]'); if (inp) inp.focus();
     if (first) {
@@ -1722,7 +1722,9 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const novas = [...L.querySelectorAll('[data-row]')].filter(x => !oldRows.has(x.closest('[data-grp]').dataset.grp + ':' + x.dataset.row));
     novas.forEach(x => { x.style.transition = 'none'; x.style.opacity = '0'; x.style.transform = 'translateY(8px)'; });
     // cards que mudaram de altura: animam da altura velha pra nova; cards novos entram em fade
-    const cards = [...L.querySelectorAll('[data-grp]')];
+    const gone = [...L.querySelectorAll('[data-gone]')];
+    gone.forEach(c => { c.style.transition = 'none'; c.style.height = old[c.dataset.grp] + 'px'; c.style.overflow = 'hidden'; c.style.boxSizing = 'border-box'; });
+    const cards = [...L.querySelectorAll('[data-grp]:not([data-gone])')];
     cards.forEach(c => { const h0 = old[c.dataset.grp]; if (h0 == null) { c.style.transition = 'none'; c.style.opacity = '0'; c.style.transform = 'translateY(10px)'; } else { const h1 = c.getBoundingClientRect().height; if (Math.abs(h1 - h0) > 1) { c.dataset.h1 = h1; c.style.transition = 'none'; c.style.height = h0 + 'px'; c.style.overflow = 'hidden'; } } });
     void L.offsetHeight;
     requestAnimationFrame(() => {
@@ -1730,6 +1732,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
         if (c.dataset.h1) { c.style.transition = 'height .5s ' + E; c.style.height = c.dataset.h1 + 'px'; const done = () => { c.style.height = ''; c.style.overflow = 'visible'; c.style.transition = ''; delete c.dataset.h1; }; c.addEventListener('transitionend', function f(e) { if (e.target === c) { c.removeEventListener('transitionend', f); done(); } }); setTimeout(done, 700); }
         else if (old[c.dataset.grp] == null) { c.style.transition = 'opacity .45s ease .1s, transform .6s ' + E + ' .1s'; c.style.opacity = '1'; c.style.transform = 'none'; }
       });
+      gone.forEach(c => { c.style.transition = 'opacity .3s ease, height .5s ' + E + ' .1s, padding .5s ' + E + ' .1s, margin .5s ' + E + ' .1s'; c.style.opacity = '0'; c.style.height = '0px'; c.style.paddingTop = c.style.paddingBottom = '0px'; c.style.marginTop = '-16px'; c.style.borderWidth = '0px'; setTimeout(() => c.remove(), 650); });
       novas.forEach((x, k) => { const dl = Math.min(k, 12) * .03 + .12; x.style.transition = 'opacity .4s ease ' + dl + 's, transform .55s ' + E + ' ' + dl + 's'; x.style.opacity = '1'; x.style.transform = 'none'; });
     });
   }
