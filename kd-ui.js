@@ -549,33 +549,38 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   // ACIMA dele via order (os dois continuam na mesma ordem no DOM), e um card único (deco) por trás dos dois
   // dá o fundo mais claro + sombra, encobrindo linha+reduzido como uma peça só. 16px de respiro só quando a
   // linha é a primeira/última da lista (senão encostaria na borda do card master, alguns níveis acima).
+  const CLIP = 'inset(0 -40px 0 -40px)', SLIDE = '.5s ' + EH;
+  const noDeco = (els) => els.filter(c => !c.hasAttribute('data-tx-card'));
   function cardOn(rw, kids, host) {
-    rw.style.position = 'relative'; rw.style.display = 'flex'; rw.style.flexDirection = 'column'; rw.style.clipPath = 'inset(0 -40px 0 -40px)';
+    rw.style.position = 'relative'; rw.style.display = 'flex'; rw.style.flexDirection = 'column'; rw.style.clipPath = CLIP;
+    // camada própria da linha: sem isso, quando o clip-path sai (fim da animação) o deco (z-index:-1) cai
+    // pra trás do fundo do card mestre da lista e o fundo mais claro some.
+    rw.style.isolation = 'isolate';
     // o respiro lateral fica só no próprio painel reduzido (data-pw), não aqui: a linha original (kids) não
     // pode mudar de padding em relação ao estado colapsado normal.
     host.style.order = '-1'; kids.forEach(k => { k.style.order = '1'; });
-    // respiro só quando o vizinho não é outra linha (cabeçalho do dia, borda do card da lista etc.)
-    const prevRow = rw.previousElementSibling && rw.previousElementSibling.hasAttribute('data-x-e');
-    const nextRow = rw.nextElementSibling && rw.nextElementSibling.hasAttribute('data-x-e');
-    rw.style.marginTop = prevRow ? '' : '16px';
-    rw.style.marginBottom = nextRow ? '' : '16px';
     let deco = rw.querySelector('[data-tx-card]');
     if (!deco) {
       deco = document.createElement('div'); deco.setAttribute('data-tx-card', '1');
-      deco.style.cssText = 'position:absolute;inset:0;z-index:-1;border-radius:20px;background:#17171B;border:1px solid #28282D;box-shadow:0 30px 54px -16px rgba(0,0,0,.42),0 10px 26px -6px rgba(0,0,0,.22);opacity:0;transition:opacity .3s ease;pointer-events:none';
+      deco.style.cssText = 'position:absolute;inset:0;z-index:-1;border-radius:20px;background:#17171B;border:1px solid #28282D;box-shadow:0 30px 54px -16px rgba(0,0,0,.42),0 10px 26px -6px rgba(0,0,0,.22);opacity:0;transition:opacity .4s ease;pointer-events:none';
       rw.insertBefore(deco, rw.firstChild);
       requestAnimationFrame(() => { deco.style.opacity = '1'; });
     }
+    // respiro de 16px só quando o vizinho não é outra linha (cabeçalho do dia, borda do card da lista etc.);
+    // devolvido em vez de aplicado, pra entrar animado junto com a altura (aplicar direto dava um salto).
+    const prevRow = rw.previousElementSibling && rw.previousElementSibling.hasAttribute('data-x-e');
+    const nextRow = rw.nextElementSibling && rw.nextElementSibling.hasAttribute('data-x-e');
+    return { mt: prevRow ? '0px' : '16px', mb: nextRow ? '0px' : '16px' };
   }
   function inlineReset(h) {
     const { rw, kids } = kidsOf(h);
     if (rw) {
-      rw.style.height = ''; rw.style.transition = ''; rw.style.position = ''; rw.style.clipPath = '';
+      rw.style.height = ''; rw.style.transition = ''; rw.style.position = ''; rw.style.clipPath = ''; rw.style.isolation = '';
       rw.style.display = ''; rw.style.flexDirection = ''; rw.style.marginTop = ''; rw.style.marginBottom = '';
       const deco = rw.querySelector('[data-tx-card]'); if (deco) deco.remove();
     }
-    kids.forEach(c => { c.style.opacity = ''; c.style.transition = ''; c.style.pointerEvents = ''; c.style.order = ''; });
-    ['left', 'right', 'top', 'height', 'transition', 'order'].forEach(k => { h.style[k] = ''; }); h.style.position = 'relative';
+    kids.forEach(c => { c.style.opacity = ''; c.style.transition = ''; c.style.pointerEvents = ''; c.style.order = ''; c.style.transform = ''; });
+    ['left', 'right', 'top', 'height', 'transition', 'order', 'clipPath'].forEach(k => { h.style[k] = ''; }); h.style.position = 'relative';
     h.innerHTML = '';
   }
   TX.open = function (c, row, o) {
@@ -585,22 +590,33 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     host = ab;
     if (!S.inline) { host.style.pointerEvents = 'auto'; render(true); return; }
     host.style.pointerEvents = '';
-    // inline: o card da linha cresce (sem salto) pra caber o reduzido acima do conteúdo original, que nunca
-    // some — ver cardOn. Altura medida em fluxo normal (sem position:absolute concorrendo com o layout).
+    // inline: o card cresce, a linha original DESLIZA pra baixo junto com a borda de baixo do card (nunca
+    // some nem pula), e o reduzido vai sendo revelado no espaço que a linha libera — sem sobreposição.
     const { rw, kids } = kidsOf(host);
     if (!rw) { render(true); return; }
     const H0 = rw.offsetHeight;
-    cardOn(rw, kids, host);
-    rw.style.height = H0 + 'px'; rw.style.transition = 'none';
+    const m = cardOn(rw, kids, host);
+    rw.style.transition = 'none'; rw.style.height = H0 + 'px'; rw.style.marginTop = '0px'; rw.style.marginBottom = '0px';
     render(true);
+    rw.style.height = 'auto'; const H1 = rw.offsetHeight; rw.style.height = H0 + 'px';
+    const D = H1 - H0;
+    // FLIP: no quadro 0 a linha é puxada de volta (-D) pro lugar onde estava; o reduzido começa todo coberto
+    kids.forEach(k => { k.style.transition = 'none'; k.style.transform = 'translateY(' + (-D) + 'px)'; });
+    host.style.transition = 'none'; host.style.clipPath = 'inset(0 0 ' + D + 'px 0)';
     void rw.offsetHeight;
-    rw.style.height = 'auto'; const H1 = rw.offsetHeight; rw.style.height = H0 + 'px'; void rw.offsetHeight;
-    rw.style.transition = 'height .5s ' + EH; rw.style.height = H1 + 'px';
+    rw.style.transition = 'height ' + SLIDE + ',margin-top ' + SLIDE + ',margin-bottom ' + SLIDE;
+    rw.style.height = H1 + 'px'; rw.style.marginTop = m.mt; rw.style.marginBottom = m.mb;
+    kids.forEach(k => { k.style.transition = 'transform ' + SLIDE; k.style.transform = 'translateY(0px)'; });
+    host.style.transition = 'clip-path ' + SLIDE; host.style.clipPath = 'inset(0 0 0px 0)';
     const mine = S;
-    // o clip só é necessário ENQUANTO a altura anima (é o que cria o efeito de "revelar" aos poucos); depois
-    // de assentado ele tem que sair, senão corta os popups (categoria, cartão, estabelecimento) que precisam
-    // aparecer por cima da linha. Volta a ser aplicado em TX.close, bem antes de iniciar a animação de saída.
-    later(() => { if (S !== mine || !host) return; rw.style.height = ''; rw.style.transition = ''; rw.style.clipPath = ''; }, 520);
+    // os clips só valem ENQUANTO anima; assentado, têm que sair senão cortam os popups (categoria, cartão)
+    // que aparecem por cima da linha. TX.close reaplica antes da animação de saída.
+    later(() => {
+      if (S !== mine || !host) return;
+      rw.style.height = ''; rw.style.transition = ''; rw.style.clipPath = '';
+      host.style.transition = ''; host.style.clipPath = '';
+      kids.forEach(k => { k.style.transition = ''; k.style.transform = ''; });
+    }, 520);
   };
   TX.openNew = function (c) {
     comp = c; TX.close(true);
@@ -626,16 +642,25 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     pn.style.transition = 'opacity .24s ease, transform .3s ' + E; pn.style.opacity = '0'; if (!inl) pn.style.transform = pn.style.transform + ' translateY(14px)'; else pn.style.transform = pn.style.transform + ' translateY(6px)';
     if (bd) { bd.style.transition = 'opacity .25s ease'; bd.style.opacity = '0'; }
     if (inl) {
-      const { rw, kids } = kidsOf(h);
+      const { rw } = kidsOf(h);
       if (rw) {
-        const deco = rw.querySelector('[data-tx-card]'); if (deco) { deco.style.transition = 'opacity .3s ease'; deco.style.opacity = '0'; }
+        const kids = noDeco(kidsOf(h).kids);
+        const deco = rw.querySelector('[data-tx-card]'); if (deco) { deco.style.transition = 'opacity .45s ease'; deco.style.opacity = '0'; }
         // mede a altura "fechada" (só o conteúdo original) escondendo o reduzido um instante, sem repintar
         const prevDisplay = h.style.display; h.style.display = 'none';
         const H0 = rw.offsetHeight;
         h.style.display = prevDisplay;
-        rw.style.clipPath = 'inset(0 -40px 0 -40px)';   // reaplica o clip pra animação de saída também "revelar" (nesse caso, encolher) aos poucos
-        rw.style.transition = 'none'; rw.style.height = rw.offsetHeight + 'px'; void rw.offsetHeight;
-        rw.style.transition = 'height .5s ' + EH; rw.style.height = H0 + 'px';
+        const H1 = rw.offsetHeight, D = H1 - H0;
+        // o inverso da abertura: a linha sobe colada na borda de baixo do card, cobrindo o reduzido
+        rw.style.clipPath = CLIP; rw.style.transition = 'none'; rw.style.height = H1 + 'px';
+        rw.style.marginTop = getComputedStyle(rw).marginTop; rw.style.marginBottom = getComputedStyle(rw).marginBottom;
+        kids.forEach(k => { k.style.transition = 'none'; k.style.transform = 'translateY(0px)'; });
+        h.style.transition = 'none'; h.style.clipPath = 'inset(0 0 0px 0)';
+        void rw.offsetHeight;
+        rw.style.transition = 'height ' + SLIDE + ',margin-top ' + SLIDE + ',margin-bottom ' + SLIDE;
+        rw.style.height = H0 + 'px'; rw.style.marginTop = '0px'; rw.style.marginBottom = '0px';
+        kids.forEach(k => { k.style.transition = 'transform ' + SLIDE; k.style.transform = 'translateY(' + (-D) + 'px)'; });
+        h.style.transition = 'clip-path ' + SLIDE; h.style.clipPath = 'inset(0 0 ' + D + 'px 0)';
         pendingDone = done; later(done, 540);
         return;
       }
@@ -827,7 +852,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const editBtn = '<span data-a="full" style="margin-left:auto;flex:none;height:46px;display:flex;align-items:center;gap:8px;padding:0 26px;border-radius:9999px;background:#F2F0EB;color:#0A0A0A;font-weight:900;letter-spacing:.06em;font-size:12.5px;text-transform:uppercase;cursor:pointer">' + svg('pencil', 14, 2.6) + 'Editar</span>';
     // botão de fechar maior e com presença (círculo com borda interna, "bonitinho"), no lugar do x pequeno/discreto de antes
     const closeBtn = '<span data-a="close" title="Fechar" style="flex:none;width:44px;height:44px;border-radius:9999px;background:#1C1C20;color:#F2F0EB;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:inset 0 0 0 1px #3A3A40;transition:box-shadow .3s cubic-bezier(.45,0,.55,1)" onmouseover="this.style.boxShadow=\'inset 0 0 0 1px #6A6A72\'" onmouseout="this.style.boxShadow=\'inset 0 0 0 1px #3A3A40\'">' + svg('x', 18, 2.4) + '</span>';
-    host.innerHTML = REDUCED_CSS + '<div data-pw style="position:relative;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 20px;font-family:Helvetica,Arial,sans-serif;color:#F2F0EB;' + (first ? 'animation:txin .22s ' + E : '') + '">' + estBit + origemTag + notaInd + obsInd + catChip + cardChip + editBtn + closeBtn + '</div>';
+    host.innerHTML = REDUCED_CSS + '<div data-pw style="position:relative;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 20px;font-family:Helvetica,Arial,sans-serif;color:#F2F0EB;' + (first ? 'animation:txin .4s ease .08s both' : '') + '">' + estBit + origemTag + notaInd + obsInd + catChip + cardChip + editBtn + closeBtn + '</div>';
     const pw = host.querySelector('[data-pw]');
     if (keep.k) { const el = pw.querySelector('[data-in="' + keep.k + '"]'); if (el) { el.focus(); try { if (el.tagName === 'INPUT') { const l = el.value.length; el.setSelectionRange(l, l); } else { const l = el.textContent.length; const rg = document.createRange(); rg.selectNodeContents(el); rg.collapse(false); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg); } } catch (e) { } } }
     pw.querySelectorAll('[data-pop]').forEach(pop => { pop.style.maxHeight = POPMAXH + 'px'; const sc = pop.querySelector('[data-popscroll]'); if (sc) { syncFade(pop); sc.onscroll = () => syncFade(pop); } });
