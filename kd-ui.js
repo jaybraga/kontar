@@ -26,6 +26,71 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   KD.accLogo = () => { const o = {}; KD.M.accs.forEach(a => { const b = KD.colorOf(a.nome, '', '') && (KD.BANK[a.nome] ? a.nome : null); o[a.nome] = /Mercado Pago/.test(a.nome) ? 'Mercado Pago' : /Nubank/.test(a.nome) ? 'Nubank' : /Itaú/.test(a.nome) ? 'Itaú' : /C6/.test(a.nome) ? 'C6' : b || a.nome; }); return o; };
   KD.alert = k => (KD._C && KD._C.NOTIFS.find(n => n.home === k && n.kind === 'block' && (k !== 'a1' || n.card))) || {};
 
+  /* ---------------- dropdowns: abrem com a opção atual em cima do campo (como o menu do sistema) ----------------
+     Vale pra todo dropdown de escolha única da plataforma. A opção selecionada ([data-dd-on="1"]) fica centrada
+     no campo que abriu o menu; se isso empurraria o menu pra fora da tela (ou de um container que corta, tipo
+     a área rolável da página ou o painel com máscara), ele desliza pra dentro e, se a lista for maior que o
+     espaço, ela já abre rolada de forma que a opção atual continue alinhada com o campo.
+     Menus do template ganham [data-dd] e são posicionados sozinhos ao aparecer (observer lá embaixo);
+     o painel de transação chama KD.drop.place direto porque redesenha por innerHTML. */
+  const DD_GAP = 8;
+  const ddBounds = (el, minTop) => {
+    let t = DD_GAP, b = window.innerHeight - DD_GAP, l = DD_GAP, r = window.innerWidth - DD_GAP;
+    for (let e = el.parentElement; e && e !== document.body; e = e.parentElement) {
+      const c = getComputedStyle(e), cut = c.clipPath !== 'none' || (c.maskImage && c.maskImage !== 'none') || (c.webkitMaskImage && c.webkitMaskImage !== 'none');
+      const cy = cut || c.overflowY !== 'visible', cx = cut || c.overflowX !== 'visible';
+      if (!cx && !cy) continue;
+      const rc = e.getBoundingClientRect();
+      if (cy) { t = Math.max(t, rc.top + DD_GAP); b = Math.min(b, rc.bottom - DD_GAP); }
+      if (cx) { l = Math.max(l, rc.left + DD_GAP); r = Math.min(r, rc.right - DD_GAP); }
+    }
+    if (minTop != null) t = Math.max(t, minTop);
+    return { t, b, l, r };
+  };
+  const ddScale = (m) => { const p = m.offsetParent; if (!p || !p.offsetHeight) return 1; return p.getBoundingClientRect().height / p.offsetHeight || 1; };
+  KD.drop = {
+    // o = { anchor, minTop (px de tela), maxH (px do layout), animate (default true) }
+    place(m, o) {
+      o = o || {}; const anchor = o.anchor || m.previousElementSibling; if (!anchor || !m.offsetParent) return null;
+      const sc = m.querySelector('[data-popscroll]') || m, k = ddScale(m);
+      if (!m.dataset.ddCap) { const mh = parseFloat(getComputedStyle(m).maxHeight); m.dataset.ddCap = String(o.maxH || (isFinite(mh) ? mh : 1e5)); }
+      const cap = +m.dataset.ddCap * k;
+      m.style.bottom = 'auto'; m.style.marginTop = '0px'; m.style.marginBottom = '0px'; m.style.maxHeight = 'none'; m.style.translate = '';
+      sc.scrollTop = 0;
+      const pr = m.offsetParent.getBoundingClientRect(), A = anchor.getBoundingClientRect(), cy = A.top + A.height / 2, pt = pr.top + m.offsetParent.clientTop * k;
+      m.style.top = (A.top - pt) / k + 'px';
+      const R = m.getBoundingClientRect(), full = R.height;
+      const on = m.querySelector('[data-dd-on="1"]'), oR = on && on.getBoundingClientRect();
+      const oy = oR ? oR.top - R.top + oR.height / 2 : A.height / 2;   // sem opção marcada: o topo do menu encosta no topo do campo
+      const B = ddBounds(m, o.minTop), h = Math.max(Math.min(full, cap, B.b - B.t), Math.min(full, 120 * k));
+      let top = Math.min(Math.max(cy - oy, B.t), B.b - h); if (top < B.t && h <= B.b - B.t) top = B.t;
+      const s = Math.min(Math.max(top + oy - cy, 0), full - h);
+      m.style.top = (top - pt) / k + 'px'; m.style.maxHeight = h / k + 'px';
+      sc.scrollTop = s / k;
+      // lateral: se escapar da tela/container, desliza pra dentro
+      const R2 = m.getBoundingClientRect(); let dx = 0;
+      if (R2.right > B.r) dx = B.r - R2.right; if (R2.left + dx < B.l) dx = B.l - R2.left;
+      if (dx) m.style.translate = dx / k + 'px 0';
+      const pos = { top: m.style.top, maxH: m.style.maxHeight, tr: m.style.translate, s: s / k, oy: (cy - top) / k };
+      if (o.animate !== false) {
+        m.style.animation = 'none'; m.style.transformOrigin = '50% ' + pos.oy + 'px';
+        if (m.animate) m.animate([{ opacity: 0, transform: 'scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: 240, easing: 'cubic-bezier(.2,.7,.2,1)' });
+      }
+      return pos;
+    },
+    // reaplica uma posição já calculada (o painel redesenhou com o menu ainda aberto): sem animar, sem pular
+    apply(m, pos) {
+      m.style.bottom = 'auto'; m.style.marginTop = '0px'; m.style.marginBottom = '0px';
+      m.style.top = pos.top; m.style.maxHeight = pos.maxH; m.style.translate = pos.tr || ''; m.style.animation = 'none';
+    }
+  };
+  if (window.MutationObserver) new MutationObserver(ms => {
+    ms.forEach(mu => mu.addedNodes.forEach(n => {
+      if (n.nodeType !== 1) return;
+      (n.matches('[data-dd]') ? [n] : []).concat([...n.querySelectorAll('[data-dd]')]).forEach(m => { if (!m.__dd) { m.__dd = 1; KD.drop.place(m); } });
+    }));
+  }).observe(document.documentElement, { childList: true, subtree: true });
+
 
   /* ---------------- rotas: a página atual vive no endereço (#/extrato), voltar/avançar e reload funcionam ---------------- */
   const SLUG = { home: '', extrato: 'extrato', metas: 'metas', categorias: 'categorias', cartoes: 'cartoes', estab: 'estabelecimentos', config: 'preferencias', conta: 'conta', ajuda: 'ajuda' };
@@ -513,12 +578,18 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const hd = t.parentElement.parentElement, right = hd.lastElementChild;
     shrinkTo(t, 64, 40, hd.clientWidth - (right ? right.offsetWidth : 0) - 36);
   }
-  function fitPop(pw) {   // o dropdown (categoria/cartão) tampa o campo e cresce pra cima; encurta antes de bater no valor lá em cima
-    const pop = pw.querySelector('[data-pop]'); if (!pop) return;
-    const teto = pw.querySelector('[data-tot]'); // bloco do valor: a referência real, não o topo do painel (o valor fica bem abaixo dele)
-    const limite = (teto ? teto.getBoundingClientRect().bottom : pw.getBoundingClientRect().top) + 28; // folga extra: o brilho pulsante do alerta sai um pouco da caixa
-    const avail = pop.getBoundingClientRect().bottom - limite;
-    pop.style.maxHeight = Math.max(120, Math.min(POPMAXH, avail)) + 'px';
+  // dropdowns de escolha (categoria, cartão, categoria da parte): abrem com a opção atual em cima do campo e
+  // se ajustam ao espaço (KD.drop, em kd-ui.js). No overlay, o teto é o valor lá em cima (+ folga do brilho do
+  // alerta). A busca de estabelecimento não entra: é um campo de digitar, a lista abre embaixo dele.
+  function fitPop(pw) {
+    const pop = pw && pw.querySelector('[data-pop]'); if (!pop || !S || !S.pop) { if (S) S._pp = null; return; }
+    if (S.pop === 'est') pop.style.maxHeight = POPMAXH + 'px';
+    else if (S._pp && S._pp.k === S.pop) { KD.drop.apply(pop, S._pp); if (S.inline) (pop.querySelector('[data-popscroll]') || pop).scrollTop = S._pp.s; }
+    else {
+      const teto = S.inline ? null : pw.querySelector('[data-tot]');
+      const p = KD.drop.place(pop, { minTop: teto ? teto.getBoundingClientRect().bottom + 28 : null });
+      S._pp = p ? Object.assign(p, { k: S.pop }) : null;
+    }
     const sc = pop.querySelector('[data-popscroll]');
     if (sc) { syncFade(pop); sc.onscroll = () => syncFade(pop); }
   }
@@ -562,8 +633,18 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const kidT0 = (k) => { if (T0.has(k)) { k.style.transition = T0.get(k); T0.delete(k); } };
   // FLIP + respiro: dy = deslocamento vertical, pad = padding lateral (as 2 colunas da esquerda entram pra
   // direita e a de valores pra esquerda, junto com a curva da abertura)
-  const KIDT = 'transform ' + SLIDE + ',padding-left ' + SLIDE + ',padding-right ' + SLIDE;
-  const kidSet = (k, dy, pad) => { k.style.transform = 'translateY(' + dy + 'px)'; k.style.paddingLeft = pad + 'px'; k.style.paddingRight = pad + 'px'; };
+  // hover da linha dentro do card aberto: canto reto (o arredondado de 12px é só da lista normal) e recortado
+  // 1px pra dentro, pra nunca pintar por cima do contorno do card. Se a linha encosta no fundo do card, os
+  // cantos de baixo seguem a curva interna dele (19px) — reto ali ele vazaria pra fora do card arredondado.
+  const KIDT = 'transform ' + SLIDE + ',padding-left ' + SLIDE + ',padding-right ' + SLIDE + ',border-radius ' + SLIDE + ',clip-path ' + SLIDE;
+  const R0 = new WeakMap();
+  const kidSet = (k, dy, pad, last) => {
+    if (!R0.has(k)) R0.set(k, k.style.borderRadius);
+    k.style.transform = 'translateY(' + dy + 'px)'; k.style.paddingLeft = pad + 'px'; k.style.paddingRight = pad + 'px';
+    k.style.borderRadius = pad ? '0px' : (R0.get(k) || '0px');
+    k.style.clipPath = pad ? 'inset(0px 1px 1px 1px round 0px 0px ' + (last ? 19 : 0) + 'px ' + (last ? 19 : 0) + 'px)' : 'inset(0px 0px 0px 0px round 0px 0px 0px 0px)';
+  };
+  const lastKid = (kids) => { const v = kids.filter(k => k.offsetHeight > 0); return v[v.length - 1]; };
   function cardOn(rw, kids, host) {
     rw.style.position = 'relative'; rw.style.display = 'flex'; rw.style.flexDirection = 'column'; rw.style.clipPath = CLIP;
     // camada própria da linha: sem isso, quando o clip-path sai (fim da animação) o deco (z-index:-1) cai
@@ -592,7 +673,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       rw.style.display = ''; rw.style.flexDirection = ''; rw.style.marginTop = ''; rw.style.marginBottom = '';
       const deco = rw.querySelector('[data-tx-card]'); if (deco) deco.remove();
     }
-    kids.forEach(c => { kidT0(c); c.style.order = ''; c.style.transform = ''; c.style.paddingLeft = ''; c.style.paddingRight = ''; });
+    kids.forEach(c => { kidT0(c); c.style.order = ''; c.style.transform = ''; c.style.paddingLeft = ''; c.style.paddingRight = ''; c.style.clipPath = ''; if (R0.has(c)) { c.style.borderRadius = R0.get(c); R0.delete(c); } });
     ['left', 'right', 'top', 'height', 'transition', 'order', 'clipPath'].forEach(k => { h.style[k] = ''; }); h.style.position = 'relative';
     h.innerHTML = '';
   }
@@ -614,12 +695,13 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     rw.style.height = 'auto'; const H1 = rw.offsetHeight; rw.style.height = H0 + 'px';
     const D = H1 - H0;
     // FLIP: no quadro 0 a linha é puxada de volta (-D) pro lugar onde estava; o reduzido começa todo coberto
-    kids.forEach(k => { kidT(k, 'none'); kidSet(k, -D, 0); });
+    const lk = lastKid(kids);
+    kids.forEach(k => { kidT(k, 'none'); kidSet(k, -D, 0, k === lk); });
     host.style.transition = 'none'; host.style.clipPath = 'inset(0 0 ' + D + 'px 0)';
     void rw.offsetHeight;
     rw.style.transition = 'height ' + SLIDE + ',margin-top ' + SLIDE + ',margin-bottom ' + SLIDE;
     rw.style.height = H1 + 'px'; rw.style.marginTop = m.mt; rw.style.marginBottom = m.mb;
-    kids.forEach(k => { kidT(k, KIDT); kidSet(k, 0, PADX); });
+    kids.forEach(k => { kidT(k, KIDT); kidSet(k, 0, PADX, k === lk); });
     host.style.transition = 'clip-path ' + SLIDE; host.style.clipPath = 'inset(0 0 0px 0)';
     const mine = S;
     // os clips só valem ENQUANTO anima; assentado, têm que sair senão cortam os popups (categoria, cartão)
@@ -667,12 +749,13 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
         // o inverso da abertura: a linha sobe colada na borda de baixo do card, cobrindo o reduzido
         rw.style.clipPath = CLIP; rw.style.transition = 'none'; rw.style.height = H1 + 'px';
         rw.style.marginTop = getComputedStyle(rw).marginTop; rw.style.marginBottom = getComputedStyle(rw).marginBottom;
-        kids.forEach(k => { kidT(k, 'none'); kidSet(k, 0, PADX); });
+        const lk = lastKid(kids);
+        kids.forEach(k => { kidT(k, 'none'); kidSet(k, 0, PADX, k === lk); });
         h.style.transition = 'none'; h.style.clipPath = 'inset(0 0 0px 0)';
         void rw.offsetHeight;
         rw.style.transition = 'height ' + SLIDE + ',margin-top ' + SLIDE + ',margin-bottom ' + SLIDE;
         rw.style.height = H0 + 'px'; rw.style.marginTop = '0px'; rw.style.marginBottom = '0px';
-        kids.forEach(k => { kidT(k, KIDT); kidSet(k, -D, 0); });
+        kids.forEach(k => { kidT(k, KIDT); kidSet(k, -D, 0, k === lk); });
         const sep = h.querySelector('[data-sep]'); if (sep) { sep.style.animation = 'none'; sep.style.transition = 'opacity .24s ease'; sep.style.opacity = '0'; }
         h.style.transition = 'clip-path ' + SLIDE; h.style.clipPath = 'inset(0 0 ' + D + 'px 0)';
         pendingDone = done; later(done, 540);
@@ -709,9 +792,9 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     // assim o campo nunca precisa trocar de forma pra abrir/fechar (sem flicker de corner-radius).
     // o fade de topo/base é um par de overlays fora do fluxo (não um mask na própria caixa): um mask
     // junto com o box-shadow + corner-radius criava aquele recorte diagonal estranho no canto.
-    return '<div data-pop style="position:absolute;z-index:6;left:0;right:0;bottom:0;max-height:' + POPMAXH + 'px;overflow:hidden;background:#151518;border:1px solid #2A2A2F;border-radius:' + PR + 'px;box-shadow:0 24px 48px rgba(0,0,0,.6);display:flex;flex-direction:column;animation:txin .22s ' + E + '">'
+    return '<div data-pop style="position:absolute;z-index:6;left:0;right:0;top:0;max-height:' + POPMAXH + 'px;overflow:hidden;background:#151518;border:1px solid #2A2A2F;border-radius:' + PR + 'px;box-shadow:0 24px 48px rgba(0,0,0,.6);display:flex;flex-direction:column;animation:txin .22s ' + E + '">'
       + '<div class="kscroll" data-popscroll style="flex:1;min-height:0;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:7px">'
-      + cats().map(n => { const on = catAtual() === n; return '<span data-a="cat" data-v="' + esc(n) + '" style="display:flex;align-items:center;gap:12px;height:46px;flex:none;border-radius:16px;border:1px solid ' + (on ? '#F2F0EB' : '#2A2A2F') + ';background:#0D0D10;padding:0 12px;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden">' + icDot(n, 26) + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis">' + esc(n) + '</span>' + (on ? '<span style="color:#F2F0EB;display:flex">' + svg('check', 15, 2.6) + '</span>' : '') + '</span>'; }).join('') + '</div>'
+      + cats().map(n => { const on = catAtual() === n; return '<span data-a="cat" data-v="' + esc(n) + '"' + (on ? ' data-dd-on="1"' : '') + ' style="display:flex;align-items:center;gap:12px;height:46px;flex:none;border-radius:16px;border:1px solid ' + (on ? '#F2F0EB' : '#2A2A2F') + ';background:#0D0D10;padding:0 12px;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden">' + icDot(n, 26) + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis">' + esc(n) + '</span>' + (on ? '<span style="color:#F2F0EB;display:flex">' + svg('check', 15, 2.6) + '</span>' : '') + '</span>'; }).join('') + '</div>'
       + '<i data-fadetop style="position:absolute;left:0;right:0;top:0;height:40px;background:linear-gradient(#151518,rgba(21,21,24,0));pointer-events:none;opacity:0;transition:opacity .2s ease"></i>'
       + '<i data-fadebot style="position:absolute;left:0;right:0;bottom:0;height:40px;background:linear-gradient(rgba(21,21,24,0),#151518);pointer-events:none;opacity:0;transition:opacity .2s ease"></i>'
       + '</div>';
@@ -731,10 +814,10 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   function popCard() {
     const opts = KD.M.cards.map(c => ({ k: 'c:' + c.id, n: c.nick || c.n, cor: c.cor, bank: c.bank })).concat(KD.M.accs.map(a => ({ k: 'a:' + a.id, n: a.nome, cor: a.cor, bank: a.bank })));
     const cur = S.cardId ? 'c:' + S.cardId : S.accId ? 'a:' + S.accId : '';
-    return '<div data-pop style="position:absolute;z-index:6;left:0;right:0;bottom:0;max-height:' + POPMAXH + 'px;overflow:hidden;background:#151518;border:1px solid #2A2A2F;border-radius:' + PR + 'px;box-shadow:0 24px 48px rgba(0,0,0,.6);display:flex;flex-direction:column;animation:txin .22s ' + E + '">'
+    return '<div data-pop style="position:absolute;z-index:6;left:0;right:0;top:0;max-height:' + POPMAXH + 'px;overflow:hidden;background:#151518;border:1px solid #2A2A2F;border-radius:' + PR + 'px;box-shadow:0 24px 48px rgba(0,0,0,.6);display:flex;flex-direction:column;animation:txin .22s ' + E + '">'
       + '<div class="kscroll" data-popscroll style="flex:1;min-height:0;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:7px">'
       + (S.isNew ? '<div style="display:flex;gap:6px;padding:2px 2px 6px;flex-wrap:wrap">' + [['pix', 'Pix'], ['debito', 'Débito'], ['boleto', 'Boleto'], ['dinheiro', 'Dinheiro']].map(m => '<span data-a="forma" data-v="' + m[0] + '" style="padding:6px 12px;border-radius:9999px;border:1px solid ' + (S.meio === m[0] && !S.cardId ? '#F2F0EB' : '#2A2A2F') + ';font-size:12px;font-weight:700;cursor:pointer">' + m[1] + '</span>').join('') + '</div>' : '')
-      + opts.map(o => '<span data-a="meio" data-v="' + o.k + '" style="flex:none;display:flex;align-items:center;gap:12px;height:46px;border-radius:16px;border:1px solid ' + (o.k === cur ? '#F2F0EB' : '#2A2A2F') + ';background:#0D0D10;padding:0 12px;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden">' + bankChip(o.bank, o.cor) + '<span style="overflow:hidden;text-overflow:ellipsis">' + esc(o.n) + '</span></span>').join('') + '</div>'
+      + opts.map(o => '<span data-a="meio" data-v="' + o.k + '"' + (o.k === cur ? ' data-dd-on="1"' : '') + ' style="flex:none;display:flex;align-items:center;gap:12px;height:46px;border-radius:16px;border:1px solid ' + (o.k === cur ? '#F2F0EB' : '#2A2A2F') + ';background:#0D0D10;padding:0 12px;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden">' + bankChip(o.bank, o.cor) + '<span style="overflow:hidden;text-overflow:ellipsis">' + esc(o.n) + '</span></span>').join('') + '</div>'
       + '<i data-fadetop style="position:absolute;left:0;right:0;top:0;height:40px;background:linear-gradient(#151518,rgba(21,21,24,0));pointer-events:none;opacity:0;transition:opacity .2s ease"></i>'
       + '<i data-fadebot style="position:absolute;left:0;right:0;bottom:0;height:40px;background:linear-gradient(rgba(21,21,24,0),#151518);pointer-events:none;opacity:0;transition:opacity .2s ease"></i>'
       + '</div>';
@@ -820,7 +903,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
         return '<div draggable="true" data-a="item" data-v="' + k + '" data-drag="' + k + '" style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px dashed #2B2B30;cursor:pointer"><i style="width:10px;height:10px;border-radius:50%;background:' + c2 + ';flex:none;box-shadow:' + (mine ? '0 0 0 3px #111114,0 0 0 4px ' + c2 : 'none') + '"></i><span style="flex:1;min-width:0;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:' + (pi >= 0 && !mine ? .5 : 1) + '">' + esc(it.nome) + '</span><span style="font-size:11px;color:#9A9AA3">R$</span><span style="font-size:14px;font-weight:700;font-variant-numeric:tabular-nums">' + brl(it.valor) + '</span></div>'; }).join('');
       right = '<div style="border-left:1px solid #3A3A40;padding-left:34px;display:flex;flex-direction:column;gap:14px;min-height:0;position:relative">'
         + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px"><div style="display:flex;flex-direction:column;gap:8px;position:relative"><div style="font-size:14px;font-weight:700;color:#9A9AA3">Categoria</div><div data-a="pcat" style="display:flex;align-items:center;gap:12px;border-radius:9999px;padding:6px 10px 6px 8px;border:2px solid ' + cor + '8C;background:color-mix(in srgb,' + cor + ' 14%,#000);cursor:pointer;height:50px;box-sizing:border-box">' + icDot(cn, 30) + '<b style="font-size:15px;flex:1">' + esc(cn) + '</b><span style="width:28px;height:28px;border-radius:50%;background:#0A0A0A;display:flex;align-items:center;justify-content:center;color:#F2F0EB;transition:transform .3s ' + E + ';transform:rotate(' + (S.pop === 'pcat' ? 180 : 0) + 'deg)">' + svg('chev', 14, 2.6) + '</span></div>'
-        + (S.pop === 'pcat' ? '<div data-pop class="kscroll" style="position:absolute;z-index:8;left:0;right:0;top:calc(100% + 6px);max-height:172px;overflow-y:auto;background:#151518;border:1px solid #2A2A2F;border-radius:20px;padding:8px;display:flex;flex-direction:column;gap:4px;box-shadow:0 24px 48px rgba(0,0,0,.6);transform-origin:top;animation:txdrop .26s ' + E + '">' + cats().map(n => '<span data-a="pset" data-v="' + esc(n) + '" style="flex:none;display:flex;align-items:center;gap:10px;height:38px;border-radius:12px;border:1px solid ' + (n === cn ? '#F2F0EB' : 'transparent') + ';padding:0 10px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap" onmouseover="this.style.background=\'#1C1C20\'" onmouseout="this.style.background=\'\'">' + icDot(n, 22) + '<span style="flex:1">' + esc(n) + '</span>' + (n === cn ? '<span style="display:flex">' + svg('check', 14, 2.6) + '</span>' : '') + '</span>').join('') + '</div>' : '') + '</div>'
+        + (S.pop === 'pcat' ? '<div data-pop class="kscroll" style="position:absolute;z-index:8;left:0;right:0;top:calc(100% + 6px);max-height:172px;overflow-y:auto;background:#151518;border:1px solid #2A2A2F;border-radius:20px;padding:8px;display:flex;flex-direction:column;gap:4px;box-shadow:0 24px 48px rgba(0,0,0,.6);transform-origin:top;animation:txdrop .26s ' + E + '">' + cats().map(n => '<span data-a="pset" data-v="' + esc(n) + '"' + (n === cn ? ' data-dd-on="1"' : '') + ' style="flex:none;display:flex;align-items:center;gap:10px;height:38px;border-radius:12px;border:1px solid ' + (n === cn ? '#F2F0EB' : 'transparent') + ';padding:0 10px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap" onmouseover="this.style.background=\'#1C1C20\'" onmouseout="this.style.background=\'\'">' + icDot(n, 22) + '<span style="flex:1">' + esc(n) + '</span>' + (n === cn ? '<span style="display:flex">' + svg('check', 14, 2.6) + '</span>' : '') + '</span>').join('') + '</div>' : '') + '</div>'
         + '<div style="display:flex;flex-direction:column;gap:8px"><div style="font-size:14px;font-weight:700;color:#9A9AA3">Título da parte <span style="font-weight:500">· opcional</span></div><input data-in="ptit" maxlength="40" value="' + esc(P.rotulo || '') + '" placeholder="Ex.: Água, Luz" style="' + fieldCss + 'border-radius:9999px;height:50px;padding:0 20px"></div></div>'
         + (S.itens.length ? '<div style="font-size:13px;font-weight:700;color:#9A9AA3;margin-top:2px">Itens da nota <span style="font-weight:500">· clique ou arraste pra incluir nesta parte</span></div><div class="kscroll" style="overflow:auto;min-height:0;flex:1;-webkit-mask-image:linear-gradient(#0000,#000 8px,#000 calc(100% - 18px),#0000);mask-image:linear-gradient(#0000,#000 8px,#000 calc(100% - 18px),#0000)">' + its + '</div>' : '') + '</div>';
     }
@@ -874,7 +957,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const pw = host.querySelector('[data-pw]');
     const rt = pw.querySelector('[data-rttl]'); if (rt) shrinkTo(rt, 23, 15, rt.parentElement.clientWidth - 12);
     if (keep.k) { const el = pw.querySelector('[data-in="' + keep.k + '"]'); if (el) { el.focus(); try { if (el.tagName === 'INPUT') { const l = el.value.length; el.setSelectionRange(l, l); } else { const l = el.textContent.length; const rg = document.createRange(); rg.selectNodeContents(el); rg.collapse(false); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg); } } catch (e) { } } }
-    pw.querySelectorAll('[data-pop]').forEach(pop => { pop.style.maxHeight = POPMAXH + 'px'; const sc = pop.querySelector('[data-popscroll]'); if (sc) { syncFade(pop); sc.onscroll = () => syncFade(pop); } });
+    fitPop(pw);
     wire(pw);
   }
   /* ---------------- render ---------------- */
@@ -1085,7 +1168,13 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       if (S) S.pd = false; const had = S && S.dirty; if (S) S.dirty = false;
       if (S && S.merge && !ev.target.closest('[data-a="domerge"]')) { S.merge = null; render(); }
       const el = ev.target.closest('[data-a]');
-      if (!el || !S) { if (S && S.pop && !ev.target.closest('[data-pop]') && !(ev.target.getAttribute && ev.target.getAttribute('data-estq') === '1')) { S.pop = null; render(); } else if (had) render(); return; }
+      if (!el || !S) {
+        if (S && S.pop && !ev.target.closest('[data-pop]') && !(ev.target.getAttribute && ev.target.getAttribute('data-estq') === '1')) { S.pop = null; render(); }
+        // reduzido: clicar num pedaço vazio do topo (fora de pill/botão) fecha, igual clicar na linha de novo
+        else if (S && S.inline && !ev.target.closest('input,textarea,[contenteditable]')) TX.requestClose();
+        else if (had) render();
+        return;
+      }
       const a = el.getAttribute('data-a'), v = el.getAttribute('data-v');
       if (a === 'close') TX.requestClose();
       else if (a === 'estpick' || a === 'estnew') { S.nome = v; S.pop = null; render(); if (S.inline) salvarReduzido(); }
