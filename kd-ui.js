@@ -498,6 +498,13 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   KD.refresh2 = (comp, reset) => { Object.keys(reset).forEach(k => { KD._snap[k] = JSON.stringify(reset[k]); }); comp.setState(reset); };
 
   /* editar transação: grava campos, nota (itens) e divisão de uma vez e recarrega */
+  /* excluir transação: só lançamento manual. Itens, nota, divisão, parcelas e tags saem junto (ON DELETE
+     CASCADE no banco). Confere que apagou mesmo — com RLS, apagar algo que não é seu volta 0 linhas sem erro. */
+  KD.txDelete = async (comp, id) => {
+    const q = ck(await sb().from('transactions').delete().eq('id', id).eq('origem', 'manual').select('id'));
+    if (!q.data || !q.data.length) throw new Error('transação não encontrada');
+    await KD.refresh(comp);
+  };
   KD.txSave = async (comp, d) => {
     const c = sb(); let id = d.id, r = id ? KD.M.rowById[id] : null;
     if (d.isNew) {
@@ -559,6 +566,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     split: '<circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="12" r="2.2"/><path d="M6 7.2v9.6M8 5h4a4 4 0 0 1 4 4v.8M8 19h4a4 4 0 0 0 4-4v-.8"/>',
     qr: '<path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><rect x="7" y="7" width="4" height="4" rx=".5"/><rect x="13" y="7" width="4" height="4" rx=".5"/><rect x="7" y="13" width="4" height="4" rx=".5"/><path d="M13 13h1.5M16.5 13H17M13 16.5V17M16 15v2"/>',
     plus: '<path d="M12 5v14M5 12h14"/>', pencil: '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/>',
+    trash: '<path d="M4 7h16"/><path d="M9 7V4.5h6V7"/><path d="M6 7l1 12.2A2 2 0 0 0 9 21h6a2 2 0 0 0 2-1.8L18 7"/><path d="M10 11v6M14 11v6"/>',
     copy: '<rect x="8" y="8" width="13" height="13" rx="2.5"/><path d="M16 8V6a2.5 2.5 0 0 0-2.5-2.5h-7A2.5 2.5 0 0 0 4 6v7A2.5 2.5 0 0 0 6.5 16H8"/>', check2: '<path d="m5 12.5 4.5 4.5L19 7.5"/>'
   };
   const warnIco = (w) => '<svg width="' + w + '" height="' + w + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex:none;display:block"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v5"/><path d="M12 17.5v.01"/></svg>';
@@ -734,7 +742,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const ab = document.querySelector('[data-tx-host]'); if (!ab) return;
     host = ab; host.style.pointerEvents = 'auto'; render(true);
   };
-  TX.requestClose = function () { if (!S) return; if (isDirty()) { S.askClose = true; S.askBack = false; render(); return; } TX.close(); };
+  TX.requestClose = function () { if (!S || S.busy) return; S.askDel = false; if (isDirty()) { S.askClose = true; S.askBack = false; render(); return; } TX.close(); };
   TX.isOpen = function (id) { return !!(S && S.row && S.row.id === id); };
   let pendingDone = null;
   TX.close = function (quick) {
@@ -868,7 +876,11 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       + '<div style="display:flex;flex-direction:column;gap:10px">' + lb('card', 'Cartão / Conta') + '<div style="display:flex;gap:8px;align-items:flex-start"><div style="position:relative;flex:1;min-width:0"><div data-a="pop" data-v="card" data-alert-target="card" style="' + fieldCss + 'border-radius:' + PR + 'px;flex:1;min-width:0;display:flex;align-items:center;gap:10px;cursor:pointer" class="' + (S.alertField === 'card' ? 'txalert-box' : '') + '">' + bankChip(meioObj && meioObj.bank, (meioObj || {}).cor || '#3A3A40') + '<span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700">' + esc(meio) + '</span></div>' + (S.pop === 'card' ? popCard() : '') + '</div>' + (S.isNew && S.cardId ? '<div data-a="parc" title="Parcelas" style="flex:none;width:74px">' + pill((S.parc || 1) + 'x') + '</div>' : '') + '</div></div>'
       + '<div style="display:flex;flex-direction:column;gap:10px;position:relative">' + lb('tag', 'Categoria') + '<div data-a="pop" data-v="cat" style="display:flex;align-items:center;gap:12px;border-radius:' + PR + 'px;padding:9px 12px 9px 10px;border:2px solid ' + cor + '8C;background:color-mix(in srgb,' + cor + ' 14%,#000);cursor:pointer">' + icDot(cn, 30) + '<b style="font-size:16px;flex:1">' + esc(cn) + '</b><span style="width:28px;height:28px;border-radius:50%;background:#0A0A0A;display:flex;align-items:center;justify-content:center;color:#F2F0EB">' + svg('chev', 14, 2.6) + '</span></div>' + (S.pop === 'cat' ? popCat() : '') + '</div>';
     const nf = S.itens.length ? S.itens.length + (S.itens.length === 1 ? ' item lido' : ' itens lidos') : 'Escaneie ou cole o link<br>pra ver os itens da compra';
-    const rail = '<div style="width:331px;flex:none;background:#1C1C20;border-left:1px solid #3A3A40;border-radius:0 30px 30px 0;padding:66px 24px 24px 26px;display:flex;flex-direction:column;box-sizing:border-box;position:relative">'
+    // excluir: só lançamento manual já salvo (os de extrato/Open Finance voltariam na próxima importação).
+    // pequeno e discreto no vão acima do "Dividir"; abre a confirmação, nunca apaga direto.
+    const podeExcluir = !S.isNew && S.row.id && S.row.origem === 'manual';
+    const delLink = podeExcluir ? '<span data-a="askdel" style="position:absolute;left:28px;top:26px;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#FF6B5A;cursor:pointer;opacity:.85;transition:opacity .25s ease" onmouseover="this.style.opacity=\'1\'" onmouseout="this.style.opacity=\'.85\'">' + svg('trash', 13, 2.2) + 'Excluir transação</span>' : '';
+    const rail = '<div style="width:331px;flex:none;background:#1C1C20;border-left:1px solid #3A3A40;border-radius:0 30px 30px 0;padding:66px 24px 24px 26px;display:flex;flex-direction:column;box-sizing:border-box;position:relative">' + delLink
       + '<div data-a="mode" data-v="dividir" style="height:54px;flex:none;display:flex;align-items:center;justify-content:center;gap:14px;padding:0 20px;white-space:nowrap;border:2px solid #2A2A2F;border-radius:28px;background:#000;cursor:pointer;transition:border-color .25s ease" onmouseover="this.style.borderColor=\'#51515C\'" onmouseout="this.style.borderColor=\'#2A2A2F\'"><span style="color:#F2F0EB;display:flex">' + svg('split', 30, 1.7) + '</span><div style="display:flex;flex-direction:column;line-height:1.15;align-items:flex-start"><span style="font-weight:900;letter-spacing:.06em;font-size:14px;text-transform:uppercase">Dividir transação</span><span style="font-size:12.5px;color:#9A9AA3">' + (S.partes.length ? S.partes.length + (S.partes.length === 1 ? ' parte' : ' partes') : 'Separe em categorias') + '</span></div></div>'
       + '<div style="height:313px;flex:none;margin-top:21px;position:relative"><svg data-tk style="position:absolute;inset:0;overflow:visible" width="280" height="313"></svg>'
       + '<div data-a="mode" data-v="ler" class="txnf" style="position:absolute;left:0;right:0;top:0;height:249px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;font-weight:900;letter-spacing:.06em;font-size:14px;text-transform:uppercase;cursor:pointer;color:#0A0A0A;transition:transform .35s ' + E + '"><span style="display:flex">' + svg('qr', 60, 1.5, '#1A1A1A') + '</span><span>Nota fiscal</span><small style="font-size:12.5px;font-weight:500;letter-spacing:0;text-transform:none;color:#6A6A72;text-align:center;line-height:1.4;margin-top:-6px">' + nf + '</small></div>'
@@ -985,7 +997,13 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const bodyHtml = S.mode === 'dados' ? viewDados() : S.mode === 'ler' ? viewLer() : viewDividir();
     const x = '<span data-a="close" style="position:absolute;right:0;top:0;width:44px;height:44px;border-radius:50%;background:#F2F0EB;color:#0A0A0A;display:flex;align-items:center;justify-content:center;z-index:3;cursor:pointer;"><span data-xi style="display:flex;transition:transform .5s cubic-bezier(.65,0,.2,1)">' + svg('x', 18, 2.4) + '</span></span>';
     const prevPn = host.querySelector('[data-pn]');
-    const modal = (S.askBack || S.askClose) ? '<div style="position:absolute;inset:0;z-index:9;background:rgba(0,0,0,.6);border-radius:30px;display:flex;align-items:center;justify-content:center;animation:txfade .2s ease"><div style="width:460px;background:#151518;border:1px solid #3A3A40;border-radius:28px;padding:28px;display:flex;flex-direction:column;gap:12px"><div style="font-size:22px;font-weight:700;letter-spacing:-.02em">' + (S.askClose ? 'Fechar sem salvar?' : 'Sair sem confirmar?') + '</div><div style="font-size:14px;color:#9A9AA3;line-height:1.5">' + (S.askClose ? (S.isNew ? 'Essa transação ainda não foi salva e o que você preencheu vai se perder.' : 'As alterações dessa transação não foram salvas e vão se perder.') : 'As alterações dessa divisão não foram salvas e vão se perder. Elas só valem quando você clica em Confirmar divisão.') + '</div><div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px"><span data-a="keep" style="height:44px;display:flex;align-items:center;padding:0 22px;border-radius:9999px;border:2px solid #2A2A2F;font-weight:900;letter-spacing:.06em;font-size:12.5px;text-transform:uppercase;cursor:pointer">Continuar editando</span><span data-a="discard" style="height:44px;display:flex;align-items:center;padding:0 22px;border-radius:9999px;background:#FF6B5A;color:#0A0A0A;font-weight:900;letter-spacing:.06em;font-size:12.5px;text-transform:uppercase;cursor:pointer">Descartar</span></div></div></div>' : '';
+    const modal = S.askDel ? '<div data-modal style="position:absolute;inset:0;z-index:9;background:rgba(0,0,0,.6);border-radius:30px;display:flex;align-items:center;justify-content:center;animation:txfade .2s ease"><div style="width:460px;background:#151518;border:1px solid #3A3A40;border-radius:28px;padding:28px;display:flex;flex-direction:column;gap:12px">'
+        + '<div style="display:flex;align-items:center;gap:12px"><span style="width:40px;height:40px;flex:none;border-radius:50%;background:rgba(255,107,90,.14);color:#FF6B5A;display:flex;align-items:center;justify-content:center">' + svg('trash', 18, 2.2) + '</span><div style="font-size:22px;font-weight:700;letter-spacing:-.02em">Excluir transação?</div></div>'
+        + '<div style="font-size:14px;color:#9A9AA3;line-height:1.5"><b style="color:#F2F0EB">' + esc(S.row.e || 'Sem nome') + '</b> · R$ ' + brl(S.row.total || 0) + ' · ' + dfmt(S.row.iso) + '<br>Ela some do extrato e dos totais, junto com a nota e a divisão em categorias, se tiver.</div>'
+        + '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:14px;background:rgba(255,107,90,.08);border:1px solid rgba(255,107,90,.28);color:#FF8A7C;font-size:13px;font-weight:700">' + warnIco(16) + 'Isso não pode ser desfeito.</div>'
+        + (S.delErr ? '<div style="font-size:12.5px;color:#FFC24A">' + esc(S.delErr) + '</div>' : '')
+        + '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px"><span data-a="keep" style="height:44px;display:flex;align-items:center;padding:0 22px;border-radius:9999px;border:2px solid #2A2A2F;font-weight:900;letter-spacing:.06em;font-size:12.5px;text-transform:uppercase;cursor:pointer">Cancelar</span><span data-a="dodel" style="height:44px;display:flex;align-items:center;gap:8px;padding:0 22px;border-radius:9999px;background:#FF6B5A;color:#0A0A0A;font-weight:900;letter-spacing:.06em;font-size:12.5px;text-transform:uppercase;cursor:pointer;opacity:' + (S.busy ? .5 : 1) + '">' + svg('trash', 14, 2.4) + (S.busy ? 'Excluindo…' : 'Excluir') + '</span></div></div></div>'
+      : (S.askBack || S.askClose) ? '<div data-modal style="position:absolute;inset:0;z-index:9;background:rgba(0,0,0,.6);border-radius:30px;display:flex;align-items:center;justify-content:center;animation:txfade .2s ease"><div style="width:460px;background:#151518;border:1px solid #3A3A40;border-radius:28px;padding:28px;display:flex;flex-direction:column;gap:12px"><div style="font-size:22px;font-weight:700;letter-spacing:-.02em">' + (S.askClose ? 'Fechar sem salvar?' : 'Sair sem confirmar?') + '</div><div style="font-size:14px;color:#9A9AA3;line-height:1.5">' + (S.askClose ? (S.isNew ? 'Essa transação ainda não foi salva e o que você preencheu vai se perder.' : 'As alterações dessa transação não foram salvas e vão se perder.') : 'As alterações dessa divisão não foram salvas e vão se perder. Elas só valem quando você clica em Confirmar divisão.') + '</div><div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px"><span data-a="keep" style="height:44px;display:flex;align-items:center;padding:0 22px;border-radius:9999px;border:2px solid #2A2A2F;font-weight:900;letter-spacing:.06em;font-size:12.5px;text-transform:uppercase;cursor:pointer">Continuar editando</span><span data-a="discard" style="height:44px;display:flex;align-items:center;padding:0 22px;border-radius:9999px;background:#FF6B5A;color:#0A0A0A;font-weight:900;letter-spacing:.06em;font-size:12.5px;text-transform:uppercase;cursor:pointer">Descartar</span></div></div></div>' : '';
     const Wn = 120, r = 32, fr = 10, cy = 22, cx = Wn - 22, dd = Math.sqrt((r + fr) ** 2 - (cy - fr) ** 2), xf = cx - dd, yf = cy + dd, P1 = [cx + (xf - cx) * r / (r + fr), cy + (fr - cy) * r / (r + fr)], P2 = [cx + (Wn - fr - cx) * r / (r + fr), cy + (yf - cy) * r / (r + fr)];
     const bdp = 'M' + xf + ',0.5A' + fr + ',' + fr + ' 0 0 1 ' + P1[0] + ',' + P1[1] + 'A' + r + ',' + r + ' 0 0 0 ' + P2[0] + ',' + P2[1] + 'A' + fr + ',' + fr + ' 0 0 1 ' + (Wn - .5) + ',' + yf;
     const goo = '<div style="position:absolute;right:0;top:0;width:119px;height:119px;overflow:hidden;border-radius:0 30px 0 0;z-index:2;pointer-events:none"><svg width="120" height="120" style="position:absolute;right:-1px;top:-1px;overflow:visible"><path d="' + bdp + '" fill="none" stroke="#2A2A2F" stroke-width="1"/></svg></div>';
@@ -1137,6 +1155,20 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     catch (e) { console.error('[kontar] salvar transação', e); S.busy = false; S.msg = 'Não consegui salvar: ' + ((e && e.message) || 'erro'); render(); }
   }
 
+  // o modal some em fade (não some de uma vez) antes do painel redesenhar sem ele
+  function fecharModal() {
+    const md = host && host.querySelector('[data-modal]'), mine = S;
+    const fim = () => { if (S !== mine) return; S.askBack = false; S.askClose = false; S.askDel = false; S.delErr = ''; render(); };
+    if (!md) { fim(); return; }
+    md.style.animation = 'none'; md.style.transition = 'opacity .2s ease'; md.style.pointerEvents = 'none';
+    requestAnimationFrame(() => { md.style.opacity = '0'; }); setTimeout(fim, 210);
+  }
+  async function excluir() {
+    if (!S || S.busy || !S.row.id || S.row.origem !== 'manual') return;
+    S.busy = true; S.delErr = ''; render();
+    try { await KD.txDelete(comp, S.row.id); TX.close(); }
+    catch (e) { console.error('[kontar] excluir transação', e); if (!S) return; S.busy = false; S.delErr = 'Não consegui excluir: ' + ((e && e.message) || 'erro'); render(); }
+  }
   function anotar() {
     if (!S.itens.length) return;
     const linhas = S.itens.map(i => '• ' + i.nome + (i.qtd && i.qtd !== 1 ? ' (' + String(i.qtd).replace('.', ',') + (i.un ? ' ' + i.un : '') + ')' : '') + ' — R$ ' + brl(i.valor)).join('\n');
@@ -1194,7 +1226,9 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       else if (a === 'mode') goMode(v);
       else if (a === 'retry') { S.err = null; S.msg = ''; render(); const fi = pn.querySelector('[data-in="foto"]'); if (fi) { fi.value = ''; fi.click(); } }
       else if (a === 'discard') { if (S.askClose) { TX.close(); return; } restoreSnap(); S.askBack = false; S.mode = 'dados'; render(); }
-      else if (a === 'keep') { S.askBack = false; S.askClose = false; render(); }
+      else if (a === 'keep') { if (S.busy) return; fecharModal(); }
+      else if (a === 'askdel') { S.askDel = true; S.delErr = ''; S.askBack = false; S.askClose = false; render(); }
+      else if (a === 'dodel') excluir();
       else if (a === 'pop') { ev.stopPropagation(); S.pop = S.pop === v ? null : v; render(); }
       else if (a === 'domerge') { const m = S.merge; S.merge = null; if (m && S.partes[m.from] && S.partes[m.to]) { const A = S.partes[m.from], B = S.partes[m.to]; B.valor = Math.round((A.valor + B.valor) * 100) / 100; B.itens = B.itens.concat(A.itens); S.partes.splice(m.from, 1); S.sel = Math.min(m.to > m.from ? m.to - 1 : m.to, S.partes.length - 1); S.partesDirty = true; } render(); }
       else if (a === 'anotar') anotar();
@@ -1247,5 +1281,5 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     S.partes.forEach(q => { q.itens = q.itens.filter(x => x !== i); });
     p.itens.push(i); recalc(); S.partesDirty = true; render();
   }
-  window.addEventListener('keydown', e => { if (S && e.key === 'Escape') { if (S.askClose || S.askBack) { S.askClose = false; S.askBack = false; render(); } else TX.requestClose(); } });
+  window.addEventListener('keydown', e => { if (S && e.key === 'Escape') { if (S.askClose || S.askBack || S.askDel) { if (!S.busy) fecharModal(); } else TX.requestClose(); } });
 })();
