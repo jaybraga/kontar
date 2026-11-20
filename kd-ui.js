@@ -1579,7 +1579,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   }
   function group(key, title, sub, col, rows, open) {
     const lim = key === 'ok' ? 6 : 99, show = S.open[key] ? rows : rows.slice(0, key === 'skip' ? 0 : lim), more = rows.length - show.length;
-    return '<div data-g style="margin-top:22px"><div style="display:flex;align-items:baseline;gap:12px"><span style="width:10px;height:10px;border-radius:50%;background:' + col + ';flex:none;align-self:center"></span><b style="font-size:20px">' + title + '</b><span style="font-size:12px;color:#8a8a90;letter-spacing:.06em">' + sub + '</span><span style="margin-left:auto;font-size:26px;font-weight:800">' + rows.length + '</span></div>'
+    return '<div data-grp style="margin-top:22px"><div style="display:flex;align-items:baseline;gap:12px"><span style="width:10px;height:10px;border-radius:50%;background:' + col + ';flex:none;align-self:center"></span><b style="font-size:20px">' + title + '</b><span style="font-size:12px;color:#8a8a90;letter-spacing:.06em">' + sub + '</span><span style="margin-left:auto;font-size:26px;font-weight:800">' + rows.length + '</span></div>'
       + show.map(rowHtml).join('')
       + (more > 0 ? '<div data-more="' + key + '" style="padding:11px 0 0 34px;font-size:12px;color:#8a8a90;cursor:pointer;text-decoration:underline">' + (key === 'skip' ? 'ver lista' : '+ ' + more + ' linhas · mostrar todas') + '</div>' : '')
       + (key === 'ok' && rows.length > lim && S.open.ok ? '' : '') + '</div>';
@@ -1602,7 +1602,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       + group('need', 'Precisam de você', 'SEM CATEGORIA, VALOR ALTO OU POSSÍVEL DUPLICATA', AM, G.need)
       + group('skip', 'Descartadas', 'DUPLICATAS CERTAS · NADA É APAGADO, DÁ PARA RECUPERAR', '#777', G.skip) + '</div>';
     L.scrollTop = keepScroll;
-    if (first) L.querySelectorAll('[data-g]').forEach((g, k) => { g.style.opacity = '0'; g.style.transform = 'translateY(10px)'; g.style.transition = 'opacity .45s ease ' + (0.12 + k * .12) + 's, transform .55s cubic-bezier(.2,.7,.2,1) ' + (0.12 + k * .12) + 's'; requestAnimationFrame(() => requestAnimationFrame(() => { g.style.opacity = '1'; g.style.transform = 'none'; })); });
+    if (first) { const gs = [...L.querySelectorAll('[data-grp]')]; gs.forEach(g => { g.style.transition = 'none'; g.style.opacity = '0'; g.style.transform = 'translateY(12px)'; }); void L.offsetHeight; requestAnimationFrame(() => gs.forEach((g, k) => { g.style.transition = 'opacity .5s ease ' + (0.15 + k * .14) + 's, transform .7s cubic-bezier(.2,.7,.2,1) ' + (0.15 + k * .14) + 's'; g.style.opacity = '1'; g.style.transform = 'none'; })); }
   }
   function recalc() { const t = S.targets.find(x => x.k === S.tk); S.cardId = t && t.card ? t.id : null; S.accId = t && !t.card ? t.id : null; S.rows.forEach(r => { r.meioT = t && t.card ? 'CRÉD' : /pix/i.test(r.raw) ? 'PIX' : /boleto/i.test(r.raw) ? 'BOL' : 'DÉB'; }); classificar(S); }
   async function conhecidos(ids) {
