@@ -1119,7 +1119,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       const rc = it.parentElement && it.parentElement.parentElement, hint = rc && rc.firstElementChild;
       return { top: it.getBoundingClientRect().top, hint: hint && hint !== it.parentElement ? { html: hint.outerHTML, top: hint.offsetTop, w: hint.offsetWidth, left: hint.offsetLeft } : null };
     })() : null;
-    const modal = S.askDel ? '<div data-modal style="position:absolute;inset:0;z-index:9;background:rgba(0,0,0,.6);border-radius:30px;display:flex;align-items:center;justify-content:center;animation:txfade .2s ease"><div style="width:460px;background:#151518;border:1px solid #3A3A40;border-radius:28px;padding:28px;display:flex;flex-direction:column;gap:12px">'
+    const modal = S.dup ? dupModal() : S.askDel ? '<div data-modal style="position:absolute;inset:0;z-index:9;background:rgba(0,0,0,.6);border-radius:30px;display:flex;align-items:center;justify-content:center;animation:txfade .2s ease"><div style="width:460px;background:#151518;border:1px solid #3A3A40;border-radius:28px;padding:28px;display:flex;flex-direction:column;gap:12px">'
         + '<div style="display:flex;align-items:center;gap:12px"><span style="width:40px;height:40px;flex:none;border-radius:50%;background:rgba(255,107,90,.14);color:#FF6B5A;display:flex;align-items:center;justify-content:center">' + svg('trash', 18, 2.2) + '</span><div style="font-size:22px;font-weight:700;letter-spacing:-.02em">Excluir transação?</div></div>'
         + '<div style="font-size:14px;color:#9A9AA3;line-height:1.5"><b style="color:#F2F0EB">' + esc(S.row.e || 'Sem nome') + '</b> · R$ ' + brl(S.row.total || 0) + ' · ' + dfmt(S.row.iso) + '<br>Ela some do extrato e dos totais, junto com a nota e a divisão em categorias, se tiver.</div>'
         + '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:14px;background:rgba(255,107,90,.08);border:1px solid rgba(255,107,90,.28);color:#FF8A7C;font-size:13px;font-weight:700">' + warnIco(16) + 'Isso não pode ser desfeito.</div>'
@@ -1203,7 +1203,29 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (!its.length) { S.msg = 'Não achei itens nesse texto. Confira se copiou a página inteira.'; render(); return; }
     S.itens = its; S.nota = Object.assign({}, S.nota || {}, { url: url || (S.nota && S.nota.url) || null, total: its.reduce((a, i) => a + i.valor, 0) }); S.notaDirty = true; S.partes = []; S.partesDirty = true; S.msg = ''; S.mode = 'dividir';
     if (S.isNew) { const n = S.nota || {}; if (!(S.totalV > 0)) S.totalV = Math.round(its.reduce((a, i) => a + i.valor, 0) * 100) / 100; if (!(S.nome || '').trim() && n.emitente) S.nome = n.emitente.toLowerCase().replace(/(^|[\s.])([a-zà-ú])/g, (m0, a, b) => a + b.toUpperCase()); if (n.emitida_em && /^\d{4}-\d{2}-\d{2}$/.test(n.emitida_em)) S.iso = n.emitida_em; }
+    S.dup = null;
+    if (S.isNew && KD.dup) { const n = S.nota || {}, cand = { nome: n.emitente || S.nome, valor: n.total || S.totalV, dir: 'saida', iso: S.iso, cardId: S.cardId, accId: S.accId }, f = KD.dup.find(cand); if (f.length) S.dup = { m: f[0], n: f.length, cand }; }
     render();
+  }
+  // aviso de duplicata (mockup 1A): a nota que acabou de ser lida ao lado da transação que já existe
+  function dupModal() {
+    const D = S.dup, m = D.m, r = m.row, c = D.cand, prov = m.conf === 'provavel', AM = '#F0C24B';
+    const bate = '<i style="font-style:normal;font-size:10px;letter-spacing:.1em;background:' + AM + ';color:#000;border-radius:99px;padding:3px 8px;font-weight:800">BATE</i>';
+    const row = (k, v, ok) => '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0;border-bottom:1px dashed #3a3a3e"><span style="font-size:11px;letter-spacing:.12em;color:#8a8a90;text-transform:uppercase">' + k + '</span><span style="font-size:17px;font-weight:700;display:flex;gap:10px;align-items:center;text-align:right;min-width:0">' + v + (ok ? bate : '') + '</span></div>';
+    const org = r.origem === 'manual' ? 'lançada à mão' : r.origem === 'import' ? 'via extrato' : 'via ' + r.origem;
+    const temItens = r.items && r.items.length;
+    const dOk = m.days === 0, nOk = m.nameSim != null && m.nameSim >= 0.5;
+    const btn = (a, t, cls) => '<span data-a="' + a + '" style="height:46px;display:flex;align-items:center;padding:0 26px;border-radius:9999px;font-weight:900;letter-spacing:.1em;font-size:12px;text-transform:uppercase;cursor:pointer;' + cls + '">' + t + '</span>';
+    return '<div data-modal style="position:absolute;inset:0;z-index:9;background:#1b1b1d;border-radius:30px;display:flex;flex-direction:column;padding:26px 30px;box-sizing:border-box;animation:txfade .25s ease">'
+      + '<div style="display:flex;align-items:flex-start;gap:16px"><div style="min-width:0"><div style="font-size:10px;letter-spacing:.18em;color:#8a8a90">LENDO NOTA // ' + (prov ? 'PROVÁVEL' : 'POSSÍVEL') + ' DUPLICATA</div><div style="font-size:46px;font-weight:800;letter-spacing:-.03em;line-height:1.1;margin-top:4px">Já está no extrato.</div></div>'
+      + '<span style="margin-left:auto;flex:none;background:' + AM + ';color:#000;border-radius:99px;padding:9px 16px;font-size:11px;font-weight:800;letter-spacing:.12em">' + (prov ? 'PROVÁVEL · VALOR, DATA E NOME BATEM' : 'POSSÍVEL · VALOR E DATA BATEM') + '</span></div>'
+      + '<div style="display:flex;gap:22px;margin-top:18px;flex:1;min-height:0">'
+      + '<div style="flex:1;border-radius:22px;background:#111;padding:18px 26px;box-sizing:border-box;min-width:0"><div style="font-size:10px;letter-spacing:.18em;color:#8a8a90;margin-bottom:4px">NOTA QUE VOCÊ ACABOU DE LER</div>'
+      + row('Estabelecimento', '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px">' + esc(c.nome || '—') + '</span>', nOk) + row('Valor', 'R$ ' + brl(c.valor), true) + row('Data', dfmt(c.iso), dOk) + row('Itens', S.itens.length + (S.itens.length === 1 ? ' item' : ' itens')) + '</div>'
+      + '<div style="flex:1;border-radius:22px;background:#111;padding:18px 26px;box-sizing:border-box;box-shadow:0 0 0 2px ' + AM + ';min-width:0"><div style="font-size:10px;letter-spacing:.18em;color:' + AM + ';margin-bottom:4px">JÁ NO EXTRATO · ' + esc(String(r.k || '').toUpperCase()) + ' · ' + org.toUpperCase() + '</div>'
+      + row('Estabelecimento', '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px">' + esc(r.e) + '</span>', nOk) + row('Valor', 'R$ ' + brl(r.total), true) + row('Data', dfmt(r.iso), dOk) + row('Categoria', esc(r.c)) + '</div></div>'
+      + '<div style="display:flex;align-items:center;gap:20px;margin-top:18px"><div style="font-size:13px;color:#a0a0a6;line-height:1.4;max-width:520px">' + (temItens ? 'Essa transação já tem itens; se for a mesma, eles serão trocados pelos da nota. ' : 'Se é a mesma, os itens da nota entram nessa transação. ') + 'Nada é criado em dobro.' + (D.n > 1 ? ' Há outras ' + (D.n - 1) + ' parecidas no extrato.' : '') + '</div>'
+      + '<div style="margin-left:auto;display:flex;gap:12px">' + btn('dupother', 'É outra · criar nova', 'border:1px solid #555') + btn('dupsame', 'É a mesma · ' + (temItens ? 'trocar' : 'anexar') + ' itens', 'background:#fff;color:#000') + '</div></div></div>';
   }
   async function lerLink() {
     const url = (S.link || '').trim(); if (!/^https?:\/\//i.test(url)) { S.msg = 'Cole o endereço completo do link da nota.'; render(); return; }
@@ -1363,6 +1385,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       else if (a === 'retry') { S.err = null; S.msg = ''; render(); const fi = pn.querySelector('[data-in="foto"]'); if (fi) { fi.value = ''; fi.click(); } }
       else if (a === 'discard') { if (S.askClose) { TX.close(); return; } restoreSnap(); S.askBack = false; S.mode = 'dados'; render(); }
       else if (a === 'keep') { if (S.busy) return; fecharModal(); }
+      else if (a === 'dupother') { const md = host.querySelector('[data-modal]'), mine = S; if (md) { md.style.animation = 'none'; md.style.transition = 'opacity .2s ease'; md.style.pointerEvents = 'none'; requestAnimationFrame(() => { md.style.opacity = '0'; }); } setTimeout(() => { if (S !== mine) return; S.dup = null; render(); }, md ? 210 : 0); }
+      else if (a === 'dupsame') { const D = S.dup, keep = { itens: S.itens, nota: S.nota }, md = host.querySelector('[data-modal]'); if (!D) return; const go = () => { TX.open(comp, D.m.row); if (!S) return; S.itens = keep.itens; S.nota = Object.assign({}, S.nota || {}, keep.nota); S.notaDirty = true; S.partes = []; S.partesDirty = true; S.mode = 'dividir'; render(); }; if (md) { md.style.animation = 'none'; md.style.transition = 'opacity .2s ease'; md.style.pointerEvents = 'none'; requestAnimationFrame(() => { md.style.opacity = '0'; }); setTimeout(go, 210); } else go(); }
       else if (a === 'askdel') { S.askDel = true; S.delErr = ''; S.askBack = false; S.askClose = false; render(); }
       else if (a === 'dodel') excluir();
       else if (a === 'pop') { ev.stopPropagation(); S.pop = S.pop === v ? null : v; render(); }
@@ -1418,4 +1442,232 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     p.itens.push(i); recalc(); S.partesDirty = true; render();
   }
   window.addEventListener('keydown', e => { if (S && e.key === 'Escape') { if (S.askClose || S.askBack || S.askDel) { if (!S.busy) fecharModal(); } else TX.requestClose(); } });
+})();
+
+/* Kontar · detecção de duplicatas (usada pela leitura de nota e pelo importador de extrato)
+   Nunca descarta nada sozinha: só aponta candidatas e o grau de confiança.
+   provavel = valor + data + nome batem · possivel = valor + data batem. */
+(function () {
+  'use strict';
+  const KD = window.KD, DUP = (KD.dup = {});
+  const STOP = new Set(['pag', 'pagto', 'pagamento', 'pagamentos', 'compra', 'debito', 'credito', 'pix', 'transferencia', 'enviada', 'recebida', 'ltda', 'eireli', 'sa', 'me', 'epp', 'com', 'comercio', 'servicos', 'brasil', 'cartao', 'parc']);
+  const cents = n => Math.round(Math.abs(Number(n) || 0) * 100);
+  const toks = s => KD.norm(s).replace(/[^a-z0-9]+/g, ' ').split(' ').filter(w => w.length >= 3 && !STOP.has(w) && !/^\d+$/.test(w));
+  const dayNum = iso => { const p = String(iso || '').slice(0, 10).split('-').map(Number); return p.length === 3 && p[0] ? Date.UTC(p[0], p[1] - 1, p[2]) / 864e5 : NaN; };
+  /* 0..1, ou null quando um dos lados não tem nome utilizável */
+  DUP.nameSim = (a, b) => {
+    const A = toks(a), B = toks(b); if (!A.length || !B.length) return null;
+    const hit = A.filter(x => B.some(y => x === y || (x.length >= 4 && y.length >= 4 && (x.startsWith(y) || y.startsWith(x))))).length;
+    return hit / Math.min(A.length, B.length);
+  };
+  /* cand: { nome, valor, dir:'saida'|'entrada', iso, cardId, accId }. rows: transações já existentes.
+     skip: Set de ids que já foram "usados" por outra linha (casamento um-pra-um no importador). */
+  DUP.find = (cand, rows, o) => {
+    o = o || {}; const win = o.days == null ? 2 : o.days, skip = o.skip, v = cents(cand.valor), d0 = dayNum(cand.iso), out = [];
+    if (!v || isNaN(d0)) return out;
+    (rows || KD.M.rows).forEach(r => {
+      if (skip && skip.has(r.id)) return;
+      if (cents(r.total) !== v) return;
+      if ((cand.dir || 'saida') !== ((r.amt < 0 || r.out > 0) ? 'saida' : 'entrada')) return;
+      const dd = Math.abs(dayNum(r.iso) - d0); if (!(dd <= win)) return;
+      if ((cand.cardId && r.cardId && cand.cardId !== r.cardId) || (cand.accId && r.accId && cand.accId !== r.accId) || (cand.cardId && r.accId && !r.cardId) || (cand.accId && r.cardId && !r.accId)) return;
+      const ns = DUP.nameSim(cand.nome, r.e);
+      out.push({ row: r, days: dd, nameSim: ns, conf: ns != null && ns >= 0.5 ? 'provavel' : 'possivel' });
+    });
+    return out.sort((a, b) => (a.conf === b.conf ? 0 : a.conf === 'provavel' ? -1 : 1) || a.days - b.days);
+  };
+})();
+
+/* Kontar · importador de extrato (OFX e CSV) + tela de revisão em lote (mockup 2A)
+   Fluxo: arquivo → linhas → duplicatas (KD.dup) e categorias conhecidas → três grupos → importar.
+   Cada importação vira um import_batches; as transações gravam batch_id e external_id (id do banco no arquivo). */
+(function () {
+  'use strict';
+  const KD = window.KD, IMP = (KD.imp = {});
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const brl = n => (Math.round(n * 100) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const MES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const ddmm = iso => iso.slice(8, 10) + '/' + iso.slice(5, 7);
+  const AM = '#F0C24B', GR = '#7EE2A0';
+  const PREFIX = /^(compra no d[eé]bito|compra no cr[eé]dito|transfer[eê]ncia (enviada|recebida)( pelo pix)?|pagamento de boleto efetuado|pix (enviado|recebido))\s*[-–:]\s*/i;
+  const FATURA = /pagamento (recebido|da fatura|de fatura)|desconto antecipa|estorno de/i;
+
+  /* ---------- leitura de arquivo ---------- */
+  async function lerTexto(file) {
+    const buf = await file.arrayBuffer();
+    let t = new TextDecoder('utf-8').decode(buf);
+    if (t.indexOf('�') >= 0 || /CHARSET:\s*1252/i.test(t.slice(0, 600))) t = new TextDecoder('windows-1252').decode(buf);
+    return t.replace(/^﻿/, '');
+  }
+  const num = s => { let t = String(s == null ? '' : s).trim().replace(/[^\d.,-]/g, ''); if (!t) return NaN; const c = t.lastIndexOf(','), p = t.lastIndexOf('.'); if (c >= 0 && p >= 0) t = c > p ? t.replace(/\./g, '').replace(',', '.') : t.replace(/,/g, ''); else if (c >= 0) t = t.replace(',', '.'); return Number(t); };
+  function parseOfx(t) {
+    const out = [], blocks = t.split(/<STMTTRN>/i).slice(1);
+    const tag = (b, k) => { const m = b.match(new RegExp('<' + k + '>\\s*([^<\\r\\n]*)', 'i')); return m ? m[1].trim() : ''; };
+    blocks.forEach(b => {
+      const d = tag(b, 'DTPOSTED').replace(/\D/g, '').slice(0, 8), v = num(tag(b, 'TRNAMT'));
+      if (d.length !== 8 || isNaN(v)) return;
+      out.push({ iso: d.slice(0, 4) + '-' + d.slice(4, 6) + '-' + d.slice(6, 8), raw: tag(b, 'MEMO') || tag(b, 'NAME'), amt: v, fitid: tag(b, 'FITID') });
+    });
+    return out;
+  }
+  function csvRows(t) {
+    const first = t.split(/\r?\n/, 1)[0] || '', sep = (first.match(/;/g) || []).length > (first.match(/,/g) || []).length ? ';' : ',';
+    const rows = []; let row = [], cell = '', q = false;
+    for (let i = 0; i < t.length; i++) {
+      const c = t[i];
+      if (q) { if (c === '"') { if (t[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; }
+      else if (c === '"') q = true;
+      else if (c === sep) { row.push(cell); cell = ''; }
+      else if (c === '\n' || c === '\r') { if (c === '\r' && t[i + 1] === '\n') i++; row.push(cell); cell = ''; if (row.some(x => x.trim())) rows.push(row); row = []; }
+      else cell += c;
+    }
+    row.push(cell); if (row.some(x => x.trim())) rows.push(row);
+    return rows;
+  }
+  function parseCsv(t) {
+    const rows = csvRows(t); if (rows.length < 2) return [];
+    const H = rows[0].map(h => KD.norm(h).trim());
+    const col = re => H.findIndex(h => re.test(h));
+    const cD = col(/^(data|date)/), cV = col(/^(valor|amount|value)/), cT = col(/(descri|titulo|title|estabelecimento|historico|lancamento|memo|nome)/), cI = col(/^(identificador|id$|codigo)/), fatura = H.some(h => h === 'category') && H.some(h => h === 'title');
+    if (cD < 0 || cV < 0 || cT < 0) return [];
+    const out = [];
+    rows.slice(1).forEach(r => {
+      let d = (r[cD] || '').trim(), v = num(r[cV]); if (isNaN(v)) return;
+      const m1 = d.match(/^(\d{4})-(\d{2})-(\d{2})/), m2 = d.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+      const iso = m1 ? m1[1] + '-' + m1[2] + '-' + m1[3] : m2 ? m2[3] + '-' + m2[2] + '-' + m2[1] : null; if (!iso) return;
+      out.push({ iso, raw: (r[cT] || '').trim(), amt: fatura ? -v : v, fitid: cI >= 0 ? (r[cI] || '').trim() : '' });   // fatura de cartão: positivo = gasto
+    });
+    return out;
+  }
+  const limpo = s => { let n = String(s || '').replace(/\s+/g, ' ').trim(); const m = n.match(PREFIX); if (m) { n = n.slice(m[0].length); n = n.split(/\s+[-–]\s+/)[0]; } return n.replace(/^\*+/, '').trim() || String(s || '').trim(); };
+
+  /* ---------- classificação ---------- */
+  function classificar(S) {
+    const M = KD.M, hist = {};
+    M.rows.forEach(r => { const k = KD.norm(r.e); if (r.catId && !(k in hist)) hist[k] = r.catId; });
+    const usados = new Set();
+    S.rows.forEach(r => {
+      r.why = ''; r.grp = 'ok'; r.dup = null; r.dupChoice = null; r.include = true;
+      r.catId = hist[KD.norm(r.nome)] || null;
+      if (!r.catId) { const k = Object.keys(hist).find(h => h.length >= 4 && (h.startsWith(KD.norm(r.nome)) || KD.norm(r.nome).startsWith(h))); if (k) r.catId = hist[k]; }
+      if (S.known.has(r.fitid) && r.fitid) { r.grp = 'skip'; r.why = 'Já importada antes'; r.include = false; return; }
+      if (FATURA.test(r.raw)) { r.grp = 'skip'; r.why = 'Pagamento de fatura (não conta como gasto)'; r.include = false; return; }
+      const f = KD.dup.find({ nome: r.nome, valor: r.amt, dir: r.dir, iso: r.iso, cardId: S.cardId, accId: S.accId }, M.rows, { skip: usados });
+      if (f.length) { r.dup = f[0]; usados.add(f[0].row.id); r.grp = 'need'; r.include = false; r.why = (f[0].conf === 'provavel' ? 'Provável' : 'Possível') + ' duplicata de "' + f[0].row.e + '" (' + (f[0].row.origem === 'manual' ? 'lançada à mão' : 'já no extrato') + ')'; return; }
+      if (!r.catId) { r.grp = 'need'; r.include = false; r.why = 'Sem categoria'; return; }
+      if (r.amt >= 1000) { r.grp = 'need'; r.include = false; r.why = 'Valor alto, confira'; }
+    });
+  }
+  const grp = r => (r.dupChoice === 'same' ? 'skip' : r.grp);
+  const whyOf = r => (r.dupChoice === 'same' ? 'Marcada como a mesma · nada será criado' : r.why);
+
+  /* ---------- tela ---------- */
+  let L = null, S = null, input = null;
+  const catOpts = sel => Object.values(KD.M.catById).sort((a, b) => a.ordem - b.ordem).map(c => '<option value="' + c.id + '"' + (c.id === sel ? ' selected' : '') + '>' + esc(c.nome) + '</option>').join('');
+  const chip = (t, bg, fg) => '<span style="background:' + bg + ';color:' + fg + ';border-radius:99px;padding:8px 14px;font-size:12px;letter-spacing:.08em">' + t + '</span>';
+  function rowHtml(r) {
+    const cat = r.catId ? KD.M.catById[r.catId] : null, need = grp(r) === 'need';
+    const catCell = need && !r.dup ? '<select data-cat="' + r.i + '" style="background:#000;color:' + AM + ';border:1px dashed ' + AM + ';border-radius:99px;padding:6px 10px;font-size:12px;max-width:150px"><option value="">Escolher ▾</option>' + catOpts(r.catId) + '</select>'
+      : '<span style="font-size:12px;border:1px solid ' + (cat ? (cat.cor || '#888') : '#666') + ';color:' + (cat ? (cat.cor || '#ddd') : '#999') + ';border-radius:99px;padding:5px 12px;min-width:80px;text-align:center">' + esc(cat ? cat.nome : '—') + '</span>';
+    const q = r.dup && !r.dupChoice && grp(r) === 'need' ? ' <span data-ch="' + r.i + ':same" style="cursor:pointer;text-decoration:underline">É a mesma</span> · <span data-ch="' + r.i + ':other" style="cursor:pointer;text-decoration:underline">É outra</span>' : r.dupChoice === 'other' ? ' <span data-ch="' + r.i + ':" style="cursor:pointer;text-decoration:underline;color:#888">desfazer</span>' : '';
+    return '<div style="display:flex;align-items:center;gap:16px;padding:11px 0;border-bottom:1px dashed #333">'
+      + (grp(r) === 'skip' ? '<span style="width:18px;flex:none"></span>' : '<span data-ck="' + r.i + '" style="width:18px;height:18px;border-radius:5px;flex:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#000;font-size:13px;font-weight:900;' + (r.include ? 'background:#fff' : 'border:2px solid #666') + '">' + (r.include ? '✓' : '') + '</span>')
+      + '<span style="font-size:10px;letter-spacing:.1em;border:1px solid #555;border-radius:99px;padding:3px 9px;color:#aaa;width:34px;text-align:center;flex:none">' + (r.dir === 'entrada' ? 'ENT' : r.meioT) + '</span>'
+      + '<div style="width:300px;flex:none;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b style="font-size:15px">' + esc(r.nome) + '</b> <span style="font-size:12px;color:#8a8a90">' + ddmm(r.iso) + '</span></div>'
+      + '<div style="flex:1;font-size:12px;color:' + (grp(r) === 'skip' ? '#8a8a90' : AM) + ';min-width:0">' + esc(whyOf(r)) + q + '</div>' + catCell
+      + '<b style="width:110px;text-align:right;font-size:15px;flex:none">' + (r.dir === 'entrada' ? '+ ' : '– ') + 'R$ ' + brl(r.amt) + '</b></div>';
+  }
+  function group(key, title, sub, col, rows, open) {
+    const lim = key === 'ok' ? 6 : 99, show = S.open[key] ? rows : rows.slice(0, key === 'skip' ? 0 : lim), more = rows.length - show.length;
+    return '<div data-g style="margin-top:22px"><div style="display:flex;align-items:baseline;gap:12px"><span style="width:10px;height:10px;border-radius:50%;background:' + col + ';flex:none;align-self:center"></span><b style="font-size:20px">' + title + '</b><span style="font-size:12px;color:#8a8a90;letter-spacing:.06em">' + sub + '</span><span style="margin-left:auto;font-size:26px;font-weight:800">' + rows.length + '</span></div>'
+      + show.map(rowHtml).join('')
+      + (more > 0 ? '<div data-more="' + key + '" style="padding:11px 0 0 34px;font-size:12px;color:#8a8a90;cursor:pointer;text-decoration:underline">' + (key === 'skip' ? 'ver lista' : '+ ' + more + ' linhas · mostrar todas') + '</div>' : '')
+      + (key === 'ok' && rows.length > lim && S.open.ok ? '' : '') + '</div>';
+  }
+  function render(first) {
+    if (!L) return;
+    const rs = S.rows, G = { ok: [], need: [], skip: [] }; rs.forEach(r => G[grp(r)].push(r));
+    const inc = rs.filter(r => r.include && grp(r) !== 'skip'), need = G.need.length;
+    const pillSel = (on) => 'border-radius:99px;padding:8px 14px;font-size:12px;letter-spacing:.06em;cursor:pointer;' + (on ? 'background:#fff;color:#000;font-weight:800' : 'border:1px solid #444;color:#ddd');
+    const tg = S.targets.map(t => '<span data-tg="' + t.k + '" style="' + pillSel(t.k === S.tk) + '">' + esc(t.label) + '</span>').join('');
+    const keepScroll = L.scrollTop;
+    L.innerHTML = '<div style="padding:26px 70px 60px;max-width:1500px;margin:0 auto">'
+      + '<div style="display:flex;align-items:flex-end;gap:24px"><div><div style="font-size:10px;letter-spacing:.18em;color:#8a8a90">REVISAR IMPORTAÇÃO · ' + esc(String(S.file).toUpperCase()) + '</div><div style="font-size:58px;font-weight:800;letter-spacing:-.03em;line-height:1">Revisar extrato</div></div>'
+      + '<div style="margin-left:auto;display:flex;gap:10px;align-items:center"><span data-a="cancel" style="border:1px solid #555;border-radius:99px;padding:13px 24px;font-size:11px;font-weight:800;letter-spacing:.12em;cursor:pointer">CANCELAR</span>'
+      + '<span data-a="go" style="background:#fff;color:#000;border-radius:99px;padding:13px 26px;font-size:11px;font-weight:800;letter-spacing:.12em;cursor:' + (inc.length && !S.busy ? 'pointer' : 'default') + ';opacity:' + (inc.length && !S.busy ? 1 : .4) + '">' + (S.busy ? 'IMPORTANDO…' : 'IMPORTAR ' + inc.length + ' TRANSAÇÕES') + '</span></div></div>'
+      + '<div style="display:flex;gap:8px;margin-top:16px;align-items:center;flex-wrap:wrap"><span style="font-size:11px;letter-spacing:.14em;color:#8a8a90;margin-right:4px">IMPORTAR PARA</span>' + tg + '</div>'
+      + '<div style="display:flex;gap:12px;margin-top:14px;flex-wrap:wrap">' + chip(rs.length + ' LINHAS NO ARQUIVO', '#222', '#fff') + (S.per ? chip('PERÍODO ' + ddmm(S.per[0]) + ' – ' + ddmm(S.per[1]), '#222', '#fff') : '') + chip(inc.length + ' SERÃO IMPORTADAS', '#1c3b27', GR) + chip(need + ' PRECISAM DE VOCÊ', '#4a3a12', AM) + chip(G.skip.length + ' DESCARTADAS', '#2a2a2a', '#aaa') + '</div>'
+      + (S.err ? '<div style="margin-top:14px;color:#FF8A7C;font-size:13px">' + esc(S.err) + '</div>' : '')
+      + group('ok', 'Confiantes', 'CATEGORIA E ESTABELECIMENTO RECONHECIDOS · MARCADAS PARA IMPORTAR', GR, G.ok)
+      + group('need', 'Precisam de você', 'SEM CATEGORIA, VALOR ALTO OU POSSÍVEL DUPLICATA', AM, G.need)
+      + group('skip', 'Descartadas', 'DUPLICATAS CERTAS · NADA É APAGADO, DÁ PARA RECUPERAR', '#777', G.skip) + '</div>';
+    L.scrollTop = keepScroll;
+    if (first) L.querySelectorAll('[data-g]').forEach((g, k) => { g.style.opacity = '0'; g.style.transform = 'translateY(10px)'; g.style.transition = 'opacity .45s ease ' + (0.12 + k * .12) + 's, transform .55s cubic-bezier(.2,.7,.2,1) ' + (0.12 + k * .12) + 's'; requestAnimationFrame(() => requestAnimationFrame(() => { g.style.opacity = '1'; g.style.transform = 'none'; })); });
+  }
+  function recalc() { const t = S.targets.find(x => x.k === S.tk); S.cardId = t && t.card ? t.id : null; S.accId = t && !t.card ? t.id : null; S.rows.forEach(r => { r.meioT = t && t.card ? 'CRÉD' : /pix/i.test(r.raw) ? 'PIX' : /boleto/i.test(r.raw) ? 'BOL' : 'DÉB'; }); classificar(S); }
+  async function conhecidos(ids) {
+    const set = new Set(), list = ids.filter(Boolean);
+    for (let i = 0; i < list.length; i += 150) { const q = await KD.sb.from('transactions').select('external_id').in('external_id', list.slice(i, i + 150)); (q.data || []).forEach(x => set.add(x.external_id)); }
+    return set;
+  }
+  function close() {
+    if (!L) return; const el = L; L = null; S = null; el.style.opacity = '0'; setTimeout(() => el.remove(), 260);
+  }
+  async function importar() {
+    if (!S || S.busy) return;
+    const sel = S.rows.filter(r => r.include && grp(r) !== 'skip'); if (!sel.length) return;
+    if (KD.isDemo()) { S.err = 'Esta é a conta de demonstração: importar fica travado para todo mundo poder testar.'; render(); return; }
+    S.busy = true; S.err = ''; render();
+    try {
+      const uid = KD.user.id, per = S.per;
+      const b = await KD.sb.from('import_batches').insert({ user_id: uid, origem: 'extrato_' + S.ext, arquivo: S.file, status: 'aprovado', total_linhas: S.rows.length, duplicatas_detectadas: S.rows.filter(r => grp(r) === 'skip' || r.dup).length }).select('id').single();
+      if (b.error) throw b.error; const bid = b.data.id;
+      const rows = sel.map(r => ({ user_id: uid, estabelecimento: r.nome, valor_total: Math.round(r.amt * 100) / 100, direcao: r.dir, meio: S.cardId ? 'cartao' : (r.meioT === 'PIX' ? 'pix' : r.meioT === 'BOL' ? 'boleto' : 'debito'), data_compra: r.iso, card_id: S.cardId || null, account_id: S.cardId ? null : (S.accId || null), category_id: r.catId || null, parcelas_total: 1, origem: 'import', status: r.catId ? 'confirmado' : 'pendente_revisao', categoria_origem: r.catId ? 'usuario' : null, batch_id: bid, external_id: r.fitid || null }));
+      for (let i = 0; i < rows.length; i += 100) { const q = await KD.sb.from('transactions').insert(rows.slice(i, i + 100)); if (q.error) throw q.error; }
+      await KD.refresh(KD.comp); close();
+    } catch (e) { console.error('[kontar] importar', e); if (S) { S.busy = false; S.err = 'Não consegui importar: ' + ((e && e.message) || 'erro') + '. Se algo entrou pela metade, a importação inteira pode ser desfeita.'; render(); } }
+  }
+  async function abrir(file) {
+    const ext = ((file.name || '').split('.').pop() || '').toLowerCase();
+    let raw = [];
+    if (ext === 'pdf' || ext === 'xlsx' || ext === 'xls') return alerta('Esse formato ainda não é lido. Exporte o extrato em OFX ou CSV no app do banco.');
+    try { const t = await lerTexto(file); raw = /<STMTTRN>/i.test(t) ? parseOfx(t) : parseCsv(t); } catch (e) { raw = []; }
+    if (!raw.length) return alerta('Não achei lançamentos nesse arquivo. Use o extrato em OFX ou CSV exportado pelo banco.');
+    const targets = KD.M.cards.map(c => ({ k: 'c' + c.id, id: c.id, card: true, label: c.nick || c.n })).concat(KD.M.accs.map(a => ({ k: 'a' + a.id, id: a.id, card: false, label: a.nome })));
+    if (!targets.length) return alerta('Cadastre um cartão ou conta antes de importar.');
+    const fn = KD.norm(file.name); let tk = (targets.find(t => fn.indexOf(KD.norm(t.label).split(' ')[0]) >= 0) || targets[0]).k;
+    const rows = raw.map((r, i) => ({ i, iso: r.iso, raw: r.raw, nome: limpo(r.raw), amt: Math.abs(r.amt), dir: r.amt < 0 ? 'saida' : 'entrada', fitid: r.fitid || '' })).filter(r => r.amt > 0);
+    const isos = rows.map(r => r.iso).sort();
+    S = { file: file.name, ext, rows, targets, tk, open: {}, known: await conhecidos(rows.map(r => r.fitid)), per: isos.length ? [isos[0], isos[isos.length - 1]] : null, busy: false, err: '' };
+    recalc();
+    L = document.createElement('div');
+    L.setAttribute('data-imp', '1'); L.style.cssText = 'position:fixed;left:0;right:0;top:68px;bottom:0;background:#000;z-index:99990;font-family:Helvetica,Arial,sans-serif;color:#F2F0EB;overflow:auto;opacity:0;transition:opacity .35s ease';
+    document.body.appendChild(L); render(true); requestAnimationFrame(() => { if (L) L.style.opacity = '1'; });
+    L.addEventListener('click', ev => {
+      const el = ev.target.closest('[data-a],[data-ck],[data-tg],[data-more],[data-ch]'); if (!el || !S) return;
+      if (el.dataset.a === 'cancel') return close();
+      if (el.dataset.a === 'go') return importar();
+      if (el.dataset.tg) { S.tk = el.dataset.tg; recalc(); return render(); }
+      if (el.dataset.more) { S.open[el.dataset.more] = true; return render(); }
+      if (el.dataset.ck != null) { const r = S.rows[+el.dataset.ck]; r.include = !r.include; return render(); }
+      if (el.dataset.ch != null) { const [i, v] = el.dataset.ch.split(':'), r = S.rows[+i]; r.dupChoice = v || null; r.include = v === 'other'; return render(); }
+    });
+    L.addEventListener('change', ev => { const el = ev.target.closest('[data-cat]'); if (!el || !S) return; const r = S.rows[+el.dataset.cat]; r.catId = el.value || null; if (r.catId) r.include = true; render(); });
+  }
+  function alerta(msg) { const n = document.createElement('div'); n.textContent = msg; n.style.cssText = 'position:fixed;left:50%;top:84px;transform:translateX(-50%);background:#1b1b1d;color:#F2F0EB;border:1px solid ' + AM + ';border-radius:16px;padding:14px 22px;font:14px Helvetica,Arial,sans-serif;z-index:99999;opacity:0;transition:opacity .3s ease'; document.body.appendChild(n); requestAnimationFrame(() => { n.style.opacity = '1'; }); setTimeout(() => { n.style.opacity = '0'; setTimeout(() => n.remove(), 320); }, 4200); }
+  IMP.open = abrir;
+
+  /* ---------- botão "Importar" na barra de cima, ao lado de "Nova" ---------- */
+  function mountButton() {
+    const nova = document.querySelector('span[title="Nova transação"]'); if (!nova || nova.parentElement.querySelector('[data-kd-imp]')) return;
+    if (!input) { input = document.createElement('input'); input.type = 'file'; input.accept = '.ofx,.csv,.qfx,text/csv'; input.style.display = 'none'; input.addEventListener('change', () => { const f = input.files && input.files[0]; input.value = ''; if (f) abrir(f); }); document.body.appendChild(input); }
+    const b = document.createElement('span'); b.setAttribute('data-kd-imp', '1'); b.title = 'Importar extrato (OFX ou CSV)';
+    b.style.cssText = 'height:38px;display:flex;align-items:center;gap:7px;padding:0 16px 0 12px;border-radius:9999px;border:1px solid #3A3A40;color:#F2F0EB;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;transition:background .25s';
+    b.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>Importar';
+    b.onmouseenter = () => { b.style.background = 'rgba(255,255,255,.1)'; }; b.onmouseleave = () => { b.style.background = ''; };
+    b.onclick = () => input.click();
+    nova.parentElement.insertBefore(b, nova);
+  }
+  new MutationObserver(() => { try { mountButton(); } catch (e) {} }).observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener('keydown', e => { if (e.key === 'Escape' && L && !S.busy) close(); });
 })();
