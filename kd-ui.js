@@ -541,11 +541,37 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const later = (fn, ms) => { const t = setTimeout(fn, ms); timers.push(t); return t; };
   const clearTimers = () => { timers.forEach(clearTimeout); timers = []; };
   const kidsOf = (h) => { const rw = h && h.closest && h.closest('[data-x-e]'); return { rw, kids: rw ? [...rw.children].filter(c => c !== h) : [] }; };
+  // cardOn: o conteúdo original da linha (kids) nunca some — o inline reduzido (host) só nasce visualmente
+  // ACIMA dele via order (os dois continuam na mesma ordem no DOM), e um card único (deco) por trás dos dois
+  // dá o fundo mais claro + sombra, encobrindo linha+reduzido como uma peça só. 16px de respiro só quando a
+  // linha é a primeira/última da lista (senão encostaria na borda do card master, alguns níveis acima).
+  function cardOn(rw, kids, host) {
+    rw.style.position = 'relative'; rw.style.display = 'flex'; rw.style.flexDirection = 'column'; rw.style.clipPath = 'inset(0 -40px 0 -40px)';
+    rw.style.paddingLeft = '20px'; rw.style.paddingRight = '20px';   // o card precisa do próprio respiro lateral — sem isso o conteúdo (linha e reduzido) encosta na borda nova que passou a existir
+    host.style.order = '-1'; kids.forEach(k => { k.style.order = '1'; });
+    // respiro só quando o vizinho não é outra linha (cabeçalho do dia, borda do card da lista etc.)
+    const prevRow = rw.previousElementSibling && rw.previousElementSibling.hasAttribute('data-x-e');
+    const nextRow = rw.nextElementSibling && rw.nextElementSibling.hasAttribute('data-x-e');
+    rw.style.marginTop = prevRow ? '' : '16px';
+    rw.style.marginBottom = nextRow ? '' : '16px';
+    let deco = rw.querySelector('[data-tx-card]');
+    if (!deco) {
+      deco = document.createElement('div'); deco.setAttribute('data-tx-card', '1');
+      deco.style.cssText = 'position:absolute;inset:0;z-index:-1;border-radius:20px;background:#17171B;box-shadow:0 30px 54px -16px rgba(0,0,0,.42),0 10px 26px -6px rgba(0,0,0,.22);opacity:0;transition:opacity .3s ease;pointer-events:none';
+      rw.insertBefore(deco, rw.firstChild);
+      requestAnimationFrame(() => { deco.style.opacity = '1'; });
+    }
+  }
   function inlineReset(h) {
     const { rw, kids } = kidsOf(h);
-    if (rw) { rw.style.height = ''; rw.style.transition = ''; rw.style.position = ''; rw.style.clipPath = ''; }
-    kids.forEach(c => { c.style.opacity = ''; c.style.transition = ''; c.style.pointerEvents = ''; });
-    ['left', 'right', 'top', 'height', 'transition'].forEach(k => { h.style[k] = ''; }); h.style.position = 'relative';
+    if (rw) {
+      rw.style.height = ''; rw.style.transition = ''; rw.style.position = ''; rw.style.clipPath = '';
+      rw.style.display = ''; rw.style.flexDirection = ''; rw.style.marginTop = ''; rw.style.marginBottom = '';
+      rw.style.paddingLeft = ''; rw.style.paddingRight = '';
+      const deco = rw.querySelector('[data-tx-card]'); if (deco) deco.remove();
+    }
+    kids.forEach(c => { c.style.opacity = ''; c.style.transition = ''; c.style.pointerEvents = ''; c.style.order = ''; });
+    ['left', 'right', 'top', 'height', 'transition', 'order'].forEach(k => { h.style[k] = ''; }); h.style.position = 'relative';
     h.innerHTML = '';
   }
   TX.open = function (c, row, o) {
@@ -555,23 +581,22 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     host = ab;
     if (!S.inline) { host.style.pointerEvents = 'auto'; render(true); return; }
     host.style.pointerEvents = '';
-    // inline: o card da linha cresce e vira o painel (sem salto): o resto da linha some em fade enquanto a altura anima
+    // inline: o card da linha cresce (sem salto) pra caber o reduzido acima do conteúdo original, que nunca
+    // some — ver cardOn. Altura medida em fluxo normal (sem position:absolute concorrendo com o layout).
     const { rw, kids } = kidsOf(host);
-    if (!rw) { S.settled = true; render(true); return; }
+    if (!rw) { render(true); return; }
     const H0 = rw.offsetHeight;
-    rw.style.position = 'relative'; rw.style.clipPath = 'inset(0 -40px 0 -40px)'; rw.style.height = H0 + 'px'; rw.style.transition = 'none';
-    kids.forEach(k => { k.style.transition = 'opacity .12s ease'; k.style.opacity = '0'; k.style.pointerEvents = 'none'; });
-    host.style.position = 'absolute'; host.style.left = '0'; host.style.right = '0'; host.style.top = '0';
+    cardOn(rw, kids, host);
+    rw.style.height = H0 + 'px'; rw.style.transition = 'none';
     render(true);
-    const H1 = host.offsetHeight; void rw.offsetHeight;
+    void rw.offsetHeight;
+    rw.style.height = 'auto'; const H1 = rw.offsetHeight; rw.style.height = H0 + 'px'; void rw.offsetHeight;
     rw.style.transition = 'height .5s cubic-bezier(.2,.7,.2,1)'; rw.style.height = H1 + 'px';
     const mine = S;
-    later(() => {
-      if (S !== mine || !host) return;
-      S.settled = true; rw.style.height = ''; rw.style.transition = ''; rw.style.position = ''; rw.style.clipPath = '';
-      host.style.position = 'relative'; host.style.left = ''; host.style.right = ''; host.style.top = '';
-      const pw = host.querySelector('[data-pw]'); if (pw) pw.setAttribute('data-settled', '1');
-    }, 520);
+    // o clip só é necessário ENQUANTO a altura anima (é o que cria o efeito de "revelar" aos poucos); depois
+    // de assentado ele tem que sair, senão corta os popups (categoria, cartão, estabelecimento) que precisam
+    // aparecer por cima da linha. Volta a ser aplicado em TX.close, bem antes de iniciar a animação de saída.
+    later(() => { if (S !== mine || !host) return; rw.style.height = ''; rw.style.transition = ''; rw.style.clipPath = ''; }, 520);
   };
   TX.openNew = function (c) {
     comp = c; TX.close(true);
@@ -599,13 +624,14 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (inl) {
       const { rw, kids } = kidsOf(h);
       if (rw) {
-        const H1 = rw.offsetHeight; rw.style.position = 'relative'; rw.style.clipPath = 'inset(0 -40px 0 -40px)';
-        kids.forEach(k => { k.style.transition = 'none'; k.style.opacity = '0'; });
-        h.style.position = 'absolute'; h.style.left = '0'; h.style.right = '0'; h.style.top = '0';
-        pn.removeAttribute('data-settled');          // a linha original volta a existir no layout (ainda transparente)
-        rw.style.transition = 'none'; rw.style.height = 'auto'; const H0 = rw.offsetHeight; rw.style.height = H1 + 'px'; void rw.offsetHeight;
+        const deco = rw.querySelector('[data-tx-card]'); if (deco) { deco.style.transition = 'opacity .3s ease'; deco.style.opacity = '0'; }
+        // mede a altura "fechada" (só o conteúdo original) escondendo o reduzido um instante, sem repintar
+        const prevDisplay = h.style.display; h.style.display = 'none';
+        const H0 = rw.offsetHeight;
+        h.style.display = prevDisplay;
+        rw.style.clipPath = 'inset(0 -40px 0 -40px)';   // reaplica o clip pra animação de saída também "revelar" (nesse caso, encolher) aos poucos
+        rw.style.transition = 'none'; rw.style.height = rw.offsetHeight + 'px'; void rw.offsetHeight;
         rw.style.transition = 'height .5s cubic-bezier(.2,.7,.2,1)'; rw.style.height = H0 + 'px';
-        kids.forEach(k => { k.style.transition = 'opacity .32s ease .16s'; k.style.opacity = '1'; });
         pendingDone = done; later(done, 540);
         return;
       }
@@ -671,11 +697,36 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       + '</div>';
   }
 
+  /* ---------------- estabelecimento: busca no que já existe (KD.M.est) ou cria digitando um nome novo.
+     Compartilhado entre o inline reduzido e o painel completo — um só componente pros dois lugares. */
+  function estOptions(q) {
+    const nq = KD.norm((q || '').trim()), all = (KD.M && KD.M.est) || [];
+    return (nq ? all.filter(e => KD.norm(e.nome).indexOf(nq) >= 0) : all).slice(0, 30);
+  }
+  function estPop(q) {
+    const opts = estOptions(q), nq = KD.norm((q || '').trim()), exact = opts.some(e => KD.norm(e.nome) === nq);
+    const items = opts.map(e => '<span data-a="estpick" data-v="' + esc(e.nome) + '" style="display:flex;align-items:center;gap:12px;height:46px;flex:none;border-radius:16px;border:1px solid #2A2A2F;background:#0D0D10;padding:0 12px;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap;overflow:hidden">' + icDot(e.cat, 26) + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis">' + esc(e.nome) + '</span><span style="font-size:12px;font-weight:600;color:#6A6A72;flex:none">' + e.n + 'x</span></span>').join('');
+    const novo = (nq && !exact) ? '<span data-a="estnew" data-v="' + esc(q.trim()) + '" style="display:flex;align-items:center;gap:12px;height:46px;flex:none;border-radius:16px;border:1px dashed #51515C;padding:0 12px;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap;color:#F2F0EB">' + '<span style="width:26px;height:26px;border-radius:50%;background:#1C1C20;display:flex;align-items:center;justify-content:center;flex:none">' + svg('plus', 14, 2.4) + '</span>Criar "' + esc(q.trim()) + '"</span>' : '';
+    const vazio = (!items && !novo) ? '<div style="padding:14px 10px;color:#6A6A72;font-size:13px">Comece a digitar pra buscar ou criar</div>' : '';
+    return '<div data-pop style="position:absolute;z-index:6;left:0;right:0;top:100%;margin-top:8px;max-height:' + POPMAXH + 'px;overflow:hidden;background:#151518;border:1px solid #2A2A2F;border-radius:' + PR + 'px;box-shadow:0 24px 48px rgba(0,0,0,.6);display:flex;flex-direction:column;animation:txin .22s ' + E + '">'
+      + '<div class="kscroll" data-popscroll style="flex:1;min-height:0;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:7px">' + items + novo + vazio + '</div>'
+      + '<i data-fadetop style="position:absolute;left:0;right:0;top:0;height:40px;background:linear-gradient(#151518,rgba(21,21,24,0));pointer-events:none;opacity:0;transition:opacity .2s ease"></i>'
+      + '<i data-fadebot style="position:absolute;left:0;right:0;bottom:0;height:40px;background:linear-gradient(rgba(21,21,24,0),#151518);pointer-events:none;opacity:0;transition:opacity .2s ease"></i>'
+      + '</div>';
+  }
+  function estField(compact) {
+    const css = compact
+      ? 'background:#000;border:2px solid #2A2A2F;border-radius:' + PR + 'px;padding:12px 16px;font-size:15px;font-weight:700;color:#F2F0EB;font-family:inherit;outline:0;width:100%;box-sizing:border-box;'
+      : fieldCss;
+    return '<input data-in="nome" data-estq="1" data-alert-target="nome" autocomplete="off" placeholder="Onde foi? Ex.: Padaria Central" value="' + esc(S.nome) + '" style="' + css + '" class="' + (S.alertField === 'nome' ? 'txalert-box' : '') + '">' + (S.pop === 'est' ? estPop(S.nome) : '');
+  }
+  const origemInfo = (o) => o === 'open_finance' ? { t: 'Open Finance', ic: 'link' } : o === 'importacao' ? { t: 'Importação', ic: 'copy' } : { t: 'Manual', ic: 'pencil' };
+
   function viewDados() {
     const cn = catAtual(), cor = catCor(cn);
     const meioObj = S.cardId ? KD.M.cardById[S.cardId] : S.accId ? KD.M.accs.find(a => a.id === S.accId) : null;
     const meio = meioObj ? (meioObj.nick || meioObj.n || meioObj.nome) : '—';
-    const left = '<div style="display:flex;flex-direction:column;gap:10px"><div>' + lb('home', 'Estabelecimento') + '</div>' + (S.isNew ? '<input data-in="nome" data-alert-target="nome" placeholder="Onde foi? Ex.: Padaria Central" value="' + esc(S.nome) + '" style="' + fieldCss + '" class="' + (S.alertField === 'nome' ? 'txalert-box' : '') + '">' : '<div style="display:flex;gap:10px;align-items:stretch"><div style="' + fieldCss + 'flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(S.nome) + '</div><span data-a="goest" title="Editar o estabelecimento" style="width:54px;flex:none;border-radius:9999px;border:2px solid #2A2A2F;background:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#F2F0EB;transition:border-color .25s ease,background .25s ease" onmouseover="this.style.borderColor=\'#51515C\';this.style.background=\'#151518\'" onmouseout="this.style.borderColor=\'#2A2A2F\';this.style.background=\'#000\'">' + svg('pencil', 22, 1.9) + '</span></div>') + '</div>'
+    const left = '<div style="display:flex;flex-direction:column;gap:10px"><div>' + lb('home', 'Estabelecimento') + '</div><div style="display:flex;gap:10px;align-items:stretch"><div style="position:relative;flex:1;min-width:0">' + estField(false) + '</div>' + (!S.isNew ? '<span data-a="goest" title="Ver o estabelecimento" style="width:54px;flex:none;border-radius:9999px;border:2px solid #2A2A2F;background:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#F2F0EB;transition:border-color .25s ease,background .25s ease" onmouseover="this.style.borderColor=\'#51515C\';this.style.background=\'#151518\'" onmouseout="this.style.borderColor=\'#2A2A2F\';this.style.background=\'#000\'">' + svg('home', 20, 1.9) + '</span>' : '') + '</div></div>'
       + '<div style="display:flex;flex-direction:column;gap:10px;flex:1;min-height:0">' + lb('lines', 'Observação') + '<textarea data-in="obs" placeholder="Adicionar observação" style="' + fieldCss + 'flex:1;resize:none;font-family:inherit"></textarea></div>';
     const mid = '<div style="display:flex;flex-direction:column;gap:10px">' + lb('cal', 'Data') + '<label style="position:relative;display:block">' + pill(dfmt(S.iso), 'pointer-events:none') + '<input data-in="iso" type="date" value="' + esc(S.iso) + '" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%"></label></div>'
       + '<div style="display:flex;flex-direction:column;gap:10px">' + lb('card', 'Cartão / Conta') + '<div style="display:flex;gap:8px;align-items:flex-start"><div style="position:relative;flex:1;min-width:0"><div data-a="pop" data-v="card" data-alert-target="card" style="' + fieldCss + 'border-radius:' + PR + 'px;flex:1;min-width:0;display:flex;align-items:center;gap:10px;cursor:pointer" class="' + (S.alertField === 'card' ? 'txalert-box' : '') + '">' + bankChip(meioObj && meioObj.bank, (meioObj || {}).cor || '#3A3A40') + '<span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700">' + esc(meio) + '</span></div>' + (S.pop === 'card' ? popCard() : '') + '</div>' + (S.isNew && S.cardId ? '<div data-a="parc" title="Parcelas" style="flex:none;width:74px">' + pill((S.parc || 1) + 'x') + '</div>' : '') + '</div></div>'
@@ -753,7 +804,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   async function salvarReduzido() {
     if (!S) return;
     const r = S.row;
-    const d = { id: r.id, nome: r.e, obs: r.obs || '', iso: r.iso, cardId: S.cardId, accId: S.accId, catId: S.catId, totalV: S.totalV, dir: S.dir, notaDirty: false, partesDirty: false, itens: r.items, partes: [] };
+    const d = { id: r.id, nome: S.nome, obs: r.obs || '', iso: r.iso, cardId: S.cardId, accId: S.accId, catId: S.catId, totalV: S.totalV, dir: S.dir, notaDirty: false, partesDirty: false, itens: r.items, partes: [] };
     try { await KD.txSave(comp, d); if (S) S.base = dirtyKey(); } catch (e) { }
   }
   function renderReduced(first) {
@@ -761,23 +812,24 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const cn = catAtual(), cor = catCor(cn);
     const meioObj = S.cardId ? KD.M.cardById[S.cardId] : S.accId ? KD.M.accs.find(a => a.id === S.accId) : null;
     const meio = meioObj ? (meioObj.nick || meioObj.n || meioObj.nome) : '—';
-    const valorBit = editavelValor()
-      ? '<div style="display:flex;align-items:center;gap:10px;flex:none">' + dirToggle() + '<div style="display:flex;align-items:baseline;gap:4px"><span data-in="total" data-alert-target="total" class="txtot ' + (S.alertField === 'total' ? 'txalert-text' : '') + '" contenteditable="plaintext-only" inputmode="decimal" spellcheck="false" style="display:block;outline:0;font-family:inherit;font-size:22px;font-weight:700;letter-spacing:-.03em;color:' + cor + ';min-width:56px;cursor:text;white-space:nowrap">' + (S.totalV ? brl(S.totalV) : '') + '</span><small style="font-size:12px;color:#9A9AA3">R$</small></div></div>'
-      : '<div style="font-size:22px;font-weight:700;letter-spacing:-.03em;color:' + cor + ';flex:none">' + brl(total()) + '<small style="font-size:12px;color:#9A9AA3;margin-left:4px">R$</small></div>';
-    // o chip visível é só do tamanho do conteúdo, mas o dropdown precisa de uma âncora mais larga
-    // (senão herda a largura mínima do chip e os nomes/logos ficam espremidos) — âncora invisível de 240px,
-    // o dropdown cresce bottom:0 a partir dela, igual ao padrão usado no painel completo.
-    const catChip = '<div style="position:relative;width:240px;flex:none"><div data-a="pop" data-v="cat" style="display:inline-flex;align-items:center;gap:10px;border-radius:9999px;padding:7px 14px 7px 8px;border:2px solid ' + cor + '8C;background:color-mix(in srgb,' + cor + ' 14%,#000);cursor:pointer;max-width:100%">' + icDot(cn, 24) + '<b style="font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(cn) + '</b></div>' + (S.pop === 'cat' ? popCat() : '') + '</div>';
-    const cardChip = '<div style="position:relative;width:240px;flex:none"><div data-a="pop" data-v="card" style="display:inline-flex;align-items:center;gap:10px;border-radius:9999px;padding:7px 14px 7px 8px;border:2px solid #2A2A2F;background:#000;cursor:pointer;max-width:100%">' + bankChip(meioObj && meioObj.bank, (meioObj || {}).cor || '#3A3A40') + '<b style="font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(meio) + '</b></div>' + (S.pop === 'card' ? popCard() : '') + '</div>';
-    const editBtn = '<span data-a="full" style="margin-left:auto;flex:none;height:38px;display:flex;align-items:center;padding:0 20px;border-radius:9999px;background:#F2F0EB;color:#0A0A0A;font-weight:900;letter-spacing:.06em;font-size:11.5px;text-transform:uppercase;cursor:pointer">Editar</span>';
-    // a linha some atrás do inline reduzido (mesma regra css que esconde a linha no inline completo),
-    // então o fechar precisa viver aqui dentro — não tem mais "clicar na linha de novo" visível pra isso
-    const closeBtn = '<span data-a="close" title="Fechar" style="flex:none;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#6A6A72;cursor:pointer">' + svg('x', 15, 2.2) + '</span>';
-    host.innerHTML = REDUCED_CSS + '<div data-pw' + (S.settled ? ' data-settled="1"' : '') + ' style="position:relative;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:16px 20px;font-family:Helvetica,Arial,sans-serif;color:#F2F0EB;border-radius:20px;background:#111114;border:1px solid #2A2A2F' + (first ? ';animation:txin .22s ' + E : '') + '">' + valorBit + catChip + cardChip + editBtn + closeBtn + '</div>';
+    // valor/direção saíram daqui (editam só no overlay completo — um split, por ex., quebraria editando aqui).
+    // no lugar, o campo de estabelecimento: busca no que já existe ou cria digitando (ver estField/estPop).
+    const estBit = '<div style="position:relative;width:240px;flex:none">' + estField(true) + '</div>';
+    const oi = origemInfo(S.row.origem);
+    const origemTag = '<span title="Origem" style="display:flex;align-items:center;gap:7px;height:38px;flex:none;padding:0 14px;border-radius:9999px;background:#1C1C20;color:#9A9AA3;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">' + svg(oi.ic, 14, 2.2) + oi.t + '</span>';
+    const notaInd = S.nota ? '<span title="Nota fiscal lida" style="width:38px;height:38px;flex:none;border-radius:50%;background:#1C1C20;display:flex;align-items:center;justify-content:center;color:#6AFF2A">' + svg('qr', 17, 2) + '</span>' : '';
+    const obsInd = (S.obs && S.obs.trim()) ? '<span title="Tem observação" style="width:38px;height:38px;flex:none;border-radius:50%;background:#1C1C20;display:flex;align-items:center;justify-content:center;color:#9A9AA3">' + svg('lines', 16, 2.2) + '</span>' : '';
+    // pills de categoria/cartão com a mesma cara (fieldCss/PR) e tamanho fixo do painel completo — o dobro
+    // do chip coladinho ao conteúdo que tínhamos antes, sem precisar de âncora invisível separada.
+    const catChip = '<div style="position:relative;width:300px;flex:none"><div data-a="pop" data-v="cat" style="display:flex;align-items:center;gap:10px;border-radius:' + PR + 'px;padding:11px 14px;border:2px solid ' + cor + '8C;background:color-mix(in srgb,' + cor + ' 14%,#000);cursor:pointer">' + icDot(cn, 26) + '<b style="font-size:15px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(cn) + '</b><span style="width:24px;height:24px;border-radius:50%;background:#0A0A0A;display:flex;align-items:center;justify-content:center;color:#F2F0EB;flex:none">' + svg('chev', 12, 2.6) + '</span></div>' + (S.pop === 'cat' ? popCat() : '') + '</div>';
+    const cardChip = '<div style="position:relative;width:300px;flex:none"><div data-a="pop" data-v="card" style="' + fieldCss + 'border-radius:' + PR + 'px;padding:11px 14px;display:flex;align-items:center;gap:10px;cursor:pointer">' + bankChip(meioObj && meioObj.bank, (meioObj || {}).cor || '#3A3A40') + '<span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;font-size:15px">' + esc(meio) + '</span></div>' + (S.pop === 'card' ? popCard() : '') + '</div>';
+    const editBtn = '<span data-a="full" style="margin-left:auto;flex:none;height:46px;display:flex;align-items:center;padding:0 34px;border-radius:9999px;background:#F2F0EB;color:#0A0A0A;font-weight:900;letter-spacing:.06em;font-size:12.5px;text-transform:uppercase;cursor:pointer">Editar</span>';
+    // botão de fechar maior e com presença (círculo com borda interna, "bonitinho"), no lugar do x pequeno/discreto de antes
+    const closeBtn = '<span data-a="close" title="Fechar" style="flex:none;width:44px;height:44px;border-radius:9999px;background:#1C1C20;color:#F2F0EB;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:inset 0 0 0 1px #3A3A40;transition:box-shadow .3s cubic-bezier(.45,0,.55,1)" onmouseover="this.style.boxShadow=\'inset 0 0 0 1px #6A6A72\'" onmouseout="this.style.boxShadow=\'inset 0 0 0 1px #3A3A40\'">' + svg('x', 18, 2.4) + '</span>';
+    host.innerHTML = REDUCED_CSS + '<div data-pw style="position:relative;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 0;font-family:Helvetica,Arial,sans-serif;color:#F2F0EB;' + (first ? 'animation:txin .22s ' + E : '') + '">' + estBit + origemTag + notaInd + obsInd + catChip + cardChip + editBtn + closeBtn + '</div>';
     const pw = host.querySelector('[data-pw]');
-    if (keep.k) { const el = pw.querySelector('[data-in="' + keep.k + '"]'); if (el) { el.focus(); try { const l = el.textContent.length; const rg = document.createRange(); rg.selectNodeContents(el); rg.collapse(false); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg); } catch (e) { } } }
-    const pop = pw.querySelector('[data-pop]');
-    if (pop) { pop.style.maxHeight = POPMAXH + 'px'; const sc = pop.querySelector('[data-popscroll]'); if (sc) { syncFade(pop); sc.onscroll = () => syncFade(pop); } }
+    if (keep.k) { const el = pw.querySelector('[data-in="' + keep.k + '"]'); if (el) { el.focus(); try { if (el.tagName === 'INPUT') { const l = el.value.length; el.setSelectionRange(l, l); } else { const l = el.textContent.length; const rg = document.createRange(); rg.selectNodeContents(el); rg.collapse(false); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg); } } catch (e) { } } }
+    pw.querySelectorAll('[data-pop]').forEach(pop => { pop.style.maxHeight = POPMAXH + 'px'; const sc = pop.querySelector('[data-popscroll]'); if (sc) { syncFade(pop); sc.onscroll = () => syncFade(pop); } });
     wire(pw);
   }
   /* ---------------- render ---------------- */
@@ -962,15 +1014,36 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     S.mode = v; render();
   }
   function wire(pn) {
-    pn.addEventListener('focusout', ev => { if (S && ev.target.getAttribute && ev.target.getAttribute('data-in') === 'total') { if (S.inline) { render(); if (S.totalV > 0) salvarReduzido(); } else if (S.pd) S.dirty = true; else render(); } });
-    pn.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.getAttribute && ev.target.getAttribute('data-in') === 'total') { ev.preventDefault(); ev.target.blur(); } });
+    pn.addEventListener('focusout', ev => {
+      if (!S || !ev.target.getAttribute) return;
+      const k = ev.target.getAttribute('data-in');
+      if (k === 'total') { if (S.inline) { render(); if (S.totalV > 0) salvarReduzido(); } else if (S.pd) S.dirty = true; else render(); }
+      // não fecha o pop aqui: fechar no blur é frágil (dispara em blur/foco transitório de automação/alguns
+      // navegadores) — quem fecha é o clique fora (ver o "if (!el || !S)" do click), focusout só salva.
+      else if (k === 'nome' && ev.target.getAttribute('data-estq') === '1') { if (S.inline && S.nome && S.nome.trim()) salvarReduzido(); }
+    });
+    pn.addEventListener('focusin', ev => { if (S && ev.target.getAttribute && ev.target.getAttribute('data-estq') === '1' && S.pop !== 'est') { S.pop = 'est'; render(); } });
+    pn.addEventListener('keydown', ev => {
+      if (!ev.target.getAttribute) return;
+      if (ev.key === 'Enter' && ev.target.getAttribute('data-in') === 'total') { ev.preventDefault(); ev.target.blur(); }
+      else if (ev.target.getAttribute('data-estq') === '1') {
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          const opts = estOptions(S.nome), nq = KD.norm((S.nome || '').trim()), pick = opts.find(e => KD.norm(e.nome) === nq) || opts[0];
+          if (pick) S.nome = pick.nome;
+          S.pop = null; render(); if (S.inline) salvarReduzido();
+        } else if (ev.key === 'Escape') { S.pop = null; render(); }
+      }
+    });
     pn.addEventListener('pointerdown', () => { if (S) S.pd = true; });
     pn.addEventListener('click', ev => {
       if (S) S.pd = false; const had = S && S.dirty; if (S) S.dirty = false;
       if (S && S.merge && !ev.target.closest('[data-a="domerge"]')) { S.merge = null; render(); }
-      const el = ev.target.closest('[data-a]'); if (!el || !S) { if (S && S.pop && !ev.target.closest('[data-pop]')) { S.pop = null; render(); } else if (had) render(); return; }
+      const el = ev.target.closest('[data-a]');
+      if (!el || !S) { if (S && S.pop && !ev.target.closest('[data-pop]') && !(ev.target.getAttribute && ev.target.getAttribute('data-estq') === '1')) { S.pop = null; render(); } else if (had) render(); return; }
       const a = el.getAttribute('data-a'), v = el.getAttribute('data-v');
       if (a === 'close') TX.requestClose();
+      else if (a === 'estpick' || a === 'estnew') { S.nome = v; S.pop = null; render(); if (S.inline) salvarReduzido(); }
       else if (a === 'mode') goMode(v);
       else if (a === 'retry') { S.err = null; S.msg = ''; render(); const fi = pn.querySelector('[data-in="foto"]'); if (fi) { fi.value = ''; fi.click(); } }
       else if (a === 'discard') { if (S.askClose) { TX.close(); return; } restoreSnap(); S.askBack = false; S.mode = 'dados'; render(); }
@@ -1000,7 +1073,16 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     });
     pn.addEventListener('input', ev => {
       const el = ev.target, k = el.getAttribute && el.getAttribute('data-in'); if (!k) return;
-      if (k === 'nome') { S.nome = el.value; if (S.alertField === 'nome' && S.nome.trim()) { S.alertField = null; el.classList.remove('txalert-box'); } const b = pn.querySelector('[data-ttl]'); if (b) { b.textContent = S.nome || '—'; fitTitle(pn); } }
+      if (k === 'nome') {
+        S.nome = el.value; if (S.alertField === 'nome' && S.nome.trim()) { S.alertField = null; el.classList.remove('txalert-box'); }
+        const b = pn.querySelector('[data-ttl]'); if (b) { b.textContent = S.nome || '—'; fitTitle(pn); }
+        // reescreve só o dropdown (nunca o input) pra não perder foco/cursor a cada tecla
+        if (el.getAttribute('data-estq') === '1' && S.pop === 'est') {
+          const wrap = el.parentElement, old = wrap.querySelector('[data-pop]'), fresh = estPop(S.nome);
+          if (old) old.outerHTML = fresh; else wrap.insertAdjacentHTML('beforeend', fresh);
+          const pop = wrap.querySelector('[data-pop]'); if (pop) { pop.style.maxHeight = POPMAXH + 'px'; const sc = pop.querySelector('[data-popscroll]'); if (sc) { syncFade(pop); sc.onscroll = () => syncFade(pop); } }
+        }
+      }
       else if (k === 'total') { S.totalV = num(el.textContent); if (S.alertField === 'total' && S.totalV > 0) { S.alertField = null; el.classList.remove('txalert-text'); } }
       else if (k === 'obs') S.obs = el.value; else if (k === 'link') S.link = el.value; else if (k === 'texto') S.texto = el.value;
       else if (k === 'iso') { S.iso = el.value; render(); }
