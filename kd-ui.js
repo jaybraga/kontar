@@ -466,6 +466,10 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const MES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   const dfmt = iso => { const p = String(iso || '').split('-'); return p.length === 3 ? p[2] + ' ' + MES[+p[1] - 1] + ' ' + p[0] : '—'; };
   const E = 'cubic-bezier(.2,.7,.2,1)';
+  // E é "fast-in": quase todo o movimento acontece logo no começo, ótimo pra fade/transform rápido (.2-.3s),
+  // mas numa mudança de ALTURA isso lê como um salto (cresce quase tudo de uma vez, depois rasteja). Pra
+  // crescer/encolher o card do reduzido usamos um ease-in-out de verdade, que também começa e termina suave.
+  const EH = 'cubic-bezier(.65,0,.35,1)';
   const I = {
     home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-5h4v5"/>',
     lines: '<path d="M4 6h16M4 12h16M4 18h10"/>',
@@ -547,7 +551,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   // linha é a primeira/última da lista (senão encostaria na borda do card master, alguns níveis acima).
   function cardOn(rw, kids, host) {
     rw.style.position = 'relative'; rw.style.display = 'flex'; rw.style.flexDirection = 'column'; rw.style.clipPath = 'inset(0 -40px 0 -40px)';
-    rw.style.paddingLeft = '20px'; rw.style.paddingRight = '20px';   // o card precisa do próprio respiro lateral — sem isso o conteúdo (linha e reduzido) encosta na borda nova que passou a existir
+    // o respiro lateral fica só no próprio painel reduzido (data-pw), não aqui: a linha original (kids) não
+    // pode mudar de padding em relação ao estado colapsado normal.
     host.style.order = '-1'; kids.forEach(k => { k.style.order = '1'; });
     // respiro só quando o vizinho não é outra linha (cabeçalho do dia, borda do card da lista etc.)
     const prevRow = rw.previousElementSibling && rw.previousElementSibling.hasAttribute('data-x-e');
@@ -557,7 +562,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     let deco = rw.querySelector('[data-tx-card]');
     if (!deco) {
       deco = document.createElement('div'); deco.setAttribute('data-tx-card', '1');
-      deco.style.cssText = 'position:absolute;inset:0;z-index:-1;border-radius:20px;background:#17171B;box-shadow:0 30px 54px -16px rgba(0,0,0,.42),0 10px 26px -6px rgba(0,0,0,.22);opacity:0;transition:opacity .3s ease;pointer-events:none';
+      deco.style.cssText = 'position:absolute;inset:0;z-index:-1;border-radius:20px;background:#17171B;border:1px solid #28282D;box-shadow:0 30px 54px -16px rgba(0,0,0,.42),0 10px 26px -6px rgba(0,0,0,.22);opacity:0;transition:opacity .3s ease;pointer-events:none';
       rw.insertBefore(deco, rw.firstChild);
       requestAnimationFrame(() => { deco.style.opacity = '1'; });
     }
@@ -567,7 +572,6 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (rw) {
       rw.style.height = ''; rw.style.transition = ''; rw.style.position = ''; rw.style.clipPath = '';
       rw.style.display = ''; rw.style.flexDirection = ''; rw.style.marginTop = ''; rw.style.marginBottom = '';
-      rw.style.paddingLeft = ''; rw.style.paddingRight = '';
       const deco = rw.querySelector('[data-tx-card]'); if (deco) deco.remove();
     }
     kids.forEach(c => { c.style.opacity = ''; c.style.transition = ''; c.style.pointerEvents = ''; c.style.order = ''; });
@@ -591,7 +595,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     render(true);
     void rw.offsetHeight;
     rw.style.height = 'auto'; const H1 = rw.offsetHeight; rw.style.height = H0 + 'px'; void rw.offsetHeight;
-    rw.style.transition = 'height .5s cubic-bezier(.2,.7,.2,1)'; rw.style.height = H1 + 'px';
+    rw.style.transition = 'height .5s ' + EH; rw.style.height = H1 + 'px';
     const mine = S;
     // o clip só é necessário ENQUANTO a altura anima (é o que cria o efeito de "revelar" aos poucos); depois
     // de assentado ele tem que sair, senão corta os popups (categoria, cartão, estabelecimento) que precisam
@@ -631,7 +635,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
         h.style.display = prevDisplay;
         rw.style.clipPath = 'inset(0 -40px 0 -40px)';   // reaplica o clip pra animação de saída também "revelar" (nesse caso, encolher) aos poucos
         rw.style.transition = 'none'; rw.style.height = rw.offsetHeight + 'px'; void rw.offsetHeight;
-        rw.style.transition = 'height .5s cubic-bezier(.2,.7,.2,1)'; rw.style.height = H0 + 'px';
+        rw.style.transition = 'height .5s ' + EH; rw.style.height = H0 + 'px';
         pendingDone = done; later(done, 540);
         return;
       }
@@ -714,11 +718,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       + '<i data-fadebot style="position:absolute;left:0;right:0;bottom:0;height:40px;background:linear-gradient(rgba(21,21,24,0),#151518);pointer-events:none;opacity:0;transition:opacity .2s ease"></i>'
       + '</div>';
   }
-  function estField(compact) {
-    const css = compact
-      ? 'background:#000;border:2px solid #2A2A2F;border-radius:' + PR + 'px;padding:12px 16px;font-size:15px;font-weight:700;color:#F2F0EB;font-family:inherit;outline:0;width:100%;box-sizing:border-box;'
-      : fieldCss;
-    return '<input data-in="nome" data-estq="1" data-alert-target="nome" autocomplete="off" placeholder="Onde foi? Ex.: Padaria Central" value="' + esc(S.nome) + '" style="' + css + '" class="' + (S.alertField === 'nome' ? 'txalert-box' : '') + '">' + (S.pop === 'est' ? estPop(S.nome) : '');
+  function estField() {
+    return '<input data-in="nome" data-estq="1" data-alert-target="nome" autocomplete="off" placeholder="Onde foi? Ex.: Padaria Central" value="' + esc(S.nome) + '" style="' + fieldCss + '" class="' + (S.alertField === 'nome' ? 'txalert-box' : '') + '">' + (S.pop === 'est' ? estPop(S.nome) : '');
   }
   const origemInfo = (o) => o === 'open_finance' ? { t: 'Open Finance', ic: 'link' } : o === 'importacao' ? { t: 'Importação', ic: 'copy' } : { t: 'Manual', ic: 'pencil' };
 
@@ -726,7 +727,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const cn = catAtual(), cor = catCor(cn);
     const meioObj = S.cardId ? KD.M.cardById[S.cardId] : S.accId ? KD.M.accs.find(a => a.id === S.accId) : null;
     const meio = meioObj ? (meioObj.nick || meioObj.n || meioObj.nome) : '—';
-    const left = '<div style="display:flex;flex-direction:column;gap:10px"><div>' + lb('home', 'Estabelecimento') + '</div><div style="display:flex;gap:10px;align-items:stretch"><div style="position:relative;flex:1;min-width:0">' + estField(false) + '</div>' + (!S.isNew ? '<span data-a="goest" title="Ver o estabelecimento" style="width:54px;flex:none;border-radius:9999px;border:2px solid #2A2A2F;background:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#F2F0EB;transition:border-color .25s ease,background .25s ease" onmouseover="this.style.borderColor=\'#51515C\';this.style.background=\'#151518\'" onmouseout="this.style.borderColor=\'#2A2A2F\';this.style.background=\'#000\'">' + svg('home', 20, 1.9) + '</span>' : '') + '</div></div>'
+    const left = '<div style="display:flex;flex-direction:column;gap:10px"><div>' + lb('home', 'Estabelecimento') + '</div><div style="display:flex;gap:10px;align-items:stretch"><div style="position:relative;flex:1;min-width:0">' + estField() + '</div>' + (!S.isNew ? '<span data-a="goest" title="Ver o estabelecimento" style="width:54px;flex:none;border-radius:9999px;border:2px solid #2A2A2F;background:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#F2F0EB;transition:border-color .25s ease,background .25s ease" onmouseover="this.style.borderColor=\'#51515C\';this.style.background=\'#151518\'" onmouseout="this.style.borderColor=\'#2A2A2F\';this.style.background=\'#000\'">' + svg('home', 20, 1.9) + '</span>' : '') + '</div></div>'
       + '<div style="display:flex;flex-direction:column;gap:10px;flex:1;min-height:0">' + lb('lines', 'Observação') + '<textarea data-in="obs" placeholder="Adicionar observação" style="' + fieldCss + 'flex:1;resize:none;font-family:inherit"></textarea></div>';
     const mid = '<div style="display:flex;flex-direction:column;gap:10px">' + lb('cal', 'Data') + '<label style="position:relative;display:block">' + pill(dfmt(S.iso), 'pointer-events:none') + '<input data-in="iso" type="date" value="' + esc(S.iso) + '" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%"></label></div>'
       + '<div style="display:flex;flex-direction:column;gap:10px">' + lb('card', 'Cartão / Conta') + '<div style="display:flex;gap:8px;align-items:flex-start"><div style="position:relative;flex:1;min-width:0"><div data-a="pop" data-v="card" data-alert-target="card" style="' + fieldCss + 'border-radius:' + PR + 'px;flex:1;min-width:0;display:flex;align-items:center;gap:10px;cursor:pointer" class="' + (S.alertField === 'card' ? 'txalert-box' : '') + '">' + bankChip(meioObj && meioObj.bank, (meioObj || {}).cor || '#3A3A40') + '<span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700">' + esc(meio) + '</span></div>' + (S.pop === 'card' ? popCard() : '') + '</div>' + (S.isNew && S.cardId ? '<div data-a="parc" title="Parcelas" style="flex:none;width:74px">' + pill((S.parc || 1) + 'x') + '</div>' : '') + '</div></div>'
@@ -813,20 +814,20 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const meioObj = S.cardId ? KD.M.cardById[S.cardId] : S.accId ? KD.M.accs.find(a => a.id === S.accId) : null;
     const meio = meioObj ? (meioObj.nick || meioObj.n || meioObj.nome) : '—';
     // valor/direção saíram daqui (editam só no overlay completo — um split, por ex., quebraria editando aqui).
-    // no lugar, o campo de estabelecimento: busca no que já existe ou cria digitando (ver estField/estPop).
-    const estBit = '<div style="position:relative;width:240px;flex:none">' + estField(true) + '</div>';
+    // estabelecimento aqui é só leitura (título, sem cara de campo/pill) — buscar/trocar é coisa do "Editar".
+    const estBit = '<div style="flex:1 1 auto;min-width:90px;max-width:300px;display:flex;align-items:center"><b style="font-size:23px;font-weight:800;letter-spacing:-.01em;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(S.nome || 'Sem nome') + '</b></div>';
     const oi = origemInfo(S.row.origem);
     const origemTag = '<span title="Origem" style="display:flex;align-items:center;gap:7px;height:38px;flex:none;padding:0 14px;border-radius:9999px;background:#1C1C20;color:#9A9AA3;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">' + svg(oi.ic, 14, 2.2) + oi.t + '</span>';
     const notaInd = S.nota ? '<span title="Nota fiscal lida" style="width:38px;height:38px;flex:none;border-radius:50%;background:#1C1C20;display:flex;align-items:center;justify-content:center;color:#6AFF2A">' + svg('qr', 17, 2) + '</span>' : '';
     const obsInd = (S.obs && S.obs.trim()) ? '<span title="Tem observação" style="width:38px;height:38px;flex:none;border-radius:50%;background:#1C1C20;display:flex;align-items:center;justify-content:center;color:#9A9AA3">' + svg('lines', 16, 2.2) + '</span>' : '';
-    // pills de categoria/cartão com a mesma cara (fieldCss/PR) e tamanho fixo do painel completo — o dobro
-    // do chip coladinho ao conteúdo que tínhamos antes, sem precisar de âncora invisível separada.
-    const catChip = '<div style="position:relative;width:300px;flex:none"><div data-a="pop" data-v="cat" style="display:flex;align-items:center;gap:10px;border-radius:' + PR + 'px;padding:11px 14px;border:2px solid ' + cor + '8C;background:color-mix(in srgb,' + cor + ' 14%,#000);cursor:pointer">' + icDot(cn, 26) + '<b style="font-size:15px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(cn) + '</b><span style="width:24px;height:24px;border-radius:50%;background:#0A0A0A;display:flex;align-items:center;justify-content:center;color:#F2F0EB;flex:none">' + svg('chev', 12, 2.6) + '</span></div>' + (S.pop === 'cat' ? popCat() : '') + '</div>';
-    const cardChip = '<div style="position:relative;width:300px;flex:none"><div data-a="pop" data-v="card" style="' + fieldCss + 'border-radius:' + PR + 'px;padding:11px 14px;display:flex;align-items:center;gap:10px;cursor:pointer">' + bankChip(meioObj && meioObj.bank, (meioObj || {}).cor || '#3A3A40') + '<span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;font-size:15px">' + esc(meio) + '</span></div>' + (S.pop === 'card' ? popCard() : '') + '</div>';
-    const editBtn = '<span data-a="full" style="margin-left:auto;flex:none;height:46px;display:flex;align-items:center;padding:0 34px;border-radius:9999px;background:#F2F0EB;color:#0A0A0A;font-weight:900;letter-spacing:.06em;font-size:12.5px;text-transform:uppercase;cursor:pointer">Editar</span>';
+    // pills de categoria/cartão com a mesma cara (fieldCss/PR) do painel completo, só que mais estreitas —
+    // não precisam da largura toda pra caber um nome curto; o dropdown acompanha a largura do chip.
+    const catChip = '<div style="position:relative;width:190px;flex:none"><div data-a="pop" data-v="cat" style="display:flex;align-items:center;gap:10px;border-radius:' + PR + 'px;padding:11px 14px;border:2px solid ' + cor + '8C;background:color-mix(in srgb,' + cor + ' 14%,#000);cursor:pointer">' + icDot(cn, 26) + '<b style="font-size:15px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(cn) + '</b><span style="width:24px;height:24px;border-radius:50%;background:#0A0A0A;display:flex;align-items:center;justify-content:center;color:#F2F0EB;flex:none">' + svg('chev', 12, 2.6) + '</span></div>' + (S.pop === 'cat' ? popCat() : '') + '</div>';
+    const cardChip = '<div style="position:relative;width:190px;flex:none"><div data-a="pop" data-v="card" style="' + fieldCss + 'border-radius:' + PR + 'px;padding:11px 14px;display:flex;align-items:center;gap:10px;cursor:pointer">' + bankChip(meioObj && meioObj.bank, (meioObj || {}).cor || '#3A3A40') + '<span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;font-size:15px">' + esc(meio) + '</span></div>' + (S.pop === 'card' ? popCard() : '') + '</div>';
+    const editBtn = '<span data-a="full" style="margin-left:auto;flex:none;height:46px;display:flex;align-items:center;gap:8px;padding:0 26px;border-radius:9999px;background:#F2F0EB;color:#0A0A0A;font-weight:900;letter-spacing:.06em;font-size:12.5px;text-transform:uppercase;cursor:pointer">' + svg('pencil', 14, 2.6) + 'Editar</span>';
     // botão de fechar maior e com presença (círculo com borda interna, "bonitinho"), no lugar do x pequeno/discreto de antes
     const closeBtn = '<span data-a="close" title="Fechar" style="flex:none;width:44px;height:44px;border-radius:9999px;background:#1C1C20;color:#F2F0EB;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:inset 0 0 0 1px #3A3A40;transition:box-shadow .3s cubic-bezier(.45,0,.55,1)" onmouseover="this.style.boxShadow=\'inset 0 0 0 1px #6A6A72\'" onmouseout="this.style.boxShadow=\'inset 0 0 0 1px #3A3A40\'">' + svg('x', 18, 2.4) + '</span>';
-    host.innerHTML = REDUCED_CSS + '<div data-pw style="position:relative;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 0;font-family:Helvetica,Arial,sans-serif;color:#F2F0EB;' + (first ? 'animation:txin .22s ' + E : '') + '">' + estBit + origemTag + notaInd + obsInd + catChip + cardChip + editBtn + closeBtn + '</div>';
+    host.innerHTML = REDUCED_CSS + '<div data-pw style="position:relative;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 20px;font-family:Helvetica,Arial,sans-serif;color:#F2F0EB;' + (first ? 'animation:txin .22s ' + E : '') + '">' + estBit + origemTag + notaInd + obsInd + catChip + cardChip + editBtn + closeBtn + '</div>';
     const pw = host.querySelector('[data-pw]');
     if (keep.k) { const el = pw.querySelector('[data-in="' + keep.k + '"]'); if (el) { el.focus(); try { if (el.tagName === 'INPUT') { const l = el.value.length; el.setSelectionRange(l, l); } else { const l = el.textContent.length; const rg = document.createRange(); rg.selectNodeContents(el); rg.collapse(false); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg); } } catch (e) { } } }
     pw.querySelectorAll('[data-pop]').forEach(pop => { pop.style.maxHeight = POPMAXH + 'px'; const sc = pop.querySelector('[data-popscroll]'); if (sc) { syncFade(pop); sc.onscroll = () => syncFade(pop); } });
