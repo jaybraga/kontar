@@ -502,12 +502,16 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const somaPartes = () => S.partes.reduce((a, p) => a + p.valor, 0);
   const catAtual = () => S.catId ? catName(S.catId) : (S.isNew ? 'Sem categoria' : 'Outros');
 
+  // encolhe a fonte na proporção exata pra caber em avail, até um mínimo legível; abaixo disso a reticência
+  // do próprio elemento segura nomes extremamente longos.
+  function shrinkTo(t, max, min, avail) {
+    t.style.fontSize = max + 'px'; const w = t.scrollWidth;
+    if (w > avail && avail > 0) t.style.fontSize = Math.max(min, Math.floor(max * avail / w)) + 'px';
+  }
   function fitTitle(pn) {   // encolhe o título só o bastante pra não bater no valor (overlay e inline)
-    if (!S) return; const t = pn.querySelector('[data-ttl]'); if (!t) return; t.style.fontSize = '64px'; t.style.overflow = 'hidden'; t.style.textOverflow = 'ellipsis';
-    const hd = t.parentElement.parentElement, right = hd.lastElementChild; const avail = hd.clientWidth - (right ? right.offsetWidth : 0) - 36, w = t.scrollWidth;
-    // nomes extremamente longos não cabem nem no tamanho mínimo legível (40px): a reticência acima
-    // evita que, nesse caso raro, o título invada o valor ou a barra lateral.
-    if (w > avail && avail > 0) t.style.fontSize = Math.max(40, Math.floor(64 * avail / w)) + 'px';
+    if (!S) return; const t = pn.querySelector('[data-ttl]'); if (!t) return; t.style.overflow = 'hidden'; t.style.textOverflow = 'ellipsis';
+    const hd = t.parentElement.parentElement, right = hd.lastElementChild;
+    shrinkTo(t, 64, 40, hd.clientWidth - (right ? right.offsetWidth : 0) - 36);
   }
   function fitPop(pw) {   // o dropdown (categoria/cartão) tampa o campo e cresce pra cima; encurta antes de bater no valor lá em cima
     const pop = pw.querySelector('[data-pop]'); if (!pop) return;
@@ -549,8 +553,17 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   // ACIMA dele via order (os dois continuam na mesma ordem no DOM), e um card único (deco) por trás dos dois
   // dá o fundo mais claro + sombra, encobrindo linha+reduzido como uma peça só. 16px de respiro só quando a
   // linha é a primeira/última da lista (senão encostaria na borda do card master, alguns níveis acima).
-  const CLIP = 'inset(0 -40px 0 -40px)', SLIDE = '.5s ' + EH;
+  const CLIP = 'inset(0 -40px 0 -40px)', SLIDE = '.5s ' + EH, PADX = 20;
   const noDeco = (els) => els.filter(c => !c.hasAttribute('data-tx-card'));
+  // as linhas originais têm transição própria no template (hover, acordeão); a nossa entra somada a ela e
+  // depois volta exatamente ao que era, em vez de apagar.
+  const T0 = new WeakMap();
+  const kidT = (k, t) => { if (!T0.has(k)) T0.set(k, k.style.transition); const b = T0.get(k); k.style.transition = t === 'none' ? 'none' : (b ? b + ',' : '') + t; };
+  const kidT0 = (k) => { if (T0.has(k)) { k.style.transition = T0.get(k); T0.delete(k); } };
+  // FLIP + respiro: dy = deslocamento vertical, pad = padding lateral (as 2 colunas da esquerda entram pra
+  // direita e a de valores pra esquerda, junto com a curva da abertura)
+  const KIDT = 'transform ' + SLIDE + ',padding-left ' + SLIDE + ',padding-right ' + SLIDE;
+  const kidSet = (k, dy, pad) => { k.style.transform = 'translateY(' + dy + 'px)'; k.style.paddingLeft = pad + 'px'; k.style.paddingRight = pad + 'px'; };
   function cardOn(rw, kids, host) {
     rw.style.position = 'relative'; rw.style.display = 'flex'; rw.style.flexDirection = 'column'; rw.style.clipPath = CLIP;
     // camada própria da linha: sem isso, quando o clip-path sai (fim da animação) o deco (z-index:-1) cai
@@ -579,7 +592,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       rw.style.display = ''; rw.style.flexDirection = ''; rw.style.marginTop = ''; rw.style.marginBottom = '';
       const deco = rw.querySelector('[data-tx-card]'); if (deco) deco.remove();
     }
-    kids.forEach(c => { c.style.opacity = ''; c.style.transition = ''; c.style.pointerEvents = ''; c.style.order = ''; c.style.transform = ''; });
+    kids.forEach(c => { kidT0(c); c.style.order = ''; c.style.transform = ''; c.style.paddingLeft = ''; c.style.paddingRight = ''; });
     ['left', 'right', 'top', 'height', 'transition', 'order', 'clipPath'].forEach(k => { h.style[k] = ''; }); h.style.position = 'relative';
     h.innerHTML = '';
   }
@@ -601,21 +614,21 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     rw.style.height = 'auto'; const H1 = rw.offsetHeight; rw.style.height = H0 + 'px';
     const D = H1 - H0;
     // FLIP: no quadro 0 a linha é puxada de volta (-D) pro lugar onde estava; o reduzido começa todo coberto
-    kids.forEach(k => { k.style.transition = 'none'; k.style.transform = 'translateY(' + (-D) + 'px)'; });
+    kids.forEach(k => { kidT(k, 'none'); kidSet(k, -D, 0); });
     host.style.transition = 'none'; host.style.clipPath = 'inset(0 0 ' + D + 'px 0)';
     void rw.offsetHeight;
     rw.style.transition = 'height ' + SLIDE + ',margin-top ' + SLIDE + ',margin-bottom ' + SLIDE;
     rw.style.height = H1 + 'px'; rw.style.marginTop = m.mt; rw.style.marginBottom = m.mb;
-    kids.forEach(k => { k.style.transition = 'transform ' + SLIDE; k.style.transform = 'translateY(0px)'; });
+    kids.forEach(k => { kidT(k, KIDT); kidSet(k, 0, PADX); });
     host.style.transition = 'clip-path ' + SLIDE; host.style.clipPath = 'inset(0 0 0px 0)';
     const mine = S;
     // os clips só valem ENQUANTO anima; assentado, têm que sair senão cortam os popups (categoria, cartão)
-    // que aparecem por cima da linha. TX.close reaplica antes da animação de saída.
+    // que aparecem por cima da linha. TX.close reaplica antes da animação de saída. O padding fica.
     later(() => {
       if (S !== mine || !host) return;
       rw.style.height = ''; rw.style.transition = ''; rw.style.clipPath = '';
       host.style.transition = ''; host.style.clipPath = '';
-      kids.forEach(k => { k.style.transition = ''; k.style.transform = ''; });
+      kids.forEach(k => { kidT0(k); k.style.transform = ''; });
     }, 520);
   };
   TX.openNew = function (c) {
@@ -654,12 +667,13 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
         // o inverso da abertura: a linha sobe colada na borda de baixo do card, cobrindo o reduzido
         rw.style.clipPath = CLIP; rw.style.transition = 'none'; rw.style.height = H1 + 'px';
         rw.style.marginTop = getComputedStyle(rw).marginTop; rw.style.marginBottom = getComputedStyle(rw).marginBottom;
-        kids.forEach(k => { k.style.transition = 'none'; k.style.transform = 'translateY(0px)'; });
+        kids.forEach(k => { kidT(k, 'none'); kidSet(k, 0, PADX); });
         h.style.transition = 'none'; h.style.clipPath = 'inset(0 0 0px 0)';
         void rw.offsetHeight;
         rw.style.transition = 'height ' + SLIDE + ',margin-top ' + SLIDE + ',margin-bottom ' + SLIDE;
         rw.style.height = H0 + 'px'; rw.style.marginTop = '0px'; rw.style.marginBottom = '0px';
-        kids.forEach(k => { k.style.transition = 'transform ' + SLIDE; k.style.transform = 'translateY(' + (-D) + 'px)'; });
+        kids.forEach(k => { kidT(k, KIDT); kidSet(k, -D, 0); });
+        const sep = h.querySelector('[data-sep]'); if (sep) { sep.style.animation = 'none'; sep.style.transition = 'opacity .24s ease'; sep.style.opacity = '0'; }
         h.style.transition = 'clip-path ' + SLIDE; h.style.clipPath = 'inset(0 0 ' + D + 'px 0)';
         pendingDone = done; later(done, 540);
         return;
@@ -840,7 +854,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const meio = meioObj ? (meioObj.nick || meioObj.n || meioObj.nome) : '—';
     // valor/direção saíram daqui (editam só no overlay completo — um split, por ex., quebraria editando aqui).
     // estabelecimento aqui é só leitura (título, sem cara de campo/pill) — buscar/trocar é coisa do "Editar".
-    const estBit = '<div style="flex:1 1 auto;min-width:90px;max-width:300px;display:flex;align-items:center"><b style="font-size:23px;font-weight:800;letter-spacing:-.01em;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(S.nome || 'Sem nome') + '</b></div>';
+    // o título fica com todo o espaço que sobra à esquerda (as pills vão pra direita) e encolhe se não couber
+    const estBit = '<div style="flex:1 1 0;min-width:0;padding-right:12px;display:flex;align-items:center"><b data-rttl style="display:block;min-width:0;font-size:23px;font-weight:800;letter-spacing:-.01em;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(S.nome || 'Sem nome') + '</b></div>';
     const oi = origemInfo(S.row.origem);
     const origemTag = '<span title="Origem" style="display:flex;align-items:center;gap:7px;height:38px;flex:none;padding:0 14px;border-radius:9999px;background:#1C1C20;color:#9A9AA3;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap">' + svg(oi.ic, 14, 2.2) + oi.t + '</span>';
     const notaInd = S.nota ? '<span title="Nota fiscal lida" style="width:38px;height:38px;flex:none;border-radius:50%;background:#1C1C20;display:flex;align-items:center;justify-content:center;color:#6AFF2A">' + svg('qr', 17, 2) + '</span>' : '';
@@ -849,11 +864,15 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     // não precisam da largura toda pra caber um nome curto; o dropdown acompanha a largura do chip.
     const catChip = '<div style="position:relative;width:190px;flex:none"><div data-a="pop" data-v="cat" style="display:flex;align-items:center;gap:10px;border-radius:' + PR + 'px;padding:11px 14px;border:2px solid ' + cor + '8C;background:color-mix(in srgb,' + cor + ' 14%,#000);cursor:pointer">' + icDot(cn, 26) + '<b style="font-size:15px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(cn) + '</b><span style="width:24px;height:24px;border-radius:50%;background:#0A0A0A;display:flex;align-items:center;justify-content:center;color:#F2F0EB;flex:none">' + svg('chev', 12, 2.6) + '</span></div>' + (S.pop === 'cat' ? popCat() : '') + '</div>';
     const cardChip = '<div style="position:relative;width:190px;flex:none"><div data-a="pop" data-v="card" style="' + fieldCss + 'border-radius:' + PR + 'px;padding:11px 14px;display:flex;align-items:center;gap:10px;cursor:pointer">' + bankChip(meioObj && meioObj.bank, (meioObj || {}).cor || '#3A3A40') + '<span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;font-size:15px">' + esc(meio) + '</span></div>' + (S.pop === 'card' ? popCard() : '') + '</div>';
-    const editBtn = '<span data-a="full" style="margin-left:auto;flex:none;height:46px;display:flex;align-items:center;gap:8px;padding:0 26px;border-radius:9999px;background:#F2F0EB;color:#0A0A0A;font-weight:900;letter-spacing:.06em;font-size:12.5px;text-transform:uppercase;cursor:pointer">' + svg('pencil', 14, 2.6) + 'Editar</span>';
+    const editBtn = '<span data-a="full" style="flex:none;height:46px;display:flex;align-items:center;gap:8px;padding:0 26px;border-radius:9999px;background:#F2F0EB;color:#0A0A0A;font-weight:900;letter-spacing:.06em;font-size:12.5px;text-transform:uppercase;cursor:pointer">' + svg('pencil', 14, 2.6) + 'Editar</span>';
     // botão de fechar maior e com presença (círculo com borda interna, "bonitinho"), no lugar do x pequeno/discreto de antes
     const closeBtn = '<span data-a="close" title="Fechar" style="flex:none;width:44px;height:44px;border-radius:9999px;background:#1C1C20;color:#F2F0EB;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:inset 0 0 0 1px #3A3A40;transition:box-shadow .3s cubic-bezier(.45,0,.55,1)" onmouseover="this.style.boxShadow=\'inset 0 0 0 1px #6A6A72\'" onmouseout="this.style.boxShadow=\'inset 0 0 0 1px #3A3A40\'">' + svg('x', 18, 2.4) + '</span>';
-    host.innerHTML = REDUCED_CSS + '<div data-pw style="position:relative;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 20px;font-family:Helvetica,Arial,sans-serif;color:#F2F0EB;' + (first ? 'animation:txin .4s ease .08s both' : '') + '">' + estBit + origemTag + notaInd + obsInd + catChip + cardChip + editBtn + closeBtn + '</div>';
+    // padding de baixo (12) + linha + padding de cima da própria linha da transação (12, do template) =
+    // o mesmo respiro dos dois lados da linha divisória.
+    host.innerHTML = REDUCED_CSS + '<div data-pw style="position:relative;display:flex;align-items:center;gap:12px;padding:16px ' + PADX + 'px 12px;font-family:Helvetica,Arial,sans-serif;color:#F2F0EB;' + (first ? 'animation:txin .4s ease .08s both' : '') + '">' + estBit + origemTag + notaInd + obsInd + catChip + cardChip + editBtn + closeBtn + '</div>'
+      + '<div data-sep style="height:1px;margin:0 ' + PADX + 'px;background:#2A2A2F;' + (first ? 'animation:txin .4s ease .08s both' : '') + '"></div>';
     const pw = host.querySelector('[data-pw]');
+    const rt = pw.querySelector('[data-rttl]'); if (rt) shrinkTo(rt, 23, 15, rt.parentElement.clientWidth - 12);
     if (keep.k) { const el = pw.querySelector('[data-in="' + keep.k + '"]'); if (el) { el.focus(); try { if (el.tagName === 'INPUT') { const l = el.value.length; el.setSelectionRange(l, l); } else { const l = el.textContent.length; const rg = document.createRange(); rg.selectNodeContents(el); rg.collapse(false); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg); } } catch (e) { } } }
     pw.querySelectorAll('[data-pop]').forEach(pop => { pop.style.maxHeight = POPMAXH + 'px'; const sc = pop.querySelector('[data-popscroll]'); if (sc) { syncFade(pop); sc.onscroll = () => syncFade(pop); } });
     wire(pw);
