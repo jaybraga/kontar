@@ -639,6 +639,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     S = null;
     if (quick || !pn) { if (!pn && !inl) { h.innerHTML = ''; if (h.hasAttribute('data-tx-host')) h.style.pointerEvents = 'none'; } else done(); return; }
     if (xi) { xi.style.transition = 'transform .3s cubic-bezier(.65,0,.2,1)'; xi.style.transform = 'rotate(180deg)'; }
+    // a animação de entrada (fill both) segura a opacidade em 1 e ignora o inline — tira ela antes do fade de saída
+    pn.style.opacity = getComputedStyle(pn).opacity; pn.style.animation = 'none'; void pn.offsetHeight;
     pn.style.transition = 'opacity .24s ease, transform .3s ' + E; pn.style.opacity = '0'; if (!inl) pn.style.transform = pn.style.transform + ' translateY(14px)'; else pn.style.transform = pn.style.transform + ' translateY(6px)';
     if (bd) { bd.style.transition = 'opacity .25s ease'; bd.style.opacity = '0'; }
     if (inl) {
@@ -646,11 +648,9 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       if (rw) {
         const kids = noDeco(kidsOf(h).kids);
         const deco = rw.querySelector('[data-tx-card]'); if (deco) { deco.style.transition = 'opacity .45s ease'; deco.style.opacity = '0'; }
-        // mede a altura "fechada" (só o conteúdo original) escondendo o reduzido um instante, sem repintar
-        const prevDisplay = h.style.display; h.style.display = 'none';
-        const H0 = rw.offsetHeight;
-        h.style.display = prevDisplay;
-        const H1 = rw.offsetHeight, D = H1 - H0;
+        // altura "fechada" = altura atual menos o reduzido. Não esconder o host pra medir: display:none
+        // reinicia a animação de entrada do painel (ele piscava e voltava em fade enquanto era coberto).
+        const H1 = rw.offsetHeight, D = h.offsetHeight, H0 = H1 - D;
         // o inverso da abertura: a linha sobe colada na borda de baixo do card, cobrindo o reduzido
         rw.style.clipPath = CLIP; rw.style.transition = 'none'; rw.style.height = H1 + 'px';
         rw.style.marginTop = getComputedStyle(rw).marginTop; rw.style.marginBottom = getComputedStyle(rw).marginBottom;
