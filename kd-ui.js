@@ -1571,7 +1571,9 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       // transferência: só em extrato de conta. Par = mesmo valor, direção oposta, até 3 dias, em outra conta sua.
       if (S.accId && !r.xferOff) {
         const v = cents(r.amt), d0 = dayNum(r.iso), opp = r.dir === 'saida' ? 'entrada' : 'saida';
-        const par = M.rows.filter(x => x.accId && !x.cardId && x.accId !== S.accId && !pares.has(x.id) && cents(x.total) === v && (x.amt > 0 ? 'entrada' : 'saida') === opp && Math.abs(dayNum(x.iso) - d0) <= 3)
+        // as duas pontas precisam ter cara de transferência (pix/TED/transf, ou já marcada), senão um boleto de mesmo valor vira par por coincidência
+        const pareceT = /pix|transf|\bted\b|\bdoc\b/i.test(r.raw), outraT = x => x.xfer || KD.isTransf(x) || x.meio === 'pix' || x.meio === 'transferencia' || !!temNome(x.e, S.nomes);
+        const par = !pareceT ? null : M.rows.filter(x => x.accId && !x.cardId && x.accId !== S.accId && !pares.has(x.id) && outraT(x) && cents(x.total) === v && (x.amt > 0 ? 'entrada' : 'saida') === opp && Math.abs(dayNum(x.iso) - d0) <= 3)
           .sort((a, b) => (b.xfer ? 1 : 0) - (a.xfer ? 1 : 0) || Math.abs(dayNum(a.iso) - d0) - Math.abs(dayNum(b.iso) - d0))[0];
         const nome = temNome(r.raw, S.nomes);
         if (par || nome) {
