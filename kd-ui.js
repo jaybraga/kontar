@@ -623,6 +623,26 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (top) top.style.opacity = (scrollable && !atTop) ? '1' : '0';
     if (bot) bot.style.opacity = (scrollable && !atBot) ? '1' : '0';
   }
+  // entrada escalonada: cada bloco aparece em fade + subida curta, um depois do outro (delay crescente).
+  // WAAPI com fill 'backwards': nada fica gravado no elemento depois (sem stacking context sobrando, que cortaria dropdowns).
+  const REDUCE = () => window.matchMedia && matchMedia('(prefers-reduced-motion:reduce)').matches;
+  function stagger(els, base, step, dur) {
+    if (REDUCE()) return;
+    const max = 420; // o último bloco nunca espera mais que isso
+    els.forEach((el, i) => { if (el && el.animate) el.animate([{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }], { duration: dur || 420, delay: base + Math.min(i * step, max), easing: E, fill: 'backwards' }); });
+  }
+  // os blocos de cada tela do painel completo: cabeçalho (título / valor), colunas do corpo (um bloco por filho),
+  // rodapé e a coluna lateral — em ordem de leitura. Mesma estrutura nas 3 telas (Dados, Ler nota, Dividir).
+  function viewBlocks(pn) {
+    const root = pn.querySelector(':scope > div[style*="padding:26px 34px"]'), rail = pn.querySelector(':scope > div[style*="width:331px"]'), out = [];
+    if (root) [...root.children].forEach((c, i) => {
+      if (i === 0) out.push(...c.children);                                   // título + valor
+      else if (c.style.display === 'grid') [...c.children].forEach(col => { out.push(...(col.children.length > 1 ? col.children : [col])); });
+      else out.push(c);                                                       // rodapé
+    });
+    if (rail) out.push(...rail.children);
+    return out.filter(e => e.style.position !== 'absolute' || e.hasAttribute('data-a') || e.tagName === 'DIV');
+  }
   const dirtyKey = () => JSON.stringify([S.nome, S.obs, S.iso, S.cardId, S.accId, S.catId, S.totalV, S.dir, S.meio, S.parc || 1, S.itens, S.partes, S.nota && S.nota.url]);
   const isDirty = () => !!S && S.base !== undefined && dirtyKey() !== S.base;
   function init(row) {
@@ -977,9 +997,10 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const closeBtn = '<span data-a="close" title="Fechar" style="flex:none;width:44px;height:44px;border-radius:9999px;background:#1C1C20;color:#F2F0EB;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:inset 0 0 0 1px #3A3A40;transition:box-shadow .3s cubic-bezier(.45,0,.55,1)" onmouseover="this.style.boxShadow=\'inset 0 0 0 1px #6A6A72\'" onmouseout="this.style.boxShadow=\'inset 0 0 0 1px #3A3A40\'">' + svg('x', 18, 2.4) + '</span>';
     // padding de baixo (12) + linha + padding de cima da própria linha da transação (12, do template) =
     // o mesmo respiro dos dois lados da linha divisória.
-    host.innerHTML = REDUCED_CSS + '<div data-pw style="position:relative;display:flex;align-items:center;gap:12px;padding:16px ' + PADX + 'px 12px;font-family:Helvetica,Arial,sans-serif;color:#F2F0EB;' + (first ? 'animation:txin .4s ease .08s both' : '') + '">' + estBit + origemTag + notaInd + obsInd + catChip + cardChip + editBtn + closeBtn + '</div>'
-      + '<div data-sep style="height:1px;margin:0 ' + PADX + 'px;background:#2A2A2F;' + (first ? 'animation:txin .4s ease .08s both' : '') + '"></div>';
+    host.innerHTML = REDUCED_CSS + '<div data-pw style="position:relative;display:flex;align-items:center;gap:12px;padding:16px ' + PADX + 'px 12px;font-family:Helvetica,Arial,sans-serif;color:#F2F0EB">' + estBit + origemTag + notaInd + obsInd + catChip + cardChip + editBtn + closeBtn + '</div>'
+      + '<div data-sep style="height:1px;margin:0 ' + PADX + 'px;background:#2A2A2F"></div>';
     const pw = host.querySelector('[data-pw]');
+    if (first) { stagger([...pw.children], 90, 40, 380); stagger([host.querySelector('[data-sep]')], 90 + 40 * pw.children.length, 0, 380); }
     const rt = pw.querySelector('[data-rttl]'); if (rt) shrinkTo(rt, 23, 15, rt.parentElement.clientWidth - 12);
     if (keep.k) { const el = pw.querySelector('[data-in="' + keep.k + '"]'); if (el) { el.focus(); try { if (el.tagName === 'INPUT') { const l = el.value.length; el.setSelectionRange(l, l); } else { const l = el.textContent.length; const rg = document.createRange(); rg.selectNodeContents(el); rg.collapse(false); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg); } } catch (e) { } } }
     fitPop(pw);
@@ -1031,6 +1052,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     fitTitle(host.querySelector('[data-pw]'));
     fitPop(host.querySelector('[data-pw]'));
     wire(host.querySelector('[data-pw]'));
+    // só quando a tela é nova (abriu o painel ou trocou Dados/Ler nota/Dividir); redesenhar por clique não reanima
+    if (first || S._sm !== S.mode) { stagger(viewBlocks(pn), first ? 120 : 0, 45); S._sm = S.mode; }
     const xi = host.querySelector('[data-xi]'); if (xi && first) { xi.style.transform = 'rotate(-180deg)'; requestAnimationFrame(() => requestAnimationFrame(() => { xi.style.transform = 'rotate(0deg)'; })); }
     void prevPn;
   }
