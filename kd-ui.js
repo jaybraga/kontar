@@ -643,6 +643,52 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (rail) out.push(...rail.children);
     return out.filter(e => e.style.position !== 'absolute' || e.hasAttribute('data-a') || e.tagName === 'DIV');
   }
+  /* ---- coreografia do painel completo ----
+     Dados: título (e a linha) → valor rolando como placar de aeroporto (_roll do protótipo, o mesmo dos valores
+     do app) + toggle entrada/saída que parte do meio e encaixa → campos por LINHA subindo de baixo
+     (estabelecimento+data, depois observação+cartão+categoria) → coluna lateral: "Dividir" e a nota saindo da
+     maquininha (20px de descida revelada por uma fenda fixa, botões junto). Ler nota e Dividir: blocos em
+     sequência + valor rolando; no Dividir a barra de progresso é a última, crescendo da esquerda. */
+  const SNAP = 'cubic-bezier(.16,1,.3,1)';
+  const anim = (el, kf, o) => { if (el && el.animate) el.animate(kf, Object.assign({ easing: E, fill: 'backwards' }, o)); };
+  const upIn = (el, d, px, dur) => anim(el, [{ opacity: 0, transform: 'translateY(' + px + 'px)' }, { opacity: 1, transform: 'none' }], { delay: d, duration: dur || 460 });
+  function rollValue(pn, d) {
+    const tot = pn.querySelector('[data-tot]'); if (!tot || !comp || !comp._roll) return;
+    comp._roll(tot.querySelector('.txtot') || tot.firstElementChild, d, 800);
+  }
+  function enterDados(pn, b) {
+    const root = pn.querySelector(':scope > div[style*="padding:26px 34px"]'), rail = pn.querySelector(':scope > div[style*="width:331px"]');
+    if (!root) return;
+    const hdr = root.children[0], grid = root.children[1], cols = grid ? [...grid.children] : [];
+    anim(pn.firstElementChild, [{ opacity: 0 }, { opacity: 1 }], { delay: b, duration: 400 });          // a linha horizontal
+    upIn(hdr.children[0], b, 10, 420);                                                                   // título
+    const tot = pn.querySelector('[data-tot]');
+    if (tot) {
+      upIn(tot, b + 70, 8, 380); rollValue(pn, b + 110);
+      const tg = tot.children.length > 1 ? tot.firstElementChild : null;                                // toggle entrada/saída: parte do meio e encaixa
+      if (tg && tg.children.length === 2) {
+        const top = S.dir === 'entrada', on = tg.children[top ? 0 : 1], half = (on.offsetHeight + 2) / 2;
+        anim(on, [{ transform: 'translateY(' + (top ? half : -half) + 'px)' }, { transform: 'none' }], { delay: b + 300, duration: 560, easing: SNAP });
+      }
+    }
+    const L = cols[0] ? [...cols[0].children] : [], M = cols[1] ? [...cols[1].children] : [];
+    [[L[0], M[0]], [L[1], M[1], M[2]]].forEach((row, i) => row.forEach(el => upIn(el, b + 280 + i * 110, 26, 520)));
+    if (rail) {
+      const [dv, tk] = rail.children;
+      upIn(dv, b + 280, 12, 460);
+      if (tk) {   // a nota sai da fenda: desce 20px e é revelada de cima pra baixo (a fenda fica parada), junto com os botões
+        anim(tk, [{ opacity: 0, transform: 'translateY(-20px)', clipPath: 'inset(20px -40px -40px -40px)' }, { opacity: 1, offset: .55, transform: 'translateY(-9px)', clipPath: 'inset(9px -40px -40px -40px)' }, { opacity: 1, transform: 'none', clipPath: 'inset(0px -40px -40px -40px)' }], { delay: b + 430, duration: 760, easing: SNAP });
+      }
+    }
+  }
+  function enterView(pn, b) {
+    if (REDUCE()) return;
+    if (S.mode === 'dados') { enterDados(pn, b); return; }
+    let bl = viewBlocks(pn), bar = null;
+    if (S.mode === 'dividir') { bar = pn.querySelector('[style*="height:14px"][style*="overflow:hidden"]'); bl = bl.filter(e => e !== bar); }
+    stagger(bl, b, 45); rollValue(pn, b + 60);
+    if (bar) anim(bar, [{ opacity: 0, clipPath: 'inset(0 100% 0 0 round 9999px)' }, { opacity: 1, clipPath: 'inset(0 0 0 0 round 9999px)' }], { delay: b + Math.min(bl.length * 45, 420) + 140, duration: 780, easing: EH });
+  }
   const dirtyKey = () => JSON.stringify([S.nome, S.obs, S.iso, S.cardId, S.accId, S.catId, S.totalV, S.dir, S.meio, S.parc || 1, S.itens, S.partes, S.nota && S.nota.url]);
   const isDirty = () => !!S && S.base !== undefined && dirtyKey() !== S.base;
   function init(row) {
@@ -1053,7 +1099,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     fitPop(host.querySelector('[data-pw]'));
     wire(host.querySelector('[data-pw]'));
     // só quando a tela é nova (abriu o painel ou trocou Dados/Ler nota/Dividir); redesenhar por clique não reanima
-    if (first || S._sm !== S.mode) { stagger(viewBlocks(pn), first ? 120 : 0, 45); S._sm = S.mode; }
+    if (first || S._sm !== S.mode) { enterView(pn, first ? 120 : 0); S._sm = S.mode; }
     const xi = host.querySelector('[data-xi]'); if (xi && first) { xi.style.transform = 'rotate(-180deg)'; requestAnimationFrame(() => requestAnimationFrame(() => { xi.style.transform = 'rotate(0deg)'; })); }
     void prevPn;
   }
