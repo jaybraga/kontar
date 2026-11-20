@@ -62,9 +62,16 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       const R = m.getBoundingClientRect(), full = R.height;
       const on = m.querySelector('[data-dd-on="1"]'), oR = on && on.getBoundingClientRect();
       const oy = oR ? oR.top - R.top + oR.height / 2 : A.height / 2;   // sem opção marcada: o topo do menu encosta no topo do campo
-      const B = ddBounds(m, o.minTop), h = Math.max(Math.min(full, cap, B.b - B.t), Math.min(full, 120 * k));
-      let top = Math.min(Math.max(cy - oy, B.t), B.b - h); if (top < B.t && h <= B.b - B.t) top = B.t;
-      const s = Math.min(Math.max(top + oy - cy, 0), full - h);
+      const B = ddBounds(m, o.minTop), h = Math.max(Math.min(full, cap, B.b - B.t), Math.min(full, 120 * k)), ih = oR ? oR.height : 0;
+      // s = quanto a lista já abre rolada; top = cy - oy + s mantém a opção atual exatamente no centro do campo.
+      // Restrições: menu dentro dos limites, opção atual visível dentro do menu, rolagem possível. Se a lista
+      // precisa rolar, prefere o menu centrado no campo; se cabe inteira, s = 0. Sem solução (campo colado na
+      // borda), o menu só desliza pra dentro — como o sistema faz.
+      const cl = (v, a, b) => Math.min(Math.max(v, a), b), sPref = full > h ? oy - h / 2 : 0;
+      const lo = Math.max(0, B.t - cy + oy, oy - h + ih / 2), hi = Math.min(full - h, B.b - h - cy + oy, oy - ih / 2);
+      let s, top;
+      if (lo <= hi) { s = cl(sPref, lo, hi); top = cy - oy + s; }
+      else { s = cl(sPref, 0, full - h); top = cl(cy - oy + s, B.t, B.b - h); }
       m.style.top = (top - pt) / k + 'px'; m.style.maxHeight = h / k + 'px';
       sc.scrollTop = s / k;
       // lateral: se escapar da tela/container, desliza pra dentro
