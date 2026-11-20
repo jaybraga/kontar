@@ -674,8 +674,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const L = cols[0] ? [...cols[0].children] : [], M = cols[1] ? [...cols[1].children] : [];
     [[L[0], M[0]], [L[1], M[1], M[2]]].forEach((row, i) => row.forEach(el => upIn(el, b + 280 + i * 110, 26, 520)));
     if (rail) {
-      const [dv, tk] = rail.children;
-      upIn(dv, b + 280, 12, 460);
+      const dv = rail.querySelector('[data-a="mode"][data-v="dividir"]'), tk = dv && dv.nextElementSibling;   // (o link Excluir, quando existe, é outro filho da coluna)
+      upIn(rail.querySelector('[data-a="askdel"]'), b + 280, 8, 420); upIn(dv, b + 280, 12, 460);
       if (tk) {   // a nota sai da fenda: desce 20px e é revelada de cima pra baixo (a fenda fica parada), junto com os botões
         anim(tk, [{ opacity: 0, transform: 'translateY(-20px)', clipPath: 'inset(20px -40px -40px -40px)' }, { opacity: 1, offset: .55, transform: 'translateY(-9px)', clipPath: 'inset(9px -40px -40px -40px)' }, { opacity: 1, transform: 'none', clipPath: 'inset(0px -40px -40px -40px)' }], { delay: b + 430, duration: 760, easing: SNAP });
       }
