@@ -681,18 +681,29 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       }
     }
   }
-  // clicar num item da nota cria a primeira parte: os campos (categoria e título) descem com fade e a lista de itens
-  // desliza pra baixo até o lugar novo (FLIP), em vez de a coluna trocar de uma vez.
-  function revealParte(pn, preTop) {
-    if (REDUCE()) return;
+  // clicar num item da nota cria a primeira parte. Ordem, sem nada sobreposto e sem nenhum item sumir:
+  //  1) a lista de itens desliza pra baixo até o lugar novo (FLIP, sempre 100% visível; a dica antiga só esmaece);
+  //  2) só depois, Categoria e Título descem com fade, emergindo de baixo da linha horizontal (recortados nela),
+  //     e o rótulo "Itens da nota" aparece por último no espaço que a lista abriu.
+  function revealParte(pn, pre) {
+    if (REDUCE() || !pre) return;
     const root = pn.querySelector(':scope > div[style*="padding:26px 34px"]'), rc = root && root.children[1] && root.children[1].children[1];
     if (!rc) return;
     const pw = pn.closest('[data-pw]'), sc = (pw.getBoundingClientRect().width / pw.offsetWidth) || 1;
-    const f = rc.children[0];
-    [...f.children].forEach((c, i) => anim(c, [{ opacity: 0, transform: 'translateY(-18px)' }, { opacity: 1, transform: 'none' }], { delay: 40 + i * 70, duration: 520, easing: SNAP }));
-    const it = rc.querySelector('[data-a="item"]'), rest = [...rc.children].slice(1);
-    const d = (preTop != null && it) ? (preTop - it.getBoundingClientRect().top) / sc : -40;
-    rest.forEach(e => anim(e, [{ opacity: 0, transform: 'translateY(' + d + 'px)' }, { opacity: 1, transform: 'none' }], { delay: 0, duration: 560, easing: EH }));
+    const f = rc.children[0], label = rc.children[1], list = rc.children[2] || rc.children[1], it = rc.querySelector('[data-a="item"]');
+    const T1 = 460, d = (pre.top - it.getBoundingClientRect().top) / sc;
+    if (pre.hint) {   // a dica antiga não some de uma vez: um fantasma esmaece no lugar dela, antes dos campos chegarem
+      const g = document.createElement('div'); g.innerHTML = pre.hint.html; const gh = g.firstElementChild;
+      gh.style.cssText += ';position:absolute;left:' + pre.hint.left + 'px;top:' + pre.hint.top + 'px;width:' + pre.hint.w + 'px;pointer-events:none';
+      rc.appendChild(gh); const a = gh.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 240, easing: 'ease', fill: 'forwards' }); a.onfinish = () => gh.remove();
+    }
+    anim(list, [{ transform: 'translateY(' + d + 'px)' }, { transform: 'none' }], { delay: 0, duration: T1, easing: EH });   // sem opacity: nenhum item some
+    const line = pn.querySelector(':scope > div[style*="height:1px"]');
+    const gap = line ? Math.max(0, (f.getBoundingClientRect().top - line.getBoundingClientRect().bottom) / sc) : 24, fh = f.offsetHeight, T2 = T1 - 60, D2 = 560;
+    const clip = 'inset(' + (-gap) + 'px -30px -30px -30px)';
+    anim(f, [{ clipPath: clip }, { clipPath: clip }], { delay: 0, duration: T2 + 70 + D2 });   // a linha horizontal é a "borda": nada aparece acima dela
+    [...f.children].forEach((c, i) => anim(c, [{ opacity: 0, transform: 'translateY(' + (-(gap + fh)) + 'px)' }, { opacity: 1, transform: 'none' }], { delay: T2 + i * 70, duration: D2, easing: SNAP }));
+    if (label !== list) anim(label, [{ opacity: 0 }, { opacity: 1 }], { delay: T2 + 150, duration: 360 });
   }
   function enterView(pn, b) {
     if (REDUCE()) return;
@@ -1102,7 +1113,12 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const prevPw = host.querySelector('[data-pw]'), prevH = prevPw && !S.inline ? prevPw.offsetHeight : 0;
     const Ht = S.inline ? 480 : (S.mode === 'dividir' && S.itens.length) ? Math.min(624, Math.max(480, Math.floor(((host.clientHeight || 0) - 48) / k))) : 480;
     const Hs = (prevH && !first) ? prevH : Ht;
-    const preItem = (S.mode === 'dividir' && S._hadP === false) ? (() => { const e = host.querySelector('[data-a="item"]'); return e ? e.getBoundingClientRect().top : null; })() : null;
+    // estado visual ANTES do redesenho (só quando a primeira parte está nascendo): onde estava a lista e o texto de dica
+    const preItem = (S.mode === 'dividir' && S._hadP === false) ? (() => {
+      const it = host.querySelector('[data-a="item"]'); if (!it) return null;
+      const rc = it.parentElement && it.parentElement.parentElement, hint = rc && rc.firstElementChild;
+      return { top: it.getBoundingClientRect().top, hint: hint && hint !== it.parentElement ? { html: hint.outerHTML, top: hint.offsetTop, w: hint.offsetWidth, left: hint.offsetLeft } : null };
+    })() : null;
     const modal = S.askDel ? '<div data-modal style="position:absolute;inset:0;z-index:9;background:rgba(0,0,0,.6);border-radius:30px;display:flex;align-items:center;justify-content:center;animation:txfade .2s ease"><div style="width:460px;background:#151518;border:1px solid #3A3A40;border-radius:28px;padding:28px;display:flex;flex-direction:column;gap:12px">'
         + '<div style="display:flex;align-items:center;gap:12px"><span style="width:40px;height:40px;flex:none;border-radius:50%;background:rgba(255,107,90,.14);color:#FF6B5A;display:flex;align-items:center;justify-content:center">' + svg('trash', 18, 2.2) + '</span><div style="font-size:22px;font-weight:700;letter-spacing:-.02em">Excluir transação?</div></div>'
         + '<div style="font-size:14px;color:#9A9AA3;line-height:1.5"><b style="color:#F2F0EB">' + esc(S.row.e || 'Sem nome') + '</b> · R$ ' + brl(S.row.total || 0) + ' · ' + dfmt(S.row.iso) + '<br>Ela some do extrato e dos totais, junto com a nota e a divisão em categorias, se tiver.</div>'
