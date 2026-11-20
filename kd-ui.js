@@ -71,7 +71,11 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       const lo = Math.max(0, B.t - cy + oy, oy - h + ih / 2), hi = Math.min(full - h, B.b - h - cy + oy, oy - ih / 2);
       let s, top;
       if (lo <= hi) { s = cl(sPref, lo, hi); top = cy - oy + s; }
-      else { s = cl(sPref, 0, full - h); top = cl(cy - oy + s, B.t, B.b - h); }
+      else {   // campo colado na borda: o menu encosta no limite e a lista rola pra opção ficar o mais perto possível do campo
+        top = cl(full > h ? cy - h / 2 : cy - oy, B.t, B.b - h);
+        const l2 = Math.max(0, oy - h + ih / 2), h2 = Math.min(full - h, oy - ih / 2);
+        s = l2 <= h2 ? cl(top + oy - cy, l2, h2) : cl(top + oy - cy, 0, full - h);
+      }
       m.style.top = (top - pt) / k + 'px'; m.style.maxHeight = h / k + 'px';
       sc.scrollTop = s / k;
       // lateral: se escapar da tela/container, desliza pra dentro
