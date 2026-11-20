@@ -55,6 +55,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       const sc = m.querySelector('[data-popscroll]') || m, k = ddScale(m);
       if (!m.dataset.ddCap) { const mh = parseFloat(getComputedStyle(m).maxHeight); m.dataset.ddCap = String(o.maxH || (isFinite(mh) ? mh : 1e5)); }
       const cap = +m.dataset.ddCap * k;
+      // a animação de entrada antiga de cada menu (translate/scaleY) distorce a medida: sai antes de medir
+      m.style.animation = 'none';
       m.style.bottom = 'auto'; m.style.marginTop = '0px'; m.style.marginBottom = '0px'; m.style.maxHeight = 'none'; m.style.translate = '';
       sc.scrollTop = 0;
       const pr = m.offsetParent.getBoundingClientRect(), A = anchor.getBoundingClientRect(), cy = A.top + A.height / 2, pt = pr.top + m.offsetParent.clientTop * k;
@@ -84,7 +86,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       if (dx) m.style.translate = dx / k + 'px 0';
       const pos = { top: m.style.top, maxH: m.style.maxHeight, tr: m.style.translate, s: s / k, oy: (cy - top) / k };
       if (o.animate !== false) {
-        m.style.animation = 'none'; m.style.transformOrigin = '50% ' + pos.oy + 'px';
+        m.style.transformOrigin = '50% ' + pos.oy + 'px';
         if (m.animate) m.animate([{ opacity: 0, transform: 'scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: 240, easing: 'cubic-bezier(.2,.7,.2,1)' });
       }
       return pos;
