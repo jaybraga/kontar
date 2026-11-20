@@ -676,8 +676,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (rail) {
       const dv = rail.querySelector('[data-a="mode"][data-v="dividir"]'), tk = dv && dv.nextElementSibling;   // (o link Excluir, quando existe, é outro filho da coluna)
       upIn(rail.querySelector('[data-a="askdel"]'), b + 280, 8, 420); upIn(dv, b + 280, 12, 460);
-      if (tk) {   // a nota sai da fenda: desce 20px e é revelada de cima pra baixo (a fenda fica parada), junto com os botões
-        anim(tk, [{ opacity: 0, transform: 'translateY(-20px)', clipPath: 'inset(20px -40px -40px -40px)' }, { opacity: 1, offset: .55, transform: 'translateY(-9px)', clipPath: 'inset(9px -40px -40px -40px)' }, { opacity: 1, transform: 'none', clipPath: 'inset(0px -40px -40px -40px)' }], { delay: b + 430, duration: 760, easing: SNAP });
+      if (tk) {   // a nota sai da fenda: desce 36px e é revelada de cima pra baixo (a fenda fica parada), junto com os botões
+        anim(tk, [{ opacity: 0, transform: 'translateY(-36px)', clipPath: 'inset(36px -40px -40px -40px)' }, { opacity: 1, offset: .45, transform: 'translateY(-17px)', clipPath: 'inset(17px -40px -40px -40px)' }, { opacity: 1, transform: 'none', clipPath: 'inset(0px -40px -40px -40px)' }], { delay: b + 720, duration: 1150, easing: SNAP });
       }
     }
   }
@@ -764,8 +764,28 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     ['left', 'right', 'top', 'height', 'transition', 'order', 'clipPath'].forEach(k => { h.style[k] = ''; }); h.style.position = 'relative';
     h.innerHTML = '';
   }
+  // Editar: o overlay abre por cima e a linha expandida continua aberta por baixo (intacta). Quando o overlay
+  // fecha, o estado do reduzido volta como estava (ou é refeito, se o overlay salvou alguma coisa).
+  let under = null;
+  const keyOf = (st) => { const t = S; S = st; const k = dirtyKey(); S = t; return k; };
+  function restoreUnder() {
+    const u = under; under = null; if (!u || !u.host.isConnected) return;
+    const r = KD.M.rowById[u.S.row.id]; if (!r) return;
+    const { rw, kids } = kidsOf(u.host);
+    if (rw) { rw.style.height = ''; rw.style.transition = ''; rw.style.clipPath = ''; u.host.style.transition = ''; u.host.style.clipPath = ''; kids.forEach(k => { kidT0(k); k.style.transform = ''; }); }
+    const fresh = init(r); fresh.inline = true;
+    host = u.host;
+    if (keyOf(fresh) === keyOf(u.S)) { S = u.S; return; }   // nada mudou: o mesmo reduzido, sem redesenhar (sem piscar)
+    S = fresh; S.base = dirtyKey(); render();
+  }
+  TX.openFull = function (c, row) {
+    const ab = document.querySelector('[data-tx-host]');
+    if (!S || !S.inline || !ab) { TX.open(c, row); return; }
+    under = { S, host }; comp = c; S = init(row); S.base = dirtyKey();
+    host = ab; host.style.pointerEvents = 'auto'; render(true);
+  };
   TX.open = function (c, row, o) {
-    comp = c; TX.close(true);
+    const had = !!under; comp = c; TX.close(true); if (had) TX.close(true);
     S = init(row); S.inline = !!(o && o.inline); S.base = dirtyKey();
     const ab = document.querySelector(S.inline ? '[data-tx-in="' + row.id + '"]' : '[data-tx-host]'); if (!ab) { S = null; return; }
     host = ab;
@@ -817,7 +837,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (!host) { S = null; return; }
     const inl = S && S.inline, h = host;
     const pn = h.querySelector('[data-pw]'), bd = h.querySelector('[data-bd]'), xi = h.querySelector('[data-xi]');
-    const done = () => { if (pendingDone === done) pendingDone = null; if (inl) inlineReset(h); else { h.innerHTML = ''; if (h.hasAttribute('data-tx-host')) h.style.pointerEvents = 'none'; } };
+    const done = () => { if (pendingDone === done) pendingDone = null; if (inl) inlineReset(h); else { h.innerHTML = ''; if (h.hasAttribute('data-tx-host')) h.style.pointerEvents = 'none'; if (under) restoreUnder(); } };
     S = null;
     if (quick || !pn) { if (!pn && !inl) { h.innerHTML = ''; if (h.hasAttribute('data-tx-host')) h.style.pointerEvents = 'none'; } else done(); return; }
     if (xi) { xi.style.transition = 'transform .3s cubic-bezier(.65,0,.2,1)'; xi.style.transform = 'rotate(180deg)'; }
@@ -1302,7 +1322,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       else if (a === 'domerge') { const m = S.merge; S.merge = null; if (m && S.partes[m.from] && S.partes[m.to]) { const A = S.partes[m.from], B = S.partes[m.to]; B.valor = Math.round((A.valor + B.valor) * 100) / 100; B.itens = B.itens.concat(A.itens); S.partes.splice(m.from, 1); S.sel = Math.min(m.to > m.from ? m.to - 1 : m.to, S.partes.length - 1); S.partesDirty = true; } render(); }
       else if (a === 'anotar') anotar();
       else if (a === 'goest') { const n = S.row.e; TX.close(true); comp.goEst(n); }
-      else if (a === 'full') { const r = S.row; TX.open(comp, r); }
+      else if (a === 'full') { const r = S.row; TX.openFull(comp, r); }
       else if (a === 'parc') { S.parc = (S.parc || 1) % 12 + 1; render(); }
       else if (a === 'dir') { S.dir = v; render(); if (S.inline) salvarReduzido(); }
       else if (a === 'forma') { ev.stopPropagation(); S.meio = v; S.cardId = null; render(); }
