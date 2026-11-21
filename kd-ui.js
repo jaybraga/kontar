@@ -2006,7 +2006,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     });
     await carregaHist(true);
   }
-  IMP.history = historico;
+  IMP.history = historico; IMP.toast = mostraToast;
   IMP.open = abrir;
 
   /* ---------- botão "Importar" na barra de cima, ao lado de "Nova" ---------- */
