@@ -2112,7 +2112,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     s.textContent = '[data-k="mes"][data-fm]{height:108px!important;overflow:visible!important;padding:14px 22px!important;transition:transform .5s ' + EE + ',height .55s ' + EE + '!important}'
       + '[data-k="mes"][data-fm] [data-mesn]{font-size:calc(54px*var(--ks,1))!important}'
       + '[data-k="mes"][data-fm="out"]{height:var(--rh,162px)!important;padding:18px 22px!important}'
-      + '[data-k="mes"][data-fm="out"] [data-mesn]{font-size:calc(72px*var(--ks,1))!important}';
+      + '[data-k="mes"][data-fm="out"] [data-mesn]{font-size:calc(72px*var(--ks,1))!important}'
+      + '[data-k="mes"][data-fm-hide]{opacity:0!important;transition:opacity .3s ease!important}[data-k="saldo"][data-fm-hide]{opacity:0!important;transition:opacity .3s ease .35s!important}[data-k="saldo"]:not([data-fm-hide]){transition:transform .5s ' + EE + ',opacity .3s ease}';
     document.head.appendChild(s);
   }
   function sync() {
@@ -2158,7 +2159,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       + '<div data-fm-rc style="position:absolute;left:0;top:0;width:' + cr.width + 'px;height:' + cr.height + 'px;transition:opacity .25s ease">' + reducedHtml(d) + '</div>' + expandedHtml(d, fw, fh)
       + '<span data-fm-ar style="position:absolute;right:0;top:0;width:32px;height:32px;border-radius:50%;background:' + INK + ';color:' + W + ';display:flex;align-items:center;justify-content:center;transition:opacity .25s ease,transform .45s ' + EE + '">' + ARROW + '</span>'
       + '<span data-fm-x style="position:absolute;right:0;top:0;width:44px;height:44px;border-radius:50%;background:' + W + ';color:' + INK + ';display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transform:rotate(-90deg);transition:opacity .3s ease .2s,transform .5s ' + EE + ' .1s">' + XMARK + '</span>';
-    grid.appendChild(ov); card.style.visibility = 'hidden';
+    grid.appendChild(ov); card.style.visibility = 'hidden'; w.setAttribute('data-fm-hide', '1'); const sd = grid.querySelector('[data-k="saldo"]'); if (sd) sd.setAttribute('data-fm-hide', '1');
     ov.addEventListener('click', ev => {
       if (ev.target.closest('[data-fm-x]')) return fecha();
       const b = ev.target.closest('[data-fm-imp]'); if (b && KD.imp && KD.imp.pick) KD.imp.pick(b.dataset.fmImp);
@@ -2178,6 +2179,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (!open || anim || !ov) return;
     anim = true;
     const w = document.querySelector('[data-k="mes"]'), grid = w && w.closest('[data-org-grid]'), card = w && w.querySelector(':scope > [data-fm-card]');
+    if (w) w.removeAttribute('data-fm-hide'); const sd = grid && grid.querySelector('[data-k="saldo"]'); if (sd) sd.removeAttribute('data-fm-hide');
     const o = ov; let L = 0, T = 120, cw = o.getBoundingClientRect().width, ch = 81;
     if (grid && card) { card.style.visibility = 'hidden'; const gr = grid.getBoundingClientRect(), cr = card.getBoundingClientRect(); L = cr.left - gr.left; T = cr.top - gr.top; cw = cr.width; ch = cr.height; }
     const ec = o.querySelector('[data-fm-ec]'); ec.style.transition = 'opacity .2s ease, transform .4s ' + EE; ec.style.opacity = '0'; ec.style.transform = 'translateY(8px)'; ec.style.pointerEvents = 'none';
