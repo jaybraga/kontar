@@ -1492,7 +1492,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const brl0 = n => Math.round(n).toLocaleString('pt-BR');
   const ddmm = iso => iso.slice(8, 10) + '/' + iso.slice(5, 7);
   const AM = '#F0C24B', GR = '#6AFF2A', RD = '#FF5A4A', XF = '#78788A', INK = '#0A0A0A', FG = '#F2F0EB', MU = '#8A8A90';
-  const E = 'cubic-bezier(.2,.7,.2,1)';
+  const E = 'cubic-bezier(.2,.7,.2,1)', EE = 'cubic-bezier(.65,0,.35,1)';
   const PREFIX = /^(compra no d[eé]bito|compra no cr[eé]dito|transfer[eê]ncia (enviada|recebida)( pelo pix)?|pagamento de boleto efetuado|pix (enviado|recebido))\s*[-–:]\s*/i;
   const FATURA = /pagamento (recebido|da fatura|de fatura)|desconto antecipa|estorno de/i;
 
@@ -1616,7 +1616,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   function popTarget() {
     return popShell(S.targets.map(t => '<span data-pick="tg" data-v="' + t.k + '"' + (t.k === S.tk ? ' data-dd-on="1"' : '') + ' style="' + optCss(t.k === S.tk) + '">' + bankChip(t.bank, t.cor) + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis">' + esc(t.label) + '</span><span style="font-size:10px;letter-spacing:.12em;color:' + MU + '">' + (t.card ? 'CARTÃO' : 'CONTA') + '</span></span>').join(''));
   }
-  const meioTag = (r, dark) => '<span style="justify-self:start;font-size:10px;font-weight:800;letter-spacing:.12em;border:1.5px solid ' + (dark ? '#3A3A40' : 'rgba(10,10,10,.55)') + ';border-radius:99px;padding:4px 10px;color:' + (dark ? '#B4B4BA' : INK) + ';white-space:nowrap">' + r.meioT + '</span>';
+  const meioTag = (r, dark, g) => '<span style="justify-self:start;font-size:10px;font-weight:800;letter-spacing:.12em;border:1.5px solid ' + (g === 'xfer' ? 'rgba(255,255,255,.42)' : dark ? '#3A3A40' : 'rgba(10,10,10,.55)') + ';border-radius:99px;padding:4px 10px;color:' + (g === 'xfer' ? '#E6E6EC' : dark ? '#B4B4BA' : INK) + ';white-space:nowrap' + (g === 'xfer' ? ';mix-blend-mode:screen' : '') + '">' + r.meioT + '</span>';
   const valor = (r, dark) => '<b style="text-align:right;font-size:19px;font-weight:800;letter-spacing:-.03em;white-space:nowrap;color:' + (r.dir === 'entrada' ? (dark ? GR : '#1E6B0C') : (dark ? RD : '#B3261E')) + '">' + (r.dir === 'entrada' ? '+ ' : '– ') + 'R$ ' + brl(r.amt) + '</b>';
   const ck = (on, dark, attr) => '<span ' + attr + ' style="width:20px;height:20px;border-radius:6px;box-sizing:border-box;flex:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s ease,border-color .2s ease;'
     + (on ? 'background:' + (dark ? FG : INK) + ';border:2px solid ' + (dark ? FG : INK) : 'border:2px solid ' + (dark ? '#55555C' : 'rgba(10,10,10,.55)')) + '">' + (on ? checkSvg(dark ? INK : AM) : '') + '</span>';
@@ -1631,7 +1631,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     return '<div style="position:relative;' + (open ? 'z-index:30' : '') + '">' + pill + (open ? popCat(r) : '') + '</div>';
   }
   const COLS = 'grid-template-columns:20px 78px minmax(0,1fr) auto 196px 150px';
-  function rowHtml(r, g) {
+  function rowHtml(r, g, first) {
     const dark = g !== 'need', line = dark ? '#232327' : 'rgba(10,10,10,.16)', off = r.dupChoice === 'same';
     let why = '', cat = '', box = '';
     if (g === 'skip') {
@@ -1652,16 +1652,16 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       } else if (g === 'need' && r.why && r.why !== 'Sem categoria') why = '<span>' + esc(r.why) + '</span>';
       cat = off ? '<span></span>' : catCell(r, dark);
     }
-    return '<div data-row="' + r.i + '" style="display:grid;' + COLS + ';gap:16px;align-items:center;min-height:58px;padding:8px 0;border-top:1px solid ' + line + ';opacity:' + (off ? .45 : 1) + ';transition:opacity .3s ease">'
-      + box + meioTag(r, dark)
+    return '<div data-row="' + r.i + '" style="display:grid;' + COLS + ';gap:16px;align-items:center;min-height:58px;padding:8px 0;border-top:' + (g === 'skip' && first ? '0' : '1px solid ' + line) + ';opacity:' + (off ? .45 : 1) + ';transition:opacity .3s ease">'
+      + box + meioTag(r, dark, g)
       + '<div style="min-width:0;display:flex;align-items:baseline;gap:10px"><b style="font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(r.nome) + '</b><span style="font-size:12px;color:' + (dark ? MU : 'rgba(10,10,10,.6)') + ';flex:none">' + ddmm(r.iso) + '</span></div>'
       + '<div style="font-size:12px;max-width:280px;text-align:right;line-height:1.35;color:' + (dark ? '#B4B4BA' : INK) + '">' + why + '</div>'
       + cat + valor(r, dark) + '</div>';
   }
   const GDEF = {
     need: { t: 'Precisam de você', sub: 'DUPLICATA, SEM CATEGORIA OU VALOR ALTO', bg: AM, fg: INK, rule: INK, bul: AM, bulFg: INK },
-    xfer: { t: 'Entre suas contas', sub: 'NÃO ENTRA NOS TOTAIS DE GASTO NEM DE RENDA', bg: '#141416', fg: FG, rule: XF, bul: '#5B3DF5', bulFg: '#fff' },
-    ok: { t: 'Confiantes', sub: 'CATEGORIA E ESTABELECIMENTO RECONHECIDOS', bg: '#141416', fg: FG, rule: GR, bul: GR, bulFg: INK },
+    xfer: { t: 'Entre suas contas', sub: 'NÃO ENTRA NOS TOTAIS DE GASTO NEM DE RENDA', bg: '#141416', fg: FG, rule: 'linear-gradient(90deg,#5B3DF5 0,#2E2E34 85%)', bul: '#5B3DF5', bulFg: '#fff' },
+    ok: { t: 'Confiantes', sub: 'CATEGORIA E ESTABELECIMENTO RECONHECIDOS', bg: '#141416', fg: FG, rule: 'linear-gradient(90deg,' + GR + ' 0,#2E2E34 85%)', bul: GR, bulFg: INK },
     skip: { t: 'Descartadas', sub: 'NADA É APAGADO · DÁ PARA INCLUIR DE VOLTA', bg: 'transparent', fg: '#B4B4BA', rule: '#2A2A2F', bul: 'transparent;box-shadow:inset 0 0 0 1.5px #3A3A40', bulFg: '#B4B4BA' }
   };
   const BCOL = { need: AM, xfer: '#C9BBFF', ok: GR, skip: MU };
@@ -1679,16 +1679,16 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const D = GDEF[g], dark = g !== 'need', open = !!S.open[g], lim = g === 'ok' ? 8 : 999;
     const show = g === 'skip' ? (open ? rows : []) : (open ? rows : rows.slice(0, lim)), more = rows.length - show.length;
     const sel = rows.filter(ativa), all = sel.length && sel.every(r => r.include);
-    const head = '<div style="display:flex;align-items:center;gap:14px;height:40px;padding-left:' + (NN + NF - 28 + 4) + 'px"><b style="font-size:26px;letter-spacing:-.04em">' + D.t + '</b><span style="font-size:10px;font-weight:700;letter-spacing:.14em;color:' + (dark ? MU : 'rgba(10,10,10,.62)') + '">' + D.sub + '</span>'
-      + (g === 'skip' ? '<span data-a="more" data-g="skip" style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;letter-spacing:.14em;cursor:pointer;color:' + FG + '">' + (open ? 'FECHAR' : 'VER') + '<span style="display:flex;transition:transform .35s ' + E + ';transform:rotate(' + (open ? 180 : 0) + 'deg)">' + chev(14) + '</span></span>' : '') + '</div>'
-      + '<div style="height:' + RULE + 'px;background:' + D.rule + ';margin:18px 0 ' + (g === 'skip' && !open ? 0 : 4) + 'px"></div>';
+    const head = '<div data-head style="display:flex;align-items:center;gap:14px;height:58px;padding-left:' + (NN + NF - 28 + 4) + 'px"><b style="font-size:26px;letter-spacing:-.04em">' + D.t + '</b><span style="font-size:10px;font-weight:700;letter-spacing:.14em;color:' + (dark ? MU : 'rgba(10,10,10,.62)') + '">' + D.sub + '</span>'
+      + (g === 'skip' ? '<span data-a="more" data-g="skip" style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;letter-spacing:.14em;cursor:pointer;color:' + FG + '">' + (open ? 'FECHAR' : 'VER') + '<span data-chev style="display:flex;transform:rotate(' + (open ? 180 : 0) + 'deg)">' + chev(14) + '</span></span>' : '') + '</div>'
+      + (g === 'skip' && !open ? '' : '<div data-rule style="height:' + RULE + 'px;background:' + D.rule + ';margin:0 0 4px"></div>');
     const selAll = g === 'skip' || !sel.length ? '' : '<div style="display:grid;' + COLS + ';gap:16px;align-items:center;height:44px">' + ck(all, dark, 'data-all="' + g + '"') + '<span data-all="' + g + '" style="grid-column:2 / 4;font-size:11px;font-weight:800;letter-spacing:.14em;cursor:pointer">' + (all ? 'DESMARCAR TODAS' : 'SELECIONAR TODAS') + '</span></div>';
     const bd = g === 'skip' ? '#2A2A2F' : dark ? '#232327' : null;
     const layer = '<div aria-hidden="true" style="position:absolute;inset:0;z-index:-1;box-sizing:border-box;border-radius:28px;pointer-events:none;background-color:' + D.bg + ';' + (g === 'xfer' ? 'background-image:' + MESH + ';background-size:33.333% 100%;background-repeat:no-repeat;background-position:left top;' : '') + (bd ? 'border:1px solid ' + bd + ';' : '') + '-webkit-mask:' + MASKURL + ';-webkit-mask-composite:xor;mask:' + MASKURL + ';mask-composite:exclude"></div>'
       + (bd ? '<svg aria-hidden="true" width="' + NS + '" height="' + NS + '" style="position:absolute;left:0;top:0;z-index:-1;pointer-events:none;overflow:visible"><path d="' + EDGE + '" fill="none" stroke="' + bd + '" stroke-width="1"/></svg>' : '')
       + '<span style="position:absolute;left:0;top:0;width:40px;height:40px;border-radius:50%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:' + (String(rows.length).length > 2 ? 16 : 20) + 'px;font-weight:800;letter-spacing:-.04em;background:' + D.bul + ';color:' + D.bulFg + '">' + rows.length + '</span>';
-    return '<section data-grp="' + g + '" style="position:relative;color:' + D.fg + ';border-radius:28px;padding:0 28px ' + (g === 'skip' && !open ? 22 : 14) + 'px;overflow:visible">'
-      + layer + head + selAll + '<div data-rows>' + show.map(r => rowHtml(r, g)).join('') + '</div>'
+    return '<section data-grp="' + g + '" style="position:relative;color:' + D.fg + ';box-sizing:border-box;border-radius:28px;padding:0 28px ' + (g === 'skip' && !open ? 22 : 14) + 'px;overflow:visible">'
+      + layer + head + selAll + '<div data-rows>' + show.map((r, k) => rowHtml(r, g, k === 0)).join('') + '</div>'
       + (more > 0 && g !== 'skip' ? '<div data-a="more" data-g="' + g + '" style="border-top:1px solid #232327;padding:14px 0 4px;font-size:11px;font-weight:800;letter-spacing:.14em;color:' + MU + ';cursor:pointer">+ ' + more + (more === 1 ? ' LINHA' : ' LINHAS') + ' · MOSTRAR TODAS</div>' : '')
       + '</section>';
   }
@@ -1718,7 +1718,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   /* ---------- render (com altura animada dos cards e fade das linhas novas) ---------- */
   function render(first) {
     if (!L) return;
-    const G = { need: [], xfer: [], ok: [], skip: [] }; S.rows.forEach(r => G[r.grp].push(r));
+    const ee = !!S.ee, G = { need: [], xfer: [], ok: [], skip: [] }; S.rows.forEach(r => G[r.grp].push(r));
     const old = {}, oldRows = new Set();
     if (!first) { L.querySelectorAll('[data-grp]').forEach(c => { old[c.dataset.grp] = c.getBoundingClientRect().height; }); L.querySelectorAll('[data-row]').forEach(x => oldRows.add(x.closest('[data-grp]').dataset.grp + ':' + x.dataset.row)); }
     const keep = L.scrollTop;
@@ -1726,6 +1726,13 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       + '<main style="padding:22px 32px 80px 4px;display:flex;flex-direction:column;gap:16px">' + ['need', 'xfer', 'ok', 'skip'].filter(g => G[g].length || old[g] != null).map(g => G[g].length ? card(g, G[g]) : card(g, []).replace('<section ', '<section data-gone ')).join('') + '</main></div>';
     L.scrollTop = keep;
     const inp = L.querySelector('[data-nome]'); if (inp) inp.focus();
+    const sk = !!S.open.skip, chv = L.querySelector('[data-chev]');
+    if (!first && S._sk != null && S._sk !== sk) {
+      if (chv) { chv.style.transition = 'none'; chv.style.transform = 'rotate(' + (S._sk ? 180 : 0) + 'deg)'; void chv.offsetWidth; requestAnimationFrame(() => { chv.style.transition = 'transform .5s ' + EE; chv.style.transform = 'rotate(' + (sk ? 180 : 0) + 'deg)'; }); }
+      const ru = sk ? L.querySelector('[data-grp="skip"] [data-rule]') : null;
+      if (ru) { ru.style.transition = 'none'; ru.style.opacity = '0'; ru.style.transform = 'translateY(-8px)'; void ru.offsetWidth; requestAnimationFrame(() => { ru.style.transition = 'opacity .45s ease .12s, transform .55s ' + EE + ' .12s'; ru.style.opacity = '1'; ru.style.transform = 'none'; }); }
+    }
+    S._sk = sk;
     if (first) {
       const els = [...L.querySelectorAll('[data-s],[data-grp]')];
       els.forEach(g => { g.style.transition = 'none'; g.style.opacity = '0'; g.style.transform = 'translateY(14px)'; }); void L.offsetHeight;
@@ -1743,11 +1750,11 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     void L.offsetHeight;
     requestAnimationFrame(() => {
       cards.forEach(c => {
-        if (c.dataset.h1) { c.style.transition = 'height .5s ' + E; c.style.height = c.dataset.h1 + 'px'; const done = () => { c.style.height = ''; c.style.overflow = 'visible'; c.style.transition = ''; delete c.dataset.h1; }; c.addEventListener('transitionend', function f(e) { if (e.target === c) { c.removeEventListener('transitionend', f); done(); } }); setTimeout(done, 700); }
+        if (c.dataset.h1) { c.style.transition = 'height .5s ' + (ee ? EE : E); c.style.height = c.dataset.h1 + 'px'; const done = () => { c.style.height = ''; c.style.overflow = 'visible'; c.style.transition = ''; delete c.dataset.h1; }; c.addEventListener('transitionend', function f(e) { if (e.target === c) { c.removeEventListener('transitionend', f); done(); } }); setTimeout(done, 700); }
         else if (old[c.dataset.grp] == null) { c.style.transition = 'opacity .45s ease .1s, transform .6s ' + E + ' .1s'; c.style.opacity = '1'; c.style.transform = 'none'; }
       });
       gone.forEach(c => { c.style.transition = 'opacity .3s ease, height .5s ' + E + ' .1s, padding .5s ' + E + ' .1s, margin .5s ' + E + ' .1s'; c.style.opacity = '0'; c.style.height = '0px'; c.style.paddingTop = c.style.paddingBottom = '0px'; c.style.marginTop = '-16px'; c.style.borderWidth = '0px'; setTimeout(() => c.remove(), 650); });
-      novas.forEach((x, k) => { const dl = Math.min(k, 12) * .03 + .12; x.style.transition = 'opacity .4s ease ' + dl + 's, transform .55s ' + E + ' ' + dl + 's'; x.style.opacity = '1'; x.style.transform = 'none'; });
+      novas.forEach((x, k) => { const dl = Math.min(k, 12) * .03 + .12; x.style.transition = 'opacity .4s ease ' + dl + 's, transform .55s ' + (ee ? EE : E) + ' ' + dl + 's'; x.style.opacity = '1'; x.style.transform = 'none'; });
     });
   }
   // fecha o dropdown aberto com fade antes de redesenhar
@@ -1828,6 +1835,17 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     });
     L.addEventListener('focusout', ev => { if (ev.target.matches && ev.target.matches('[data-nome]') && S && S.addNome) setTimeout(() => { if (S && S.addNome && !L.contains(document.activeElement)) { S.addNome = false; render(); } }, 0); });
   }
+  // fecha o Descartadas: linhas e régua saem em fade + slide enquanto o card encolhe (ease-in-out), e só então redesenha
+  function fechaSkip() {
+    const c = L.querySelector('[data-grp="skip"]'); if (!c || c._busy) return; c._busy = true;
+    const h0 = c.getBoundingClientRect().height, h1 = c.querySelector('[data-head]').offsetHeight + 22;
+    c.style.transition = 'none'; c.style.height = h0 + 'px'; c.style.overflow = 'hidden'; void c.offsetHeight;
+    const chv = c.querySelector('[data-chev]'); if (chv) { chv.style.transition = 'transform .5s ' + EE; chv.style.transform = 'rotate(0deg)'; }
+    c.querySelectorAll('[data-rule],[data-rows]').forEach(x => { x.style.transition = 'opacity .3s ease, transform .5s ' + EE; x.style.opacity = '0'; x.style.transform = 'translateY(-8px)'; });
+    requestAnimationFrame(() => { c.style.transition = 'height .5s ' + EE + ', padding-bottom .5s ' + EE; c.style.height = h1 + 'px'; c.style.paddingBottom = '22px'; });
+    S._sk = false;
+    setTimeout(() => { if (!S) return; S.open.skip = false; render(); }, 540);
+  }
   function onClick(ev) {
     if (!S) return;
     const pick = ev.target.closest('[data-pick]');
@@ -1844,7 +1862,10 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (a === 'go') return importar();
     if (a === 'pcat') { S.pop = { k: 'cat', i }; return render(); }
     if (a === 'ptg') { S.pop = { k: 'tg' }; return render(); }
-    if (a === 'more') { S.open[el.dataset.g] = !S.open[el.dataset.g]; return render(); }
+    if (a === 'more') {
+      if (el.dataset.g === 'skip') { if (S.open.skip) return fechaSkip(); S.ee = true; S.open.skip = true; render(); S.ee = false; return; }
+      S.open[el.dataset.g] = !S.open[el.dataset.g]; return render();
+    }
     if (a === 'goto') { const c = L.querySelector('[data-grp="' + el.dataset.g + '"]'); if (c) L.scrollTo({ top: Math.max(0, c.offsetTop - 22), behavior: 'smooth' }); return; }
     if (a === 'incluir') { const r = S.rows[i]; r.unskip = true; r.dupChoice = r.dupChoice === 'same' ? null : r.dupChoice; r.incUser = null; classificar(S); if (r.grp !== 'skip' && r.grp !== 'need') { r.include = true; r.incUser = true; } return render(); }
     if (a === 'naoxfer') { const r = S.rows[i]; r.xferOff = true; r.incUser = null; classificar(S); return render(); }
