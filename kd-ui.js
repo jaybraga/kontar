@@ -1617,7 +1617,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     return popShell(S.targets.map(t => '<span data-pick="tg" data-v="' + t.k + '"' + (t.k === S.tk ? ' data-dd-on="1"' : '') + ' style="' + optCss(t.k === S.tk) + '">' + bankChip(t.bank, t.cor) + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis">' + esc(t.label) + '</span><span style="font-size:10px;letter-spacing:.12em;color:' + MU + '">' + (t.card ? 'CARTÃO' : 'CONTA') + '</span></span>').join(''));
   }
   const meioTag = (r, dark) => '<span style="justify-self:start;font-size:10px;font-weight:800;letter-spacing:.12em;border:1.5px solid ' + (dark ? '#3A3A40' : 'rgba(10,10,10,.55)') + ';border-radius:99px;padding:4px 10px;color:' + (dark ? '#B4B4BA' : INK) + ';white-space:nowrap">' + r.meioT + '</span>';
-  const valor = (r, dark) => '<b style="text-align:right;font-size:16px;letter-spacing:-.02em;white-space:nowrap;color:' + (r.dir === 'entrada' ? (dark ? GR : '#1E6B0C') : (dark ? RD : '#B3261E')) + '">' + (r.dir === 'entrada' ? '+ ' : '– ') + 'R$ ' + brl(r.amt) + '</b>';
+  const valor = (r, dark) => '<b style="text-align:right;font-size:19px;font-weight:800;letter-spacing:-.03em;white-space:nowrap;color:' + (r.dir === 'entrada' ? (dark ? GR : '#1E6B0C') : (dark ? RD : '#B3261E')) + '">' + (r.dir === 'entrada' ? '+ ' : '– ') + 'R$ ' + brl(r.amt) + '</b>';
   const ck = (on, dark, attr) => '<span ' + attr + ' style="width:20px;height:20px;border-radius:6px;box-sizing:border-box;flex:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s ease,border-color .2s ease;'
     + (on ? 'background:' + (dark ? FG : INK) + ';border:2px solid ' + (dark ? FG : INK) : 'border:2px solid ' + (dark ? '#55555C' : 'rgba(10,10,10,.55)')) + '">' + (on ? checkSvg(dark ? INK : AM) : '') + '</span>';
   const link = (attr, t, col) => '<span ' + attr + ' style="cursor:pointer;text-decoration:underline;text-underline-offset:3px;color:' + col + ';white-space:nowrap">' + t + '</span>';
@@ -1625,12 +1625,12 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   function catCell(r, dark) {
     const open = S.pop && S.pop.k === 'cat' && S.pop.i === r.i, n = r.catId ? (KD.M.catById[r.catId] || {}).nome : null;
     let pill;
-    if (!n) pill = '<div data-a="pcat" data-i="' + r.i + '" style="height:38px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:8px;border-radius:99px;border:2px dashed ' + AM + ';background:' + INK + ';color:' + AM + ';font-size:13px;font-weight:800;cursor:pointer">Escolher categoria ' + chev(13) + '</div>';
+    if (!n) pill = '<div data-a="pcat" data-i="' + r.i + '" style="height:38px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:8px;border-radius:99px;border:2px dashed ' + INK + ';background:transparent;color:' + INK + ';font-size:13px;font-weight:800;cursor:pointer">Escolher categoria ' + chev(13) + '</div>';
     else if (dark) { const c = catCor(n); pill = '<div data-a="pcat" data-i="' + r.i + '" style="height:38px;box-sizing:border-box;display:flex;align-items:center;gap:9px;border-radius:99px;padding:0 6px 0 5px;border:2px solid ' + c + '8C;background:color-mix(in srgb,' + c + ' 14%,#000);cursor:pointer">' + icDot(n, 24) + '<b style="font-size:13px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(n) + '</b><span style="width:22px;height:22px;border-radius:50%;background:' + INK + ';display:flex;align-items:center;justify-content:center;color:' + FG + '">' + chev(11) + '</span></div>'; }
     else pill = '<div data-a="pcat" data-i="' + r.i + '" style="height:38px;box-sizing:border-box;display:flex;align-items:center;gap:9px;border-radius:99px;padding:0 6px 0 5px;border:2px solid ' + INK + ';background:' + INK + ';color:' + FG + ';cursor:pointer">' + icDot(n, 24) + '<b style="font-size:13px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(n) + '</b><span style="width:22px;height:22px;border-radius:50%;background:#2A2A2F;display:flex;align-items:center;justify-content:center;color:' + FG + '">' + chev(11) + '</span></div>';
     return '<div style="position:relative;' + (open ? 'z-index:30' : '') + '">' + pill + (open ? popCat(r) : '') + '</div>';
   }
-  const COLS = 'grid-template-columns:20px 78px minmax(0,1fr) auto 196px 130px';
+  const COLS = 'grid-template-columns:20px 78px minmax(0,1fr) auto 196px 150px';
   function rowHtml(r, g) {
     const dark = g !== 'need', line = dark ? '#232327' : 'rgba(10,10,10,.16)', off = r.dupChoice === 'same';
     let why = '', cat = '', box = '';
@@ -1649,7 +1649,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
         why = off ? '<span>Marcada como a mesma de "' + esc(d.e) + '" · nada será criado</span> · ' + link('data-ch="' + r.i + ':"', 'desfazer', INK)
           : r.dupChoice === 'other' ? '<span>Marcada como outra · será criada</span> · ' + link('data-ch="' + r.i + ':"', 'desfazer', INK)
           : '<span title="' + esc('Igual a "' + d.e + '" de ' + ddmm(d.iso) + ' · ' + (d.origem === 'manual' ? 'lançada à mão' : 'já no extrato')) + '" style="white-space:nowrap">' + esc(r.why) + ' de ' + ddmm(d.iso) + '</span><br>' + link('data-ch="' + r.i + ':same"', 'É a mesma', INK) + ' · ' + link('data-ch="' + r.i + ':other"', 'É outra', INK);
-      } else if (g === 'need' && r.why && !(r.why === 'Sem categoria' && r.catId)) why = '<span>' + esc(r.why) + '</span>';
+      } else if (g === 'need' && r.why && r.why !== 'Sem categoria') why = '<span>' + esc(r.why) + '</span>';
       cat = off ? '<span></span>' : catCell(r, dark);
     }
     return '<div data-row="' + r.i + '" style="display:grid;' + COLS + ';gap:16px;align-items:center;min-height:58px;padding:8px 0;border-top:1px solid ' + line + ';opacity:' + (off ? .45 : 1) + ';transition:opacity .3s ease">'
@@ -1662,9 +1662,10 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     need: { t: 'Precisam de você', sub: 'DUPLICATA, SEM CATEGORIA OU VALOR ALTO', bg: AM, fg: INK, rule: INK, bul: INK, bulFg: AM },
     xfer: { t: 'Entre suas contas', sub: 'NÃO ENTRA NOS TOTAIS DE GASTO NEM DE RENDA', bg: '#141416', fg: FG, rule: XF, bul: XF, bulFg: FG },
     ok: { t: 'Confiantes', sub: 'CATEGORIA E ESTABELECIMENTO RECONHECIDOS', bg: '#141416', fg: FG, rule: GR, bul: GR, bulFg: INK },
-    skip: { t: 'Descartadas', sub: 'NADA É APAGADO · DÁ PARA INCLUIR DE VOLTA', bg: '#141416', fg: FG, rule: '#3A3A40', bul: '#3A3A40', bulFg: FG }
+    skip: { t: 'Descartadas', sub: 'NADA É APAGADO · DÁ PARA INCLUIR DE VOLTA', bg: 'transparent', fg: '#B4B4BA', rule: '#2A2A2F', bul: '#2A2A2F', bulFg: FG }
   };
-  const bullet = (g, n, sz) => '<span style="width:' + sz + 'px;height:' + sz + 'px;border-radius:50%;background:' + GDEF[g].bul + ';color:' + GDEF[g].bulFg + ';display:flex;align-items:center;justify-content:center;flex:none;font-weight:800;font-size:' + Math.round(sz * (String(n).length > 2 ? .36 : .44)) + 'px;letter-spacing:-.03em">' + n + '</span>';
+  const BCOL = { need: INK, xfer: '#C9BBFF', ok: GR, skip: MU };
+  const bullet = (g, n, sz) => '<span style="width:' + sz + 'px;height:' + sz + 'px;border-radius:' + Math.round(sz * .36) + 'px;box-sizing:border-box;border:1.5px solid ' + (g === 'need' ? 'rgba(10,10,10,.32)' : '#2E2E34') + ';box-shadow:inset 0 2px 7px ' + (g === 'need' ? 'rgba(10,10,10,.22)' : 'rgba(0,0,0,.55)') + ';color:' + BCOL[g] + ';display:flex;align-items:center;justify-content:center;flex:none;font-weight:800;font-size:' + Math.round(sz * (String(n).length > 2 ? .36 : .46)) + 'px;letter-spacing:-.03em">' + n + '</span>';
   function card(g, rows) {
     const D = GDEF[g], dark = g !== 'need', open = !!S.open[g], lim = g === 'ok' ? 8 : 999;
     const show = g === 'skip' ? (open ? rows : []) : (open ? rows : rows.slice(0, lim)), more = rows.length - show.length;
@@ -1673,8 +1674,9 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       + (g === 'skip' ? '<span data-a="more" data-g="skip" style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;letter-spacing:.14em;cursor:pointer;color:' + FG + '">' + (open ? 'FECHAR' : 'VER') + '<span style="display:flex;transition:transform .35s ' + E + ';transform:rotate(' + (open ? 180 : 0) + 'deg)">' + chev(14) + '</span></span>' : '') + '</div>'
       + '<div style="height:4px;border-radius:2px;background:' + D.rule + ';margin:16px 0 ' + (g === 'skip' && !open ? 0 : 4) + 'px"></div>';
     const selAll = g === 'skip' || !sel.length ? '' : '<div style="display:grid;' + COLS + ';gap:16px;align-items:center;height:44px">' + ck(all, dark, 'data-all="' + g + '"') + '<span data-all="' + g + '" style="grid-column:2 / 4;font-size:11px;font-weight:800;letter-spacing:.14em;cursor:pointer">' + (all ? 'DESMARCAR TODAS' : 'SELECIONAR TODAS') + '</span></div>';
-    return '<section data-grp="' + g + '" style="background:' + D.bg + ';color:' + D.fg + ';border-radius:28px;padding:22px 28px ' + (g === 'skip' && !open ? 22 : 14) + 'px;' + (dark ? 'border:1px solid #232327;' : '') + 'overflow:visible">'
-      + head + selAll + '<div data-rows>' + show.map(r => rowHtml(r, g)).join('') + '</div>'
+    const glow = g === 'xfer' ? '<div aria-hidden="true" style="position:absolute;left:0;top:0;bottom:0;width:33.333%;border-radius:28px 0 0 28px;pointer-events:none;background:linear-gradient(45deg,rgba(139,111,255,.62) 0,rgba(91,61,245,.34) 46%,rgba(68,0,179,0) 100%)"></div>' : '';
+    return '<section data-grp="' + g + '" style="' + (g === 'xfer' ? 'position:relative;' : '') + 'background:' + D.bg + ';color:' + D.fg + ';border-radius:28px;padding:22px 28px ' + (g === 'skip' && !open ? 22 : 14) + 'px;' + (g === 'skip' ? 'border:1px solid #2A2A2F;' : dark ? 'border:1px solid #232327;' : '') + 'overflow:visible">'
+      + glow + (g === 'xfer' ? '<div style="position:relative">' : '') + head + selAll + '<div data-rows>' + show.map(r => rowHtml(r, g)).join('') + '</div>' + (g === 'xfer' ? '</div>' : '')
       + (more > 0 && g !== 'skip' ? '<div data-a="more" data-g="' + g + '" style="border-top:1px solid #232327;padding:14px 0 4px;font-size:11px;font-weight:800;letter-spacing:.14em;color:' + MU + ';cursor:pointer">+ ' + more + (more === 1 ? ' LINHA' : ' LINHAS') + ' · MOSTRAR TODAS</div>' : '')
       + '</section>';
   }
