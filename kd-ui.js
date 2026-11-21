@@ -1791,7 +1791,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     S.busy = true; S.err = ''; render();
     try {
       const uid = KD.user.id, tcat = transfCat();
-      const b = await KD.sb.from('import_batches').insert({ user_id: uid, origem: 'extrato_' + S.ext, arquivo: S.file, status: 'aprovado', total_linhas: S.rows.length, duplicatas_detectadas: S.rows.filter(r => r.dup || r.grp === 'skip').length, periodo_ini: S.per ? S.per[0] : null, periodo_fim: S.per ? S.per[1] : null, destino: S.tgLabel, n_transacoes: sel.length, entrou: sel.filter(r => r.dir === 'entrada' && r.grp !== 'xfer').reduce((a, r) => a + r.amt, 0), saiu: sel.filter(r => r.dir === 'saida' && r.grp !== 'xfer').reduce((a, r) => a + r.amt, 0), n_transf: sel.filter(r => r.grp === 'xfer').length }).select('id').single();
+      const b = await KD.sb.from('import_batches').insert({ user_id: uid, origem: 'extrato_' + S.ext, arquivo: S.file, status: 'aprovado', total_linhas: S.rows.length, duplicatas_detectadas: S.rows.filter(r => r.dup || r.grp === 'skip').length, periodo_ini: S.per ? S.per[0] : null, periodo_fim: S.per ? S.per[1] : null, destino: S.tgLabel, card_id: S.cardId || null, account_id: S.cardId ? null : (S.accId || null), n_transacoes: sel.length, entrou: sel.filter(r => r.dir === 'entrada' && r.grp !== 'xfer').reduce((a, r) => a + r.amt, 0), saiu: sel.filter(r => r.dir === 'saida' && r.grp !== 'xfer').reduce((a, r) => a + r.amt, 0), n_transf: sel.filter(r => r.grp === 'xfer').length }).select('id').single();
       if (b.error) throw b.error; const bid = b.data.id;
       // transferências: reaproveita o vínculo da perna que já estava esperando; senão cria um novo
       for (const r of sel.filter(x => x.grp === 'xfer')) {
@@ -1806,9 +1806,10 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       });
       for (let i = 0; i < rows.length; i += 100) { const q = await KD.sb.from('transactions').insert(rows.slice(i, i + 100)); if (q.error) throw q.error; }
       const info = { bid, n: sel.length, arquivo: S.file, destino: S.tgLabel };
-      await KD.refresh(KD.comp); close(); setTimeout(() => mostraToast(info), 350);
+      await KD.refresh(KD.comp); window.dispatchEvent(new Event('kd:batches')); close(); setTimeout(() => mostraToast(info), 350);
     } catch (e) { console.error('[kontar] importar', e); if (S) { S.busy = false; S.err = 'Não consegui importar: ' + ((e && e.message) || 'erro') + '. Se algo entrou pela metade, a importação inteira pode ser desfeita.'; render(); } }
   }
+  let presetTk = null;
   async function abrir(file) {
     if (L) { L.remove(); L = null; S = null; }
     const ext = ((file.name || '').split('.').pop() || '').toLowerCase();
@@ -1819,7 +1820,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const targets = KD.M.accs.map(a => ({ k: 'a' + a.id, id: a.id, card: false, label: a.nome, bank: a.bank, cor: a.cor })).concat(KD.M.cards.map(c => ({ k: 'c' + c.id, id: c.id, card: true, label: c.nick || c.n, bank: c.bank, cor: c.cor })));
     if (!targets.length) return alerta('Cadastre um cartão ou conta antes de importar.');
     const fn = KD.norm(file.name), isCard = /fatura|cartao|card|credit/.test(fn);
-    let tk = (targets.find(t => fn.indexOf(KD.norm(t.label).split(' ')[0]) >= 0 && t.card === isCard) || targets.find(t => fn.indexOf(KD.norm(t.label).split(' ')[0]) >= 0) || targets[0]).k;
+    const pre = presetTk && targets.find(t => t.k === presetTk); let tk = (pre || targets.find(t => fn.indexOf(KD.norm(t.label).split(' ')[0]) >= 0 && t.card === isCard) || targets.find(t => fn.indexOf(KD.norm(t.label).split(' ')[0]) >= 0) || targets[0]).k; presetTk = null;
     const rows = raw.map((r, i) => ({ i, iso: r.iso, raw: r.raw, nome: limpo(r.raw), amt: Math.abs(r.amt), dir: r.amt < 0 ? 'saida' : 'entrada', fitid: r.fitid || '', include: false, incUser: null })).filter(r => r.amt > 0);
     rows.forEach((r, k) => { r.i = k; });
     const isos = rows.map(r => r.iso).sort(), prof = KD.M.profile || {};
@@ -1952,7 +1953,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       info.busy = true; info.err = ''; draw();
       try {
         const q = await KD.sb.rpc('kontar_desfazer_lote', { p_lote: info.bid }); if (q.error) throw q.error;
-        await KD.refresh(KD.comp);
+        await KD.refresh(KD.comp); window.dispatchEvent(new Event('kd:batches'));
         info.busy = false; fechaModal(() => { alerta((q.data || 0) + (q.data === 1 ? ' transação apagada' : ' transações apagadas')); if (H) carregaHist(); });
       } catch (e) { console.error('[kontar] desfazer', e); info.busy = false; info.err = 'Não consegui desfazer: ' + ((e && e.message) || 'erro'); draw(); }
     });
@@ -2007,17 +2008,22 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     await carregaHist(true);
   }
   IMP.history = historico; IMP.toast = mostraToast;
+  IMP.pick = tk => { presetTk = tk; const inp = getInput(); inp.click(); };
   IMP.open = abrir;
 
   /* ---------- botão "Importar" na barra de cima, ao lado de "Nova" ---------- */
+  function getInput() {
+    if (!input) { input = document.createElement('input'); input.type = 'file'; input.accept = '.ofx,.csv,.qfx,text/csv'; input.style.display = 'none'; input.addEventListener('change', () => { const f = input.files && input.files[0]; input.value = ''; if (f) abrir(f); else presetTk = null; }); input.addEventListener('cancel', () => { presetTk = null; }); document.body.appendChild(input); }
+    return input;
+  }
   function mountButton() {
     const nova = document.querySelector('span[title="Nova transação"]'); if (!nova || nova.parentElement.querySelector('[data-kd-imp]')) return;
-    if (!input) { input = document.createElement('input'); input.type = 'file'; input.accept = '.ofx,.csv,.qfx,text/csv'; input.style.display = 'none'; input.addEventListener('change', () => { const f = input.files && input.files[0]; input.value = ''; if (f) abrir(f); }); document.body.appendChild(input); }
+    getInput();
     const b = document.createElement('span'); b.setAttribute('data-kd-imp', '1'); b.title = 'Importar extrato (OFX ou CSV)';
     b.style.cssText = 'height:38px;display:flex;align-items:center;gap:7px;padding:0 16px 0 12px;border-radius:9999px;border:1px solid #3A3A40;color:#F2F0EB;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;transition:background .25s';
     b.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>Importar';
     b.onmouseenter = () => { b.style.background = 'rgba(255,255,255,.1)'; }; b.onmouseleave = () => { b.style.background = ''; };
-    b.onclick = () => input.click();
+    b.onclick = () => { presetTk = null; getInput().click(); };
     nova.parentElement.insertBefore(b, nova);
   }
   function mountHist() {
@@ -2028,4 +2034,164 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   }
   new MutationObserver(() => { try { mountButton(); mountHist(); } catch (e) {} }).observe(document.documentElement, { childList: true, subtree: true });
   window.addEventListener('keydown', e => { if (e.key === 'Escape') { if (modal) return fechaModal(); if (H) return fechaHist(); } if (e.key !== 'Escape' || !L || !S || S.busy) return; if (S.pop) return closePop(); close(); });
+})();
+
+/* Kontar · "Fechar o mês" na Home (mockup 9-fechar-mes-A-expandido-v2)
+   A partir do dia 5, enquanto alguma fonte (conta ou cartão) estiver sem extrato/fatura do mês anterior, o card branco do mês
+   se divide: em cima continua o mês, embaixo fica o "Fechar o mês" reduzido. Clicar nele expande o card na coluna (cobrindo o Saldo)
+   com a lista completa e o botão Importar onde falta; o recorte do canto vira o X de fechar (mesmo mecanismo do card Sobra).
+   "Em dia" = existe lote de importação aprovado daquela fonte com período indo até o fim do mês anterior (tolerância de 3 dias). */
+(function () {
+  'use strict';
+  const KD = window.KD, FM = (KD.fm = {});
+  const EE = 'cubic-bezier(.65,0,.35,1)', W = '#F2F0EB', INK = '#0A0A0A', GRN = '#00A86B', AMB = '#F0A800', AMT = '#9A6A00';
+  const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const dm = s => s.slice(8, 10) + '/' + s.slice(5, 7);
+  const LOGOKEY = { 'Itaú Azul': 'Itaú', 'Nubank PJ': 'Nubank', 'Nubank Pessoal': 'Nubank', 'CDB Mercado Pago': 'Mercado Pago' };
+  let batches = [], loaded = false, sig = '', open = false, anim = false, ov = null, split = false;
+
+  /* ---------- dados ---------- */
+  async function carregar() {
+    try {
+      const q = await KD.sb.from('import_batches').select('id,status,destino,card_id,account_id,periodo_fim,created_at').neq('status', 'descartado');
+      let list = q.error ? [] : (q.data || []);
+      const sem = list.filter(b => !b.periodo_fim).map(b => b.id);   // lotes antigos, sem período gravado: usa a data da última transação do lote
+      if (sem.length) { const t = await KD.sb.from('transactions').select('batch_id,data_compra').in('batch_id', sem); const mx = {}; (t.data || []).forEach(x => { const d = String(x.data_compra).slice(0, 10); if (!mx[x.batch_id] || d > mx[x.batch_id]) mx[x.batch_id] = d; }); list = list.map(b => b.periodo_fim ? b : Object.assign({}, b, { periodo_fim: mx[b.id] || null })); }
+      batches = list;
+    } catch (e) { batches = []; }
+    loaded = true; sync();
+  }
+  FM.data = () => {
+    const T = KD.today, ref = new Date(T.getFullYear(), T.getMonth() - 1, 1), fimMes = new Date(T.getFullYear(), T.getMonth(), 0), lim = new Date(fimMes); lim.setDate(lim.getDate() - 3);
+    const limIso = iso(lim), nome = MESES[ref.getMonth()], norm = KD.norm;
+    const fontes = KD.M.accs.filter(a => a.tipo !== 'investimento').map(a => ({ k: 'a' + a.id, id: a.id, label: a.nome, tipo: 'EXTRATO', card: false, bank: a.bank }))
+      .concat(KD.M.cards.map(c => ({ k: 'c' + c.id, id: c.id, label: c.nick || c.n, tipo: 'FATURA', card: true, bank: c.bank })));
+    fontes.forEach(f => {
+      const bs = batches.filter(b => (f.card ? b.card_id === f.id : b.account_id === f.id) || (!b.card_id && !b.account_id && b.destino && norm(b.destino) === norm(f.label)));
+      const last = bs.map(b => b.periodo_fim).filter(Boolean).sort().pop() || null;
+      f.last = last; f.ok = !!last && last >= limIso;
+    });
+    const ok = fontes.filter(f => f.ok).length, pend = fontes.length - ok;
+    return { nome, fontes, ok, pend, total: fontes.length, show: loaded && fontes.length > 0 && T.getDate() >= 5 && pend > 0 };
+  };
+
+  /* ---------- peças visuais ---------- */
+  const notch = (NN, NF, NR) => {
+    const NS = NN + NF + 4, cut = 'M0,0H' + (NN + NF) + 'A' + NF + ',' + NF + ' 0 0 0 ' + NN + ',' + NF + 'V' + (NN - NR) + 'A' + NR + ',' + NR + ' 0 0 1 ' + (NN - NR) + ',' + NN + 'H' + NF + 'A' + NF + ',' + NF + ' 0 0 0 0,' + (NN + NF) + 'Z';
+    const u = "url('data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="' + NS + '" height="' + NS + '"><path transform="translate(' + NS + ',0) scale(-1,1)" d="' + cut + '"/></svg>') + "') right 0 top 0/" + NS + 'px ' + NS + 'px no-repeat, linear-gradient(#000 0 0)';
+    return '-webkit-mask:' + u + ';-webkit-mask-composite:xor;mask:' + u + ';mask-composite:exclude';
+  };
+  const NS_ = notch(40, 12, 24), NM_ = notch(50, 14, 30);   // S (reduzido) e M (expandido), como no card Sobra
+  const ARROW = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M7 17 17 7M9 7h8v8"/></svg>';
+  const XMARK = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="display:block"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+  const CHECK = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+  const segs = d => '<div style="display:flex;gap:5px">' + d.fontes.map(f => '<i style="flex:1;height:8px;border-radius:4px;background:' + (f.ok ? GRN : AMB) + ';display:block"></i>').join('') + '</div>';
+  const logo = f => { const key = f.bank ? (LOGOKEY[f.bank] || f.bank) : null; let u = ''; try { u = key ? KD.comp.constructor.lgcUrl(key) : ''; } catch (e) {} return u ? '<span style="width:30px;height:30px;flex:none;background:url(\'' + u + '\') center/contain no-repeat"></span>' : '<span style="width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center"><i style="width:12px;height:12px;border-radius:50%;background:' + INK + ';display:block"></i></span>'; };
+  const reducedHtml = d => '<div style="position:absolute;left:26px;top:15px;right:70px"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:800;letter-spacing:.12em"><span>FECHAR ' + d.nome.toUpperCase() + '</span><span style="color:' + AMT + '">' + d.pend + (d.pend === 1 ? ' PENDENTE' : ' PENDENTES') + '</span></div><div style="margin-top:12px">' + segs(d) + '</div><div style="font-size:11px;margin-top:9px;color:rgba(10,10,10,.6)">' + d.ok + ' de ' + d.total + ' fontes em dia</div></div>';
+  const rowHtml = (f, d) => '<div style="display:flex;align-items:center;gap:14px;height:62px;flex:none;border-top:1px solid rgba(10,10,10,.14)">' + logo(f) + '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(f.label) + ' <span style="font-size:9px;font-weight:800;letter-spacing:.12em;border:1.5px solid rgba(10,10,10,.4);border-radius:99px;padding:2px 7px;margin-left:4px;vertical-align:2px">' + f.tipo + '</span></div><div style="font-size:11px;margin-top:3px;color:' + (f.ok ? 'rgba(10,10,10,.55)' : AMT) + ';font-weight:' + (f.ok ? 500 : 700) + '">'
+    + (f.ok ? 'Em dia · ' + (f.card ? 'fatura' : 'extrato') + ' até ' + dm(f.last) : 'Falta ' + (f.card ? 'a fatura' : 'o extrato') + ' de ' + d.nome + (f.last ? ' · último até ' + dm(f.last) : '')) + '</div></div>'
+    + (f.ok ? '<span style="width:26px;height:26px;border-radius:50%;background:' + GRN + ';color:#fff;display:flex;align-items:center;justify-content:center;flex:none">' + CHECK + '</span>'
+      : '<span data-fm-imp="' + f.k + '" style="height:36px;display:flex;align-items:center;padding:0 18px;border-radius:99px;background:' + INK + ';color:' + W + ';font-size:11px;font-weight:900;letter-spacing:.12em;cursor:pointer;flex:none;transition:opacity .25s ease" onmouseover="this.style.opacity=.8" onmouseout="this.style.opacity=1">IMPORTAR</span>') + '</div>';
+  const expandedHtml = (d, w, h) => '<div data-fm-ec style="position:absolute;left:0;top:0;width:' + w + 'px;height:' + h + 'px;opacity:0;pointer-events:none">'
+    + '<div style="position:absolute;left:28px;top:22px;right:80px"><div style="font-size:10.5px;font-weight:700;letter-spacing:.14em;color:rgba(10,10,10,.6)">↘ FECHAR O MÊS</div><div style="font-size:60px;font-weight:700;letter-spacing:-.065em;line-height:.95;margin-top:8px">' + d.nome.charAt(0).toUpperCase() + d.nome.slice(1) + '</div></div>'
+    + '<div style="position:absolute;left:28px;right:28px;top:122px;bottom:18px;display:flex;flex-direction:column">'
+    + '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px;flex:none"><span style="font-size:11px;font-weight:800;letter-spacing:.12em;padding-bottom:4px">' + d.ok + ' DE ' + d.total + ' FONTES EM DIA</span>'
+    + (d.pend ? '<span style="display:flex;align-items:flex-end;gap:10px"><b style="font-size:88px;font-weight:700;letter-spacing:-.07em;line-height:.78">' + String(d.pend).padStart(2, '0') + '</b><span style="font-size:15px;font-weight:700;line-height:1.1;letter-spacing:-.01em;color:' + AMT + ';padding-bottom:2px">' + (d.pend === 1 ? 'fonte<br>falta' : 'fontes<br>faltam') + '</span></span>' : '<span style="font-size:30px;font-weight:700;letter-spacing:-.05em;color:' + GRN + '">Tudo em dia</span>') + '</div>'
+    + '<div style="flex:none">' + segs(d) + '</div>'
+    + '<div class="kscroll" data-fm-list style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;margin-top:16px;display:flex;flex-direction:column">' + d.fontes.map(f => rowHtml(f, d)).join('') + '</div>'
+    + '<div style="flex:none;font-size:11px;color:rgba(10,10,10,.55);margin-top:12px;line-height:1.4">Importar abre a tela de revisão do extrato, já no banco escolhido.</div></div></div>';
+  const layer = (m, op) => '<div aria-hidden="true" style="position:absolute;inset:0;border-radius:30px;background:' + W + ';' + m + ';opacity:' + op + ';transition:opacity .3s ease;pointer-events:none"></div>';
+  const btnArrow = '<span style="position:absolute;right:0;top:0;width:32px;height:32px;border-radius:50%;background:' + INK + ';color:' + W + ';display:flex;align-items:center;justify-content:center">' + ARROW + '</span>';
+
+  /* ---------- montagem no card branco do mês ---------- */
+  function css() {
+    if (document.getElementById('kd-fm-css')) return;
+    const s = document.createElement('style'); s.id = 'kd-fm-css';
+    s.textContent = '[data-k="mes"][data-fm]{height:108px!important;overflow:visible!important;padding:14px 22px!important;transition:transform .5s ' + EE + ',height .55s ' + EE + '!important}'
+      + '[data-k="mes"][data-fm] [data-mesn]{font-size:calc(54px*var(--ks,1))!important}'
+      + '[data-k="mes"][data-fm="out"]{height:var(--rh,162px)!important;padding:18px 22px!important}'
+      + '[data-k="mes"][data-fm="out"] [data-mesn]{font-size:calc(72px*var(--ks,1))!important}';
+    document.head.appendChild(s);
+  }
+  function sync() {
+    if (!KD.M || !KD.today) return;
+    const w = document.querySelector('[data-k="mes"]'); if (!w) { split = false; if (open || anim) { open = false; anim = false; ov = null; } sig = ''; return; }
+    const d = FM.data(), card = w.querySelector(':scope > [data-fm-card]');
+    css();
+    if (!d.show) {
+      if (open && ov) { refresh(d); return; }
+      if (card && !anim) { split = false; card.style.opacity = '0'; w.setAttribute('data-fm', 'out'); setTimeout(() => { if (!split) { const c = w.querySelector(':scope > [data-fm-card]'); if (c) c.remove(); if (w.getAttribute('data-fm') === 'out') w.removeAttribute('data-fm'); } }, 620); }
+      return;
+    }
+    const s = JSON.stringify([d.nome, d.fontes.map(f => [f.k, f.ok, f.last])]);
+    if (!w.hasAttribute('data-fm') || w.getAttribute('data-fm') === 'out') { split = true; w.setAttribute('data-fm', '1'); }
+    if (card && s === sig) return;
+    const first = !card; sig = s;
+    const c = card || document.createElement('div');
+    if (first) {
+      c.setAttribute('data-fm-card', '1');
+      c.style.cssText = 'position:absolute;left:0;right:0;top:120px;height:calc(var(--rh,162px) - 120px);cursor:pointer;color:' + INK + ';font-family:Helvetica,Arial,sans-serif;opacity:0;transition:opacity .4s ease .15s';
+      c.addEventListener('click', ev => { ev.stopPropagation(); abre(); });
+      w.appendChild(c); requestAnimationFrame(() => { c.style.opacity = '1'; });
+    }
+    c.innerHTML = layer(NS_, 1) + reducedHtml(d) + btnArrow;
+    if (open && ov) refresh(d);
+  }
+  function refresh(d) {   // dados novos com o card expandido: troca só o conteúdo, sem piscar o resto
+    const ec = ov.querySelector('[data-fm-ec]'); if (!ec) return;
+    const st = ec.querySelector('[data-fm-list]'), keep = st ? st.scrollTop : 0, o = ec.style.opacity, w = ec.style.width, h = ec.style.height;
+    ec.outerHTML = expandedHtml(d, parseFloat(w), parseFloat(h));
+    const n = ov.querySelector('[data-fm-ec]'); n.style.opacity = o; n.style.pointerEvents = 'auto'; const l = n.querySelector('[data-fm-list]'); if (l) l.scrollTop = keep;
+  }
+
+  /* ---------- expandir / recolher ---------- */
+  function abre() {
+    if (open || anim) return;
+    const w = document.querySelector('[data-k="mes"]'), grid = w && w.closest('[data-org-grid]'), card = w && w.querySelector(':scope > [data-fm-card]'); if (!grid || !card) return;
+    anim = true; open = true;
+    const gr = grid.getBoundingClientRect(), cr = card.getBoundingClientRect(), fw = w.getBoundingClientRect().width, fh = gr.height, d = FM.data();
+    ov = document.createElement('div'); ov.setAttribute('data-fm-ov', '1');
+    ov.style.cssText = 'position:absolute;left:' + (cr.left - gr.left) + 'px;top:' + (cr.top - gr.top) + 'px;width:' + cr.width + 'px;height:' + cr.height + 'px;z-index:6;overflow:hidden;font-family:Helvetica,Arial,sans-serif;color:' + INK + ';transition:left .6s ' + EE + ',top .6s ' + EE + ',width .6s ' + EE + ',height .6s ' + EE;
+    ov.innerHTML = '<span data-l="s" style="position:absolute;inset:0;display:block">' + layer(NS_, 1) + '</span><span data-l="m" style="position:absolute;inset:0;display:block">' + layer(NM_, 0) + '</span>'
+      + '<div data-fm-rc style="position:absolute;left:0;top:0;width:' + cr.width + 'px;height:' + cr.height + 'px;transition:opacity .25s ease">' + reducedHtml(d) + '</div>' + expandedHtml(d, fw, fh)
+      + '<span data-fm-ar style="position:absolute;right:0;top:0;width:32px;height:32px;border-radius:50%;background:' + INK + ';color:' + W + ';display:flex;align-items:center;justify-content:center;transition:opacity .25s ease,transform .45s ' + EE + '">' + ARROW + '</span>'
+      + '<span data-fm-x style="position:absolute;right:0;top:0;width:44px;height:44px;border-radius:50%;background:' + W + ';color:' + INK + ';display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transform:rotate(-90deg);transition:opacity .3s ease .2s,transform .5s ' + EE + ' .1s">' + XMARK + '</span>';
+    grid.appendChild(ov); card.style.visibility = 'hidden';
+    ov.addEventListener('click', ev => {
+      if (ev.target.closest('[data-fm-x]')) return fecha();
+      const b = ev.target.closest('[data-fm-imp]'); if (b && KD.imp && KD.imp.pick) KD.imp.pick(b.dataset.fmImp);
+    });
+    void ov.offsetHeight;
+    requestAnimationFrame(() => {
+      ov.style.left = '0px'; ov.style.top = '0px'; ov.style.width = fw + 'px'; ov.style.height = fh + 'px';
+      ov.querySelector('[data-l="s"] > div').style.opacity = '0'; ov.querySelector('[data-l="m"] > div').style.opacity = '1';
+      ov.querySelector('[data-fm-rc]').style.opacity = '0';
+      const ar = ov.querySelector('[data-fm-ar]'); ar.style.opacity = '0'; ar.style.transform = 'rotate(90deg) scale(.6)';
+      const x = ov.querySelector('[data-fm-x]'); x.style.opacity = '1'; x.style.transform = 'none';
+      const ec = ov.querySelector('[data-fm-ec]'); ec.style.transition = 'opacity .4s ease .25s, transform .6s ' + EE + ' .2s'; ec.style.transform = 'translateY(8px)'; void ec.offsetHeight; ec.style.opacity = '1'; ec.style.transform = 'none'; ec.style.pointerEvents = 'auto';
+    });
+    setTimeout(() => { anim = false; }, 680);
+  }
+  function fecha() {
+    if (!open || anim || !ov) return;
+    anim = true;
+    const w = document.querySelector('[data-k="mes"]'), grid = w && w.closest('[data-org-grid]'), card = w && w.querySelector(':scope > [data-fm-card]');
+    const o = ov; let L = 0, T = 120, cw = o.getBoundingClientRect().width, ch = 81;
+    if (grid && card) { card.style.visibility = 'hidden'; const gr = grid.getBoundingClientRect(), cr = card.getBoundingClientRect(); L = cr.left - gr.left; T = cr.top - gr.top; cw = cr.width; ch = cr.height; }
+    const ec = o.querySelector('[data-fm-ec]'); ec.style.transition = 'opacity .2s ease, transform .4s ' + EE; ec.style.opacity = '0'; ec.style.transform = 'translateY(8px)'; ec.style.pointerEvents = 'none';
+    const x = o.querySelector('[data-fm-x]'); x.style.transition = 'opacity .2s ease, transform .4s ' + EE; x.style.opacity = '0'; x.style.transform = 'rotate(-90deg)';
+    const rc = o.querySelector('[data-fm-rc]'); rc.style.width = cw + 'px'; rc.style.height = ch + 'px'; rc.style.transition = 'opacity .3s ease .3s'; rc.style.opacity = '1';
+    const ar = o.querySelector('[data-fm-ar]'); ar.style.transition = 'opacity .3s ease .3s, transform .45s ' + EE + ' .2s'; ar.style.opacity = '1'; ar.style.transform = 'none';
+    o.querySelector('[data-l="s"] > div').style.opacity = '1'; o.querySelector('[data-l="m"] > div').style.opacity = '0';
+    o.style.left = L + 'px'; o.style.top = T + 'px'; o.style.width = cw + 'px'; o.style.height = ch + 'px';
+    setTimeout(() => { o.remove(); if (ov === o) ov = null; open = false; anim = false; const c = document.querySelector('[data-k="mes"] > [data-fm-card]'); if (c) c.style.visibility = ''; sync(); }, 680);
+  }
+  window.addEventListener('keydown', e => { if (e.key === 'Escape' && open && !document.querySelector('[data-imp],[data-imp-modal],[data-imp-hist]')) fecha(); });
+  window.addEventListener('kd:batches', () => carregar());
+  FM.refresh = carregar;
+
+  let raf = 0;
+  new MutationObserver(() => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; try { if (!loaded && KD.sb && KD.M && document.querySelector('[data-k="mes"]')) { loaded = 'pend'; carregar(); } else if (loaded === true) sync(); } catch (e) {} }); }).observe(document.documentElement, { childList: true, subtree: true });
 })();
