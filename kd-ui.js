@@ -1660,7 +1660,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   }
   const GDEF = {
     need: { t: 'Precisam de você', sub: 'DUPLICATA, SEM CATEGORIA OU VALOR ALTO', bg: AM, fg: INK, rule: INK, bul: AM, bulFg: INK },
-    xfer: { t: 'Entre suas contas', sub: 'NÃO ENTRA NOS TOTAIS DE GASTO NEM DE RENDA', bg: '#141416', fg: FG, rule: XF, bul: 'linear-gradient(45deg,#7658FF,#4400B3)', bulFg: '#fff' },
+    xfer: { t: 'Entre suas contas', sub: 'NÃO ENTRA NOS TOTAIS DE GASTO NEM DE RENDA', bg: '#141416', fg: FG, rule: XF, bul: '#5B3DF5', bulFg: '#fff' },
     ok: { t: 'Confiantes', sub: 'CATEGORIA E ESTABELECIMENTO RECONHECIDOS', bg: '#141416', fg: FG, rule: GR, bul: GR, bulFg: INK },
     skip: { t: 'Descartadas', sub: 'NADA É APAGADO · DÁ PARA INCLUIR DE VOLTA', bg: 'transparent', fg: '#B4B4BA', rule: '#2A2A2F', bul: 'transparent;box-shadow:inset 0 0 0 1.5px #3A3A40', bulFg: '#B4B4BA' }
   };
@@ -1668,7 +1668,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const bullet = (g, n, sz) => '<span style="width:' + sz + 'px;height:' + sz + 'px;border-radius:50%;background:' + GDEF[g].bul + ';color:' + GDEF[g].bulFg + ';display:flex;align-items:center;justify-content:center;flex:none;font-weight:800;font-size:' + Math.round(sz * .44) + 'px;letter-spacing:-.03em">' + n + '</span>';
   /* indent do card (HANDOFF §5.4): recorte côncavo no canto superior esquerdo, com concordâncias, onde mora a contagem.
      O fundo do card vira uma camada com máscara (retângulo menos o recorte), pra não prender os dropdowns; o contorno é redesenhado em SVG. */
-  const NN = 58, NF = 14, NR = 29, NS = NN + NF + 4;
+  const NN = 50, NF = 14, NR = 30, NS = NN + NF + 4;
   const CUT = 'M0,0H' + (NN + NF) + 'A' + NF + ',' + NF + ' 0 0 0 ' + NN + ',' + NF + 'V' + (NN - NR) + 'A' + NR + ',' + NR + ' 0 0 1 ' + (NN - NR) + ',' + NN + 'H' + NF + 'A' + NF + ',' + NF + ' 0 0 0 0,' + (NN + NF) + 'Z';
   const EDGE = 'M' + (NN + NF) + ',.5A' + (NF - .5) + ',' + (NF - .5) + ' 0 0 0 ' + (NN + .5) + ',' + NF + 'V' + (NN - NR) + 'A' + (NR + .5) + ',' + (NR + .5) + ' 0 0 1 ' + (NN - NR) + ',' + (NN + .5) + 'H' + NF + 'A' + (NF - .5) + ',' + (NF - .5) + ' 0 0 0 .5,' + (NN + NF);
   const MASKURL = "url('data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="' + NS + '" height="' + NS + '"><path d="' + CUT + '"/></svg>') + "') 0 0/" + NS + 'px ' + NS + 'px no-repeat, linear-gradient(#000 0 0)';
@@ -1679,14 +1679,14 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const D = GDEF[g], dark = g !== 'need', open = !!S.open[g], lim = g === 'ok' ? 8 : 999;
     const show = g === 'skip' ? (open ? rows : []) : (open ? rows : rows.slice(0, lim)), more = rows.length - show.length;
     const sel = rows.filter(ativa), all = sel.length && sel.every(r => r.include);
-    const head = '<div style="display:flex;align-items:center;gap:14px;height:' + NN + 'px;padding-left:' + (NN + NF - 28 + 8) + 'px"><b style="font-size:26px;letter-spacing:-.04em">' + D.t + '</b><span style="font-size:10px;font-weight:700;letter-spacing:.14em;color:' + (dark ? MU : 'rgba(10,10,10,.62)') + '">' + D.sub + '</span>'
+    const head = '<div style="display:flex;align-items:center;gap:14px;height:40px;padding-left:' + (NN + NF - 28 + 4) + 'px"><b style="font-size:26px;letter-spacing:-.04em">' + D.t + '</b><span style="font-size:10px;font-weight:700;letter-spacing:.14em;color:' + (dark ? MU : 'rgba(10,10,10,.62)') + '">' + D.sub + '</span>'
       + (g === 'skip' ? '<span data-a="more" data-g="skip" style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;letter-spacing:.14em;cursor:pointer;color:' + FG + '">' + (open ? 'FECHAR' : 'VER') + '<span style="display:flex;transition:transform .35s ' + E + ';transform:rotate(' + (open ? 180 : 0) + 'deg)">' + chev(14) + '</span></span>' : '') + '</div>'
-      + '<div style="height:' + RULE + 'px;background:' + D.rule + ';margin:10px 0 ' + (g === 'skip' && !open ? 0 : 4) + 'px"></div>';
+      + '<div style="height:' + RULE + 'px;background:' + D.rule + ';margin:18px 0 ' + (g === 'skip' && !open ? 0 : 4) + 'px"></div>';
     const selAll = g === 'skip' || !sel.length ? '' : '<div style="display:grid;' + COLS + ';gap:16px;align-items:center;height:44px">' + ck(all, dark, 'data-all="' + g + '"') + '<span data-all="' + g + '" style="grid-column:2 / 4;font-size:11px;font-weight:800;letter-spacing:.14em;cursor:pointer">' + (all ? 'DESMARCAR TODAS' : 'SELECIONAR TODAS') + '</span></div>';
     const bd = g === 'skip' ? '#2A2A2F' : dark ? '#232327' : null;
     const layer = '<div aria-hidden="true" style="position:absolute;inset:0;z-index:-1;box-sizing:border-box;border-radius:28px;pointer-events:none;background-color:' + D.bg + ';' + (g === 'xfer' ? 'background-image:' + MESH + ';background-size:33.333% 100%;background-repeat:no-repeat;background-position:left top;' : '') + (bd ? 'border:1px solid ' + bd + ';' : '') + '-webkit-mask:' + MASKURL + ';-webkit-mask-composite:xor;mask:' + MASKURL + ';mask-composite:exclude"></div>'
       + (bd ? '<svg aria-hidden="true" width="' + NS + '" height="' + NS + '" style="position:absolute;left:0;top:0;z-index:-1;pointer-events:none;overflow:visible"><path d="' + EDGE + '" fill="none" stroke="' + bd + '" stroke-width="1"/></svg>' : '')
-      + '<span style="position:absolute;left:' + (NN - 40) / 2 + 'px;top:' + (NN - 40) / 2 + 'px;width:40px;height:40px;border-radius:50%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:' + (String(rows.length).length > 2 ? 16 : 20) + 'px;font-weight:800;letter-spacing:-.04em;background:' + D.bul + ';color:' + D.bulFg + '">' + rows.length + '</span>';
+      + '<span style="position:absolute;left:0;top:0;width:40px;height:40px;border-radius:50%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:' + (String(rows.length).length > 2 ? 16 : 20) + 'px;font-weight:800;letter-spacing:-.04em;background:' + D.bul + ';color:' + D.bulFg + '">' + rows.length + '</span>';
     return '<section data-grp="' + g + '" style="position:relative;color:' + D.fg + ';border-radius:28px;padding:0 28px ' + (g === 'skip' && !open ? 22 : 14) + 'px;overflow:visible">'
       + layer + head + selAll + '<div data-rows>' + show.map(r => rowHtml(r, g)).join('') + '</div>'
       + (more > 0 && g !== 'skip' ? '<div data-a="more" data-g="' + g + '" style="border-top:1px solid #232327;padding:14px 0 4px;font-size:11px;font-weight:800;letter-spacing:.14em;color:' + MU + ';cursor:pointer">+ ' + more + (more === 1 ? ' LINHA' : ' LINHAS') + ' · MOSTRAR TODAS</div>' : '')
