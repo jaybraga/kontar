@@ -1879,17 +1879,18 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   function alerta(msg) { const n = document.createElement('div'); n.textContent = msg; n.style.cssText = 'position:fixed;left:50%;top:84px;transform:translateX(-50%);background:#1b1b1d;color:' + FG + ';border:1px solid ' + AM + ';border-radius:16px;padding:14px 22px;font:14px Helvetica,Arial,sans-serif;z-index:99999;opacity:0;transition:opacity .3s ease'; document.body.appendChild(n); requestAnimationFrame(() => { n.style.opacity = '1'; }); setTimeout(() => { n.style.opacity = '0'; setTimeout(() => n.remove(), 320); }, 4200); }
   /* sair da revisão por outra página: os cliques na barra de cima passam por um aviso de um clique só
      ("Descartar e sair"); não precisa confirmar nem cancelar, ele some sozinho e ao clicar em qualquer outro lugar */
+  const reclica = el => el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));   // svg/path não têm .click()
   let warn = null;
-  function fechaAviso() { if (!warn) return; const w = warn; warn = null; clearTimeout(w._t); w.style.opacity = '0'; w.style.transform = 'translate(-50%,-8px)'; setTimeout(() => w.remove(), 300); }
+  function fechaAviso() { if (!warn) return; const w = warn; warn = null; clearTimeout(w._t); w.style.opacity = '0'; w.style.transform = 'translate(-50%,8px)'; setTimeout(() => w.remove(), 300); }
   function avisaSaida(alvo) {
     if (warn) return;
     const n = S.rows.filter(vai).length;
     warn = document.createElement('div'); warn.setAttribute('data-imp-warn', '1');
-    warn.style.cssText = 'position:fixed;left:50%;top:84px;transform:translate(-50%,-8px);z-index:99995;font-family:Helvetica,Arial,sans-serif;color:' + FG + ';background:#1b1b1d;border:1px solid #2A2A2F;border-radius:30px;padding:10px 10px 10px 22px;display:flex;align-items:center;gap:18px;box-shadow:0 24px 48px rgba(0,0,0,.6);opacity:0;transition:opacity .3s ease,transform .45s ' + EE;
+    warn.style.cssText = 'position:fixed;left:50%;bottom:30px;transform:translate(-50%,8px);z-index:99995;font-family:Helvetica,Arial,sans-serif;color:' + FG + ';background:#1b1b1d;border:1px solid #2A2A2F;border-radius:30px;padding:10px 10px 10px 22px;display:flex;align-items:center;gap:18px;box-shadow:0 24px 48px rgba(0,0,0,.6);opacity:0;transition:opacity .3s ease,transform .45s ' + EE;
     warn.innerHTML = '<div><div style="font-size:15px;font-weight:800;letter-spacing:-.01em">Descartar a importação?</div><div style="font-size:11px;color:' + MU + ';margin-top:2px">' + n + (n === 1 ? ' transação marcada não foi importada' : ' transações marcadas não foram importadas') + '</div></div>'
       + '<span data-w="go" style="height:40px;display:flex;align-items:center;padding:0 20px;border-radius:99px;background:' + FG + ';color:' + INK + ';font-size:11px;font-weight:900;letter-spacing:.12em;cursor:pointer;white-space:nowrap">DESCARTAR E SAIR</span>'
       + '<span data-w="stay" style="height:40px;display:flex;align-items:center;padding:0 16px;border-radius:99px;border:1px solid #3A3A40;color:#9A9AA3;font-size:11px;font-weight:800;letter-spacing:.12em;cursor:pointer;white-space:nowrap">CONTINUAR</span>';
-    warn.addEventListener('click', ev => { const b = ev.target.closest('[data-w]'); if (!b) return; if (b.dataset.w === 'go') { fechaAviso(); close(); setTimeout(() => alvo.click(), 0); } else fechaAviso(); });
+    warn.addEventListener('click', ev => { const b = ev.target.closest('[data-w]'); if (!b) return; if (b.dataset.w === 'go') { fechaAviso(); close(); setTimeout(() => reclica(alvo), 0); } else fechaAviso(); });
     document.body.appendChild(warn); requestAnimationFrame(() => { if (warn) { warn.style.opacity = '1'; warn.style.transform = 'translate(-50%,0)'; } });
     warn._t = setTimeout(fechaAviso, 9000);
   }
@@ -1899,7 +1900,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (ev.clientY >= 68) return;
     ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
     if (S.busy) return;
-    if (!S.rows.some(vai)) { close(); setTimeout(() => t.click(), 0); return; }
+    if (!S.rows.some(vai)) { close(); setTimeout(() => reclica(t), 0); return; }
     avisaSaida(t);
   }, true);
   IMP.open = abrir;
