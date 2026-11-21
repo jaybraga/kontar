@@ -1674,7 +1674,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const MASKURL = "url('data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="' + NS + '" height="' + NS + '"><path d="' + CUT + '"/></svg>') + "') 0 0/" + NS + 'px ' + NS + 'px no-repeat, linear-gradient(#000 0 0)';
   const RULE = 1.5;   // espessura padrão das linhas de cabeçalho do app
   // mesh roxo da marca (mesma lógica do glow da Sobra: sólido no canto, some na diagonal), só no terço esquerdo
-  const MESH = 'radial-gradient(120px 90px at 22% 88%,rgba(150,125,255,.55),rgba(150,125,255,0)),radial-gradient(130px 110px at 70% 62%,rgba(68,0,179,.55),rgba(68,0,179,0)),linear-gradient(45deg,rgba(123,92,255,1) 40px,rgba(91,61,245,.62) 120px,rgba(68,0,179,0) 230px)';
+  const MESH = 'radial-gradient(120px 90px at 22% 88%,rgba(150,125,255,.38),rgba(150,125,255,0)),radial-gradient(130px 110px at 70% 62%,rgba(68,0,179,.4),rgba(68,0,179,0)),linear-gradient(45deg,rgba(118,88,255,.92) 40px,rgba(91,61,245,.62) 120px,rgba(68,0,179,0) 230px)';
   function card(g, rows) {
     const D = GDEF[g], dark = g !== 'need', open = !!S.open[g], lim = g === 'ok' ? 8 : 999;
     const show = g === 'skip' ? (open ? rows : []) : (open ? rows : rows.slice(0, lim)), more = rows.length - show.length;
