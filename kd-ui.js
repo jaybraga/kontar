@@ -1791,7 +1791,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     S.busy = true; S.err = ''; render();
     try {
       const uid = KD.user.id, tcat = transfCat();
-      const b = await KD.sb.from('import_batches').insert({ user_id: uid, origem: 'extrato_' + S.ext, arquivo: S.file, status: 'aprovado', total_linhas: S.rows.length, duplicatas_detectadas: S.rows.filter(r => r.dup || r.grp === 'skip').length }).select('id').single();
+      const b = await KD.sb.from('import_batches').insert({ user_id: uid, origem: 'extrato_' + S.ext, arquivo: S.file, status: 'aprovado', total_linhas: S.rows.length, duplicatas_detectadas: S.rows.filter(r => r.dup || r.grp === 'skip').length, periodo_ini: S.per ? S.per[0] : null, periodo_fim: S.per ? S.per[1] : null, destino: S.tgLabel, n_transacoes: sel.length, entrou: sel.filter(r => r.dir === 'entrada' && r.grp !== 'xfer').reduce((a, r) => a + r.amt, 0), saiu: sel.filter(r => r.dir === 'saida' && r.grp !== 'xfer').reduce((a, r) => a + r.amt, 0), n_transf: sel.filter(r => r.grp === 'xfer').length }).select('id').single();
       if (b.error) throw b.error; const bid = b.data.id;
       // transferências: reaproveita o vínculo da perna que já estava esperando; senão cria um novo
       for (const r of sel.filter(x => x.grp === 'xfer')) {
@@ -1805,7 +1805,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
         return { user_id: uid, estabelecimento: r.nome, valor_total: Math.round(r.amt * 100) / 100, direcao: r.dir, meio: MEIO_DB[r.meioT] || 'debito', data_compra: r.iso, card_id: S.cardId || null, account_id: S.cardId ? null : (S.accId || null), category_id: cat, parcelas_total: 1, origem: 'import', status: cat ? 'confirmado' : 'pendente_revisao', categoria_origem: cat ? 'usuario' : null, batch_id: bid, external_id: r.fitid || null, transfer_id: x ? r.tid : null };
       });
       for (let i = 0; i < rows.length; i += 100) { const q = await KD.sb.from('transactions').insert(rows.slice(i, i + 100)); if (q.error) throw q.error; }
-      await KD.refresh(KD.comp); close();
+      const info = { bid, n: sel.length, arquivo: S.file, destino: S.tgLabel };
+      await KD.refresh(KD.comp); close(); setTimeout(() => mostraToast(info), 350);
     } catch (e) { console.error('[kontar] importar', e); if (S) { S.busy = false; S.err = 'Não consegui importar: ' + ((e && e.message) || 'erro') + '. Se algo entrou pela metade, a importação inteira pode ser desfeita.'; render(); } }
   }
   async function abrir(file) {
@@ -1895,6 +1896,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     warn._t = setTimeout(fechaAviso, 9000);
   }
   document.addEventListener('click', ev => {
+    if (H && !modal && ev.clientY < 68 && ev.target.closest && !ev.target.closest('[data-imp-hist],[data-imp-modal]')) fechaHist();
     if (!L || !S) return;
     const t = ev.target; if (!t || !t.closest || t.closest('[data-imp],[data-imp-warn],[data-kd-imp]')) { if (warn && t && t.closest && !t.closest('[data-imp-warn]')) fechaAviso(); return; }
     if (ev.clientY >= 68) return;
@@ -1903,6 +1905,108 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (!S.rows.some(vai)) { close(); setTimeout(() => reclica(t), 0); return; }
     avisaSaida(t);
   }, true);
+
+  /* ---------- desfazer importação: aviso (A), botão em Cartões (B), histórico de lotes (C), confirmação (D) ---------- */
+  const IC_CLOCK = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex:none"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5M12 7v5l3 2"/></svg>';
+  const IC_TRASH = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M4 7h16M9 7V4h6v3M6.5 7l1 13h9l1-13M10 11v5M14 11v5"/></svg>';
+  const pillHist = (h, label) => '<span style="display:inline-flex;align-items:center;gap:8px;height:' + h + 'px;padding:0 16px 0 12px;border-radius:9999px;border:1px solid #3A3A40;color:#9A9AA3;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;transition:border-color .25s ease,color .25s ease" onmouseover="this.style.borderColor=\'#6A6A72\';this.style.color=\'#F2F0EB\'" onmouseout="this.style.borderColor=\'#3A3A40\';this.style.color=\'#9A9AA3\'">' + IC_CLOCK + (label || 'Histórico') + '</span>';
+  let toastEl = null, H = null, modal = null;
+
+  function fechaToast() { if (!toastEl) return; const t = toastEl; toastEl = null; clearTimeout(t._t); t.style.opacity = '0'; t.style.transform = 'translate(-50%,8px)'; setTimeout(() => t.remove(), 320); }
+  function mostraToast(info) {
+    fechaToast();
+    const t = toastEl = document.createElement('div'); t.setAttribute('data-imp-toast', '1');
+    t.style.cssText = 'position:fixed;left:50%;bottom:30px;transform:translate(-50%,10px);z-index:99995;font-family:Helvetica,Arial,sans-serif;color:' + FG + ';background:#1b1b1d;border:1px solid #2A2A2F;border-radius:30px;padding:10px 12px 10px 10px;display:flex;align-items:center;gap:16px;box-shadow:0 24px 48px rgba(0,0,0,.6);overflow:hidden;opacity:0;transition:opacity .3s ease,transform .5s ' + EE;
+    t.innerHTML = '<span style="width:40px;height:40px;border-radius:50%;background:' + GR + ';color:' + INK + ';display:flex;align-items:center;justify-content:center;flex:none">' + checkSvg(INK).replace('width="13" height="13"', 'width="18" height="18"') + '</span>'
+      + '<div><div style="font-size:15px;font-weight:800;letter-spacing:-.01em">' + info.n + (info.n === 1 ? ' transação importada' : ' transações importadas') + '</div><div style="font-size:11px;color:' + MU + ';margin-top:2px;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(info.arquivo) + ' · ' + esc(info.destino) + '</div></div>'
+      + '<span data-t="undo" style="margin-left:14px;height:38px;display:flex;align-items:center;padding:0 20px;border-radius:99px;background:' + FG + ';color:' + INK + ';font-size:11px;font-weight:900;letter-spacing:.12em;cursor:pointer;white-space:nowrap">DESFAZER IMPORTAÇÃO</span>'
+      + '<span data-t="hist">' + pillHist(38) + '</span>'
+      + '<i style="position:absolute;left:0;bottom:0;height:1.5px;width:100%;background:' + GR + ';transform-origin:left;animation:kdToastBar 15s linear forwards"></i>';
+    if (!document.getElementById('kd-toast-css')) { const st = document.createElement('style'); st.id = 'kd-toast-css'; st.textContent = '@keyframes kdToastBar{from{transform:scaleX(1)}to{transform:scaleX(0)}}'; document.head.appendChild(st); }
+    t.addEventListener('click', ev => { const b = ev.target.closest('[data-t]'); if (!b) return; if (b.dataset.t === 'undo') { fechaToast(); confirmaDesfazer(info); } else { fechaToast(); historico(); } });
+    document.body.appendChild(t); requestAnimationFrame(() => { if (toastEl === t) { t.style.opacity = '1'; t.style.transform = 'translate(-50%,0)'; } });
+    t._t = setTimeout(() => { if (toastEl === t) fechaToast(); }, 15000);
+  }
+
+  function fechaModal(then) { if (!modal) return then && then(); const m = modal; modal = null; m.style.opacity = '0'; m.firstElementChild.style.transform = 'scale(.96)'; setTimeout(() => { m.remove(); then && then(); }, 260); }
+  function confirmaDesfazer(info) {
+    if (modal) return;
+    const m = modal = document.createElement('div'); m.setAttribute('data-imp-modal', '1');
+    m.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;font-family:Helvetica,Arial,sans-serif;color:' + FG + ';opacity:0;transition:opacity .26s ease';
+    const draw = () => {
+      m.innerHTML = '<div style="width:440px;max-width:calc(100vw - 32px);background:#1b1b1d;border:1px solid #2A2A2F;border-radius:28px;padding:28px;box-shadow:0 24px 48px rgba(0,0,0,.6);transform:scale(.96);transition:transform .45s ' + EE + '">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between"><span style="width:44px;height:44px;border-radius:50%;background:' + RD + ';color:' + INK + ';display:flex;align-items:center;justify-content:center">' + IC_TRASH + '</span><span style="font-size:10.5px;font-weight:700;letter-spacing:.14em;color:' + MU + '">↘ DESFAZER IMPORTAÇÃO</span></div>'
+        + '<div style="font-size:34px;font-weight:700;letter-spacing:-.05em;line-height:1;margin:18px 0 12px">Apagar ' + info.n + (info.n === 1 ? ' transação?' : ' transações?') + '</div>'
+        + '<div style="font-size:13px;line-height:1.45;color:#B4B4BA">Só as que vieram de <b style="color:' + FG + '">' + esc(info.arquivo) + '</b>. O que você lançou à mão não é tocado. As transferências entre contas dessa importação voltam a ficar sem par.<br><br>Não dá para refazer sem importar o arquivo de novo.</div>'
+        + (info.err ? '<div style="margin-top:14px;color:#FF8A7C;font-size:12px;line-height:1.4">' + esc(info.err) + '</div>' : '')
+        + '<div style="display:flex;gap:10px;margin-top:22px"><span data-m="go" style="flex:1;height:46px;display:flex;align-items:center;justify-content:center;border-radius:99px;background:' + RD + ';color:' + INK + ';font-size:11px;font-weight:900;letter-spacing:.12em;cursor:' + (info.busy ? 'default' : 'pointer') + ';opacity:' + (info.busy ? .6 : 1) + '">' + (info.busy ? 'APAGANDO…' : 'APAGAR ' + info.n) + '</span><span data-m="no" style="height:46px;display:flex;align-items:center;padding:0 22px;border-radius:99px;border:1px solid #3A3A40;color:#9A9AA3;font-size:11px;font-weight:800;letter-spacing:.12em;cursor:pointer">CANCELAR</span></div></div>';
+      const card = m.firstElementChild; if (modal === m) card.style.transform = 'none';
+    };
+    draw();
+    m.addEventListener('click', async ev => {
+      const b = ev.target.closest('[data-m]');
+      if (!b) { if (ev.target === m && !info.busy) fechaModal(); return; }
+      if (b.dataset.m === 'no') { if (!info.busy) fechaModal(); return; }
+      if (info.busy) return;
+      if (KD.isDemo()) { info.err = 'Esta é a conta de demonstração: desfazer fica travado para todo mundo poder testar.'; draw(); return; }
+      info.busy = true; info.err = ''; draw();
+      try {
+        const q = await KD.sb.rpc('kontar_desfazer_lote', { p_lote: info.bid }); if (q.error) throw q.error;
+        await KD.refresh(KD.comp);
+        info.busy = false; fechaModal(() => { alerta((q.data || 0) + (q.data === 1 ? ' transação apagada' : ' transações apagadas')); if (H) carregaHist(); });
+      } catch (e) { console.error('[kontar] desfazer', e); info.busy = false; info.err = 'Não consegui desfazer: ' + ((e && e.message) || 'erro'); draw(); }
+    });
+    document.body.appendChild(m); requestAnimationFrame(() => { if (modal === m) { m.style.opacity = '1'; m.firstElementChild.style.transform = 'none'; } });
+  }
+
+  /* histórico de lotes */
+  const quando = iso => { const d = new Date(iso), hoje = new Date(), hh = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); return (d.toDateString() === hoje.toDateString() ? 'HOJE' : String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0')) + ', ' + hh; };
+  const dm = iso => iso ? ddmm(String(iso).slice(0, 10)) : '';
+  function histCard(b) {
+    const off = b.status === 'descartado', bd = off ? '#2A2A2F' : '#232327', n = b.n_transacoes == null ? '' : b.n_transacoes;
+    const sub = [String(b.destino || '').toUpperCase(), b.periodo_ini ? dm(b.periodo_ini) + ' – ' + dm(b.periodo_fim) : '', off ? 'DESFEITA EM ' + dm(b.desfeito_em) : quando(b.created_at)].filter(Boolean).join(' · ');
+    const stats = off ? '<span style="font-size:12px;color:' + MU + '">Nenhuma transação restante</span>'
+      : '<b style="color:' + GR + ';font-size:19px;font-weight:800;letter-spacing:-.03em;white-space:nowrap">+ R$ ' + brl0(b.entrou || 0) + '</b><b style="color:' + RD + ';font-size:19px;font-weight:800;letter-spacing:-.03em;white-space:nowrap">– R$ ' + brl0(b.saiu || 0) + '</b><span style="font-size:12px;color:' + MU + ';white-space:nowrap">⇄ ' + (b.n_transf || 0) + ' entre contas</span><span style="font-size:12px;color:' + MU + ';white-space:nowrap">' + (b.duplicatas_detectadas || 0) + ' duplicatas ignoradas</span>';
+    const btn = off ? '' : '<span data-h="undo" data-id="' + b.id + '" style="position:absolute;right:20px;bottom:20px;height:40px;display:inline-flex;align-items:center;padding:0 20px;border-radius:8px;border:1.5px solid #55555C;font-size:11px;font-weight:800;letter-spacing:.12em;cursor:pointer;white-space:nowrap;transition:border-color .25s ease,background .25s ease" onmouseover="this.style.borderColor=\'#F2F0EB\'" onmouseout="this.style.borderColor=\'#55555C\'">DESFAZER IMPORTAÇÃO</span>';
+    return '<section data-hc style="position:relative;box-sizing:border-box;border-radius:28px;padding:0 28px;color:' + (off ? '#B4B4BA' : FG) + '"><div aria-hidden="true" style="position:absolute;inset:0;z-index:-1;box-sizing:border-box;border-radius:28px;pointer-events:none;background-color:' + (off ? 'transparent' : '#141416') + ';border:1px solid ' + bd + ';-webkit-mask:' + MASKURL + ';-webkit-mask-composite:xor;mask:' + MASKURL + ';mask-composite:exclude"></div>'
+      + '<svg aria-hidden="true" width="' + NS + '" height="' + NS + '" style="position:absolute;right:0;top:0;z-index:-1;pointer-events:none;overflow:visible"><path transform="translate(' + NS + ',0) scale(-1,1)" d="' + EDGE + '" fill="none" stroke="' + bd + '" stroke-width="1"/></svg>'
+      + '<span style="position:absolute;right:0;top:0;width:40px;height:40px;border-radius:50%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:' + (String(n).length > 2 ? 16 : 20) + 'px;font-weight:800;letter-spacing:-.04em;' + (off ? 'box-shadow:inset 0 0 0 1.5px #3A3A40;color:#B4B4BA' : 'background:' + FG + ';color:' + INK) + '">' + n + '</span>'
+      + '<div style="display:flex;align-items:center;height:58px;padding-right:' + (NN + NF - 28 + 4) + 'px;min-width:0"><b style="font-size:26px;letter-spacing:-.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(b.arquivo || 'Importação') + '</b><span style="margin-left:14px;font-size:10px;font-weight:700;letter-spacing:.14em;color:' + MU + ';white-space:nowrap">' + esc(sub) + '</span></div>'
+      + '<div style="height:' + RULE + 'px;background:#2E2E34"></div><div style="display:flex;align-items:center;gap:22px;height:80px;padding-right:230px">' + stats + '</div>' + btn + '</section>';
+  }
+  function histRender(list, first) {
+    if (!H) return;
+    const at = list.filter(b => b.status !== 'descartado').length, off = list.length - at, desde = list.length ? dm(list[list.length - 1].created_at) : '';
+    const bl = (v, on) => '<div style="display:flex;align-items:center;gap:12px;height:36px"><span style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;' + (on ? 'background:' + FG + ';color:' + INK : 'box-shadow:inset 0 0 0 1.5px #3A3A40;color:#B4B4BA') + '">' + v + '</span>' + (on ? 'Ativas' : 'Desfeitas') + '</div>';
+    H.innerHTML = '<div style="display:grid;grid-template-columns:330px minmax(0,1fr);max-width:1680px;margin:0 auto;min-height:100%"><aside style="position:sticky;top:0;align-self:start;height:calc(100vh - 68px);box-sizing:border-box;padding:26px 28px 24px;display:flex;flex-direction:column"><div data-s><div style="font-size:10.5px;font-weight:700;letter-spacing:.14em;color:' + MU + '">↘ IMPORTAÇÕES</div><div style="font-size:52px;font-weight:700;letter-spacing:-.06em;line-height:.95;margin:8px 0 10px">Histórico<br>de lotes</div><div style="font-size:12px;color:' + MU + '">' + list.length + (list.length === 1 ? ' importação' : ' importações') + (desde ? ' · desde ' + desde : '') + '</div></div>'
+      + (list.length ? '<div data-s style="margin-top:26px;display:flex;flex-direction:column;gap:6px;font-size:15px;font-weight:700">' + bl(at, true) + bl(off, false) + '</div>' : '')
+      + '<div data-s style="margin-top:auto"><span data-h="back" style="display:flex;align-items:center;justify-content:center;height:54px;border-radius:99px;background:' + FG + ';color:' + INK + ';font-size:12px;font-weight:900;letter-spacing:.12em;cursor:pointer">VOLTAR</span></div></aside>'
+      + '<main style="padding:22px 32px 80px 4px;display:flex;flex-direction:column;gap:16px">' + (list.length ? list.map(histCard).join('') : '<div data-hc style="padding:40px 0;color:' + MU + ';font-size:15px">Nenhuma importação ainda. Use o botão Importar, na barra de cima, para ler um extrato.</div>') + '</main></div>';
+    if (first) {
+      const els = [...H.querySelectorAll('[data-s],[data-hc]')];
+      els.forEach(g => { g.style.transition = 'none'; g.style.opacity = '0'; g.style.transform = 'translateY(14px)'; }); void H.offsetHeight;
+      requestAnimationFrame(() => els.forEach((g, k) => { g.style.transition = 'opacity .5s ease ' + (0.1 + k * .07) + 's, transform .75s ' + EE + ' ' + (0.1 + k * .07) + 's'; g.style.opacity = '1'; g.style.transform = 'none'; }));
+    }
+  }
+  let hList = [];
+  async function carregaHist(first) {
+    const q = await KD.sb.from('import_batches').select('*').order('created_at', { ascending: false }).limit(100);
+    hList = q.error ? [] : (q.data || []); histRender(hList, first !== false);
+  }
+  function fechaHist() { if (!H) return; const el = H; H = null; el.style.opacity = '0'; setTimeout(() => el.remove(), 330); }
+  async function historico() {
+    if (H) return;
+    H = document.createElement('div'); H.setAttribute('data-imp-hist', '1'); H.className = 'kscroll';
+    H.style.cssText = 'position:fixed;left:0;right:0;top:68px;bottom:0;background:#000;z-index:99990;font-family:Helvetica,Arial,sans-serif;color:' + FG + ';overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;opacity:0;transition:opacity .35s ease';
+    document.body.appendChild(H); requestAnimationFrame(() => { if (H) H.style.opacity = '1'; });
+    H.addEventListener('click', ev => {
+      const b = ev.target.closest('[data-h]'); if (!b) return;
+      if (b.dataset.h === 'back') return fechaHist();
+      if (b.dataset.h === 'undo') { const l = hList.find(x => x.id === b.dataset.id); if (l) confirmaDesfazer({ bid: l.id, n: l.n_transacoes || 0, arquivo: l.arquivo || 'a importação' }); }
+    });
+    await carregaHist(true);
+  }
+  IMP.history = historico;
   IMP.open = abrir;
 
   /* ---------- botão "Importar" na barra de cima, ao lado de "Nova" ---------- */
@@ -1916,6 +2020,12 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     b.onclick = () => input.click();
     nova.parentElement.insertBefore(b, nova);
   }
-  new MutationObserver(() => { try { mountButton(); } catch (e) {} }).observe(document.documentElement, { childList: true, subtree: true });
-  window.addEventListener('keydown', e => { if (e.key !== 'Escape' || !L || !S || S.busy) return; if (S.pop) return closePop(); close(); });
+  function mountHist() {
+    const p = [...document.querySelectorAll('p')].find(e => /O limite setado/.test(e.textContent)); if (!p) return;
+    const col = p.parentElement; if (!col || col.querySelector('[data-kd-hist]')) return;
+    const w = document.createElement('div'); w.setAttribute('data-kd-hist', '1'); w.style.cssText = 'margin-top:22px;align-self:flex-start'; w.innerHTML = pillHist(34, 'Histórico de importações');
+    w.firstElementChild.addEventListener('click', () => historico()); col.appendChild(w);
+  }
+  new MutationObserver(() => { try { mountButton(); mountHist(); } catch (e) {} }).observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener('keydown', e => { if (e.key === 'Escape') { if (modal) return fechaModal(); if (H) return fechaHist(); } if (e.key !== 'Escape' || !L || !S || S.busy) return; if (S.pop) return closePop(); close(); });
 })();
