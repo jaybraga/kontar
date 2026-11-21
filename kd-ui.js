@@ -1659,10 +1659,10 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       + cat + valor(r, dark) + '</div>';
   }
   const GDEF = {
-    need: { t: 'Precisam de você', sub: 'DUPLICATA, SEM CATEGORIA OU VALOR ALTO', bg: AM, fg: INK, rule: INK, bul: INK, bulFg: AM },
-    xfer: { t: 'Entre suas contas', sub: 'NÃO ENTRA NOS TOTAIS DE GASTO NEM DE RENDA', bg: '#141416', fg: FG, rule: XF, bul: XF, bulFg: FG },
+    need: { t: 'Precisam de você', sub: 'DUPLICATA, SEM CATEGORIA OU VALOR ALTO', bg: AM, fg: INK, rule: INK, bul: AM, bulFg: INK },
+    xfer: { t: 'Entre suas contas', sub: 'NÃO ENTRA NOS TOTAIS DE GASTO NEM DE RENDA', bg: '#141416', fg: FG, rule: XF, bul: 'linear-gradient(45deg,#7658FF,#4400B3)', bulFg: '#fff' },
     ok: { t: 'Confiantes', sub: 'CATEGORIA E ESTABELECIMENTO RECONHECIDOS', bg: '#141416', fg: FG, rule: GR, bul: GR, bulFg: INK },
-    skip: { t: 'Descartadas', sub: 'NADA É APAGADO · DÁ PARA INCLUIR DE VOLTA', bg: 'transparent', fg: '#B4B4BA', rule: '#2A2A2F', bul: '#2A2A2F', bulFg: FG }
+    skip: { t: 'Descartadas', sub: 'NADA É APAGADO · DÁ PARA INCLUIR DE VOLTA', bg: 'transparent', fg: '#B4B4BA', rule: '#2A2A2F', bul: 'transparent;box-shadow:inset 0 0 0 1.5px #3A3A40', bulFg: '#B4B4BA' }
   };
   const BCOL = { need: AM, xfer: '#C9BBFF', ok: GR, skip: MU };
   const bullet = (g, n, sz) => '<span style="width:' + sz + 'px;height:' + sz + 'px;border-radius:50%;background:' + GDEF[g].bul + ';color:' + GDEF[g].bulFg + ';display:flex;align-items:center;justify-content:center;flex:none;font-weight:800;font-size:' + Math.round(sz * .44) + 'px;letter-spacing:-.03em">' + n + '</span>';
