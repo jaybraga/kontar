@@ -2572,19 +2572,33 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       els.forEach((el, k) => el.animate([{ opacity: 0, transform: 'translateY(12px)' }, { opacity: 1, transform: 'none' }], { duration: 600, delay: 60 + k * 45, easing: EE, fill: 'backwards' }));
     }
   }
+  // a página é desenhada numa camada própria, fora da árvore do React (escrever dentro de nós do React quebra a renderização)
+  let layer = null;
+  function camada() {
+    if (layer) return layer;
+    layer = document.createElement('div'); layer.setAttribute('data-fontes-layer', '1'); layer.className = 'kscroll';
+    layer.style.cssText = 'position:fixed;left:0;right:0;top:68px;bottom:0;z-index:40;background:#000;overflow-x:hidden;overflow-y:auto;padding:18px 24px 60px;opacity:0;transition:opacity .35s ease;pointer-events:auto';
+    layer.innerHTML = '<div data-fontes-host-in="1"></div>';
+    layer.addEventListener('click', ev => {
+      const a = ev.target.closest('[data-ft-acao]'), md = ev.target.closest('[data-ft-modo]');
+      if (a) { const r = rows[+a.dataset.ftAcao]; if (r) FT.agir(r, FT.estado(r).acao); return; }
+      if (md) { const [i, modo] = md.dataset.ftModo.split(':'), r = rows[+i]; if (r) FT.mudarModo(r, modo); }
+    });
+    document.body.appendChild(layer); return layer;
+  }
+  let naPagina = false;
   function montaPagina() {
-    const host = document.querySelector('[data-fontes-host]'); if (!host) return;
-    if (!host.__ft) {
-      host.__ft = 1; if (!rows) FT.carregar();
-      host.addEventListener('click', ev => {
-        const a = ev.target.closest('[data-ft-acao]'), md = ev.target.closest('[data-ft-modo]');
-        if (a) { const r = rows[+a.dataset.ftAcao]; if (r) FT.agir(r, FT.estado(r).acao); return; }
-        if (md) { const [i, modo] = md.dataset.ftModo.split(':'), r = rows[+i]; if (r) FT.mudarModo(r, modo); }
-      });
+    const on = !!(KD.comp && KD.comp.state && KD.comp.state.page === 'fontes');
+    if (on && !naPagina) {
+      naPagina = true; if (!rows) FT.carregar();
+      const l = camada(), host = l.firstElementChild; l.style.display = 'block';
       pagina(host, true); host.__sig = JSON.stringify(rows);
+      requestAnimationFrame(() => { l.style.opacity = '1'; });
+    } else if (!on && naPagina) {
+      naPagina = false; const l = layer; if (l) { l.style.opacity = '0'; setTimeout(() => { if (!naPagina) l.style.display = 'none'; }, 360); }
     }
   }
-  window.addEventListener('kd:fontes', () => { const host = document.querySelector('[data-fontes-host]'); if (host && host.__ft) { const s = JSON.stringify(rows); if (s !== host.__sig) { const prim = host.__sig === 'null'; host.__sig = s; pagina(host, prim); } } sincCartoes(true); });
+  window.addEventListener('kd:fontes', () => { const host = layer && naPagina && layer.firstElementChild; if (host) { const s = JSON.stringify(rows); if (s !== host.__sig) { const prim = host.__sig === 'null'; host.__sig = s; pagina(host, prim); } } sincCartoes(true); });
 
   /* ---------- status e botão nos cards de Cartões ---------- */
   function sincCartoes(forcar) {
@@ -2613,5 +2627,5 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   }
 
   let raf = 0;
-  new MutationObserver(() => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; try { if (!KD.M || !KD.sb) return; if (!rows && !carregando && (document.querySelector('[data-fontes-host]') || document.querySelector('[data-k="mes"]') || document.querySelector('[data-ce-pen]'))) FT.carregar(); montaPagina(); sincCartoes(false); } catch (e) {} }); }).observe(document.documentElement, { childList: true, subtree: true });
+  new MutationObserver(() => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; try { if (!KD.M || !KD.sb) return; if (!rows && !carregando && ((KD.comp && KD.comp.state && KD.comp.state.page === 'fontes') || document.querySelector('[data-k="mes"]') || document.querySelector('[data-ce-pen]'))) FT.carregar(); montaPagina(); sincCartoes(false); } catch (e) {} }); }).observe(document.documentElement, { childList: true, subtree: true });
 })();
