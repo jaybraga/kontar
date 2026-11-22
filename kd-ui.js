@@ -1478,6 +1478,26 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   };
 })();
 
+/* Kontar · geometria do recorte (indent) de canto, HANDOFF §5.4
+   O recorte é um arco concêntrico com o botão (raio R = raio do botão + folga) entre duas concordâncias de raio F; sem trechos retos.
+   Tudo no canto superior direito. corner() = forma do corte (máscara), edge() = contorno de 1px que acompanha o corte, mask() = css. */
+(function () {
+  'use strict';
+  const KD = window.KD, f2 = n => Math.round(n * 100) / 100;
+  function geo(rb, g, F) { const R = rb + g, dd = Math.sqrt((R + F) ** 2 - (rb - F) ** 2), S = Math.ceil(rb + dd + F) + 2; return { R, dd, S, cx: S - rb, cy: rb, x1: S - rb - dd }; }
+  // off = 0: borda do corte. off = .5: linha central de um contorno de 1px que fica dentro do material (raios ajustados).
+  function path(rb, g, F, off) {
+    const G = geo(rb, g, F), R2 = G.R + off, F2 = F - off, k = R2 / (R2 + F2), C1 = [G.x1, F], B = [G.cx, G.cy], C2 = [G.S - F, G.cy + G.dd];
+    const P1 = [B[0] + (C1[0] - B[0]) * k, B[1] + (C1[1] - B[1]) * k], P2 = [B[0] + (C2[0] - B[0]) * k, B[1] + (C2[1] - B[1]) * k];
+    return 'M' + f2(G.x1) + ',' + off + 'A' + F2 + ',' + F2 + ' 0 0 1 ' + f2(P1[0]) + ',' + f2(P1[1]) + 'A' + R2 + ',' + R2 + ' 0 0 0 ' + f2(P2[0]) + ',' + f2(P2[1]) + 'A' + F2 + ',' + F2 + ' 0 0 1 ' + f2(G.S - off) + ',' + f2(G.cy + G.dd);
+  }
+  KD.notch = {
+    corner(rb, g, F) { const G = geo(rb, g, F); return { w: G.S, h: Math.ceil(G.cy + G.dd) + 2, vis: rb + G.dd, d: path(rb, g, F, 0) + 'L' + (G.S + 2) + ',' + f2(G.cy + G.dd) + 'L' + (G.S + 2) + ',-2L' + f2(G.x1) + ',-2Z' }; },
+    edge(rb, g, F) { return path(rb, g, F, .5); },
+    mask(rb, g, F) { const n = KD.notch.corner(rb, g, F); return "url('data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="' + n.w + '" height="' + n.h + '" overflow="visible"><path d="' + n.d + '"/></svg>') + "') right top/" + n.w + 'px ' + n.h + 'px no-repeat'; }
+  };
+})();
+
 /* Kontar · importador de extrato (OFX e CSV) + tela de revisão em lote (layout A: coluna lateral + cards)
    Fluxo: arquivo → linhas → duplicatas (KD.dup), transferências entre contas próprias e categorias conhecidas
    → quatro cards (Precisam de você · Entre suas contas · Confiantes · Descartadas) → importar.
@@ -1668,10 +1688,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const bullet = (g, n, sz) => '<span style="width:' + sz + 'px;height:' + sz + 'px;border-radius:50%;background:' + GDEF[g].bul + ';color:' + GDEF[g].bulFg + ';display:flex;align-items:center;justify-content:center;flex:none;font-weight:800;font-size:' + Math.round(sz * .44) + 'px;letter-spacing:-.03em">' + n + '</span>';
   /* indent do card (HANDOFF §5.4): recorte côncavo no canto superior esquerdo, com concordâncias, onde mora a contagem.
      O fundo do card vira uma camada com máscara (retângulo menos o recorte), pra não prender os dropdowns; o contorno é redesenhado em SVG. */
-  const NN = 50, NF = 14, NR = 30, NS = NN + NF + 4;
-  const CUT = 'M0,0H' + (NN + NF) + 'A' + NF + ',' + NF + ' 0 0 0 ' + NN + ',' + NF + 'V' + (NN - NR) + 'A' + NR + ',' + NR + ' 0 0 1 ' + (NN - NR) + ',' + NN + 'H' + NF + 'A' + NF + ',' + NF + ' 0 0 0 0,' + (NN + NF) + 'Z';
-  const EDGE = 'M' + (NN + NF) + ',.5A' + (NF - .5) + ',' + (NF - .5) + ' 0 0 0 ' + (NN + .5) + ',' + NF + 'V' + (NN - NR) + 'A' + (NR + .5) + ',' + (NR + .5) + ' 0 0 1 ' + (NN - NR) + ',' + (NN + .5) + 'H' + NF + 'A' + (NF - .5) + ',' + (NF - .5) + ' 0 0 0 .5,' + (NN + NF);
-  const MASKURL = "url('data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="' + NS + '" height="' + NS + '"><path transform="translate(' + NS + ',0) scale(-1,1)" d="' + CUT + '"/></svg>') + "') right 0 top 0/" + NS + 'px ' + NS + 'px no-repeat, linear-gradient(#000 0 0)';
+  const NB = [20, 10, 14], NT = KD.notch.corner(...NB), EDGE = KD.notch.edge(...NB), NVIS = Math.round(NT.vis);   // círculo de 40px, folga 10, concordância 14
+  const MASKURL = KD.notch.mask(...NB) + ', linear-gradient(#000 0 0)';
   const RULE = 1.5;   // espessura padrão das linhas de cabeçalho do app
   // mesh roxo da marca (mesma lógica do glow da Sobra: sólido no canto, some na diagonal), só no terço esquerdo
   const MESH = 'radial-gradient(120px 90px at 22% 88%,rgba(150,125,255,.38),rgba(150,125,255,0)),radial-gradient(130px 110px at 70% 62%,rgba(68,0,179,.4),rgba(68,0,179,0)),linear-gradient(45deg,rgba(118,88,255,.92) 40px,rgba(91,61,245,.62) 120px,rgba(68,0,179,0) 230px)';
@@ -1679,13 +1697,13 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const D = GDEF[g], dark = g !== 'need', open = !!S.open[g], lim = g === 'ok' ? 8 : 999;
     const show = g === 'skip' ? (open ? rows : []) : (open ? rows : rows.slice(0, lim)), more = rows.length - show.length;
     const sel = rows.filter(ativa), all = sel.length && sel.every(r => r.include);
-    const head = '<div data-head style="display:flex;align-items:center;gap:14px;height:58px;padding-right:' + (NN + NF - 28 + 4) + 'px"><b style="font-size:26px;letter-spacing:-.04em">' + D.t + '</b><span style="font-size:10px;font-weight:700;letter-spacing:.14em;color:' + (dark ? MU : 'rgba(10,10,10,.62)') + '">' + D.sub + '</span>'
+    const head = '<div data-head style="display:flex;align-items:center;gap:14px;height:58px;padding-right:' + (NVIS - 28 + 4) + 'px"><b style="font-size:26px;letter-spacing:-.04em">' + D.t + '</b><span style="font-size:10px;font-weight:700;letter-spacing:.14em;color:' + (dark ? MU : 'rgba(10,10,10,.62)') + '">' + D.sub + '</span>'
       + (g === 'skip' ? '<span data-a="more" data-g="skip" style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;letter-spacing:.14em;cursor:pointer;color:' + FG + '">' + (open ? 'FECHAR' : 'VER') + '<span data-chev style="display:flex;transform:rotate(' + (open ? 180 : 0) + 'deg)">' + chev(14) + '</span></span>' : '') + '</div>'
       + (g === 'skip' && !open ? '' : '<div data-rule style="height:' + RULE + 'px;background:' + D.rule + ';margin:0 0 4px"></div>');
     const selAll = g === 'skip' || !sel.length ? '' : '<div style="display:grid;' + COLS + ';gap:16px;align-items:center;height:44px">' + ck(all, dark, 'data-all="' + g + '"') + '<span data-all="' + g + '" style="grid-column:2 / 4;font-size:11px;font-weight:800;letter-spacing:.14em;cursor:pointer">' + (all ? 'DESMARCAR TODAS' : 'SELECIONAR TODAS') + '</span></div>';
     const bd = g === 'skip' ? '#2A2A2F' : dark ? '#232327' : null;
     const layer = '<div aria-hidden="true" style="position:absolute;inset:0;z-index:-1;box-sizing:border-box;border-radius:28px;pointer-events:none;background-color:' + D.bg + ';' + (g === 'xfer' ? 'background-image:' + MESH + ';background-size:33.333% 100%;background-repeat:no-repeat;background-position:left top;' : '') + (bd ? 'border:1px solid ' + bd + ';' : '') + '-webkit-mask:' + MASKURL + ';-webkit-mask-composite:xor;mask:' + MASKURL + ';mask-composite:exclude"></div>'
-      + (bd ? '<svg aria-hidden="true" width="' + NS + '" height="' + NS + '" style="position:absolute;right:0;top:0;z-index:-1;pointer-events:none;overflow:visible"><path transform="translate(' + NS + ',0) scale(-1,1)" d="' + EDGE + '" fill="none" stroke="' + bd + '" stroke-width="1"/></svg>' : '')
+      + (bd ? '<svg aria-hidden="true" width="' + NT.w + '" height="' + NT.h + '" style="position:absolute;right:0;top:0;z-index:-1;pointer-events:none;overflow:visible"><path d="' + EDGE + '" fill="none" stroke="' + bd + '" stroke-width="1"/></svg>' : '')
       + '<span style="position:absolute;right:0;top:0;width:40px;height:40px;border-radius:50%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:' + (String(rows.length).length > 2 ? 16 : 20) + 'px;font-weight:800;letter-spacing:-.04em;background:' + D.bul + ';color:' + D.bulFg + '">' + rows.length + '</span>';
     return '<section data-grp="' + g + '" style="position:relative;color:' + D.fg + ';box-sizing:border-box;border-radius:28px;padding:0 28px ' + (g === 'skip' && !open ? 22 : 14) + 'px;overflow:visible">'
       + layer + head + selAll + '<div data-rows>' + show.map((r, k) => rowHtml(r, g, k === 0)).join('') + '</div>'
@@ -1970,9 +1988,9 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       : '<b style="color:' + GR + ';font-size:19px;font-weight:800;letter-spacing:-.03em;white-space:nowrap">+ R$ ' + brl0(b.entrou || 0) + '</b><b style="color:' + RD + ';font-size:19px;font-weight:800;letter-spacing:-.03em;white-space:nowrap">– R$ ' + brl0(b.saiu || 0) + '</b><span style="font-size:12px;color:' + MU + ';white-space:nowrap">⇄ ' + (b.n_transf || 0) + ' entre contas</span><span style="font-size:12px;color:' + MU + ';white-space:nowrap">' + (b.duplicatas_detectadas || 0) + ' duplicatas ignoradas</span>';
     const btn = off ? '' : '<span data-h="undo" data-id="' + b.id + '" style="position:absolute;right:20px;bottom:20px;height:40px;display:inline-flex;align-items:center;padding:0 20px;border-radius:8px;border:1.5px solid #55555C;font-size:11px;font-weight:800;letter-spacing:.12em;cursor:pointer;white-space:nowrap;transition:border-color .25s ease,background .25s ease" onmouseover="this.style.borderColor=\'#F2F0EB\'" onmouseout="this.style.borderColor=\'#55555C\'">DESFAZER IMPORTAÇÃO</span>';
     return '<section data-hc style="position:relative;box-sizing:border-box;border-radius:28px;padding:0 28px;color:' + (off ? '#B4B4BA' : FG) + '"><div aria-hidden="true" style="position:absolute;inset:0;z-index:-1;box-sizing:border-box;border-radius:28px;pointer-events:none;background-color:' + (off ? 'transparent' : '#141416') + ';border:1px solid ' + bd + ';-webkit-mask:' + MASKURL + ';-webkit-mask-composite:xor;mask:' + MASKURL + ';mask-composite:exclude"></div>'
-      + '<svg aria-hidden="true" width="' + NS + '" height="' + NS + '" style="position:absolute;right:0;top:0;z-index:-1;pointer-events:none;overflow:visible"><path transform="translate(' + NS + ',0) scale(-1,1)" d="' + EDGE + '" fill="none" stroke="' + bd + '" stroke-width="1"/></svg>'
+      + '<svg aria-hidden="true" width="' + NT.w + '" height="' + NT.h + '" style="position:absolute;right:0;top:0;z-index:-1;pointer-events:none;overflow:visible"><path d="' + EDGE + '" fill="none" stroke="' + bd + '" stroke-width="1"/></svg>'
       + '<span style="position:absolute;right:0;top:0;width:40px;height:40px;border-radius:50%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:' + (String(n).length > 2 ? 16 : 20) + 'px;font-weight:800;letter-spacing:-.04em;' + (off ? 'box-shadow:inset 0 0 0 1.5px #3A3A40;color:#B4B4BA' : 'background:' + FG + ';color:' + INK) + '">' + n + '</span>'
-      + '<div style="display:flex;align-items:center;height:58px;padding-right:' + (NN + NF - 28 + 4) + 'px;min-width:0"><b style="font-size:26px;letter-spacing:-.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(b.arquivo || 'Importação') + '</b><span style="margin-left:14px;font-size:10px;font-weight:700;letter-spacing:.14em;color:' + MU + ';white-space:nowrap">' + esc(sub) + '</span></div>'
+      + '<div style="display:flex;align-items:center;height:58px;padding-right:' + (NVIS - 28 + 4) + 'px;min-width:0"><b style="font-size:26px;letter-spacing:-.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(b.arquivo || 'Importação') + '</b><span style="margin-left:14px;font-size:10px;font-weight:700;letter-spacing:.14em;color:' + MU + ';white-space:nowrap">' + esc(sub) + '</span></div>'
       + '<div style="height:' + RULE + 'px;background:#2E2E34"></div><div style="display:flex;align-items:center;gap:22px;height:80px;padding-right:230px">' + stats + '</div>' + btn + '</section>';
   }
   function histRender(list, first) {
@@ -2081,16 +2099,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   };
 
   /* ---------- recorte do canto (HANDOFF §5.4): arco concêntrico com o botão ---------- */
-  const f2 = n => Math.round(n * 100) / 100;
-  function corner(rb, g, F) {
-    const R = rb + g, dd = Math.sqrt((R + F) ** 2 - (rb - F) ** 2), S = Math.ceil(rb + dd + F) + 2, cx = S - rb, cy = rb, x1 = cx - dd, k = R / (R + F);
-    const C1 = [x1, F], B = [cx, cy], C2 = [S - F, cy + dd];
-    const P1 = [B[0] + (C1[0] - B[0]) * k, B[1] + (C1[1] - B[1]) * k], P2 = [B[0] + (C2[0] - B[0]) * k, B[1] + (C2[1] - B[1]) * k];
-    const d = 'M' + f2(x1) + ',0A' + F + ',' + F + ' 0 0 1 ' + f2(P1[0]) + ',' + f2(P1[1]) + 'A' + R + ',' + R + ' 0 0 0 ' + f2(P2[0]) + ',' + f2(P2[1]) + 'A' + F + ',' + F + ' 0 0 1 ' + S + ',' + f2(cy + dd) + 'L' + (S + 2) + ',' + f2(cy + dd) + 'L' + (S + 2) + ',-2L' + f2(x1) + ',-2Z';
-    return { w: S, h: Math.ceil(cy + dd) + 2, d };
-  }
-  const NT = corner(22, 10, 18);   // tamanho M: botão de 44px
-  const NOTCH_URL = "url('data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="' + NT.w + '" height="' + NT.h + '" overflow="visible"><path d="' + NT.d + '"/></svg>') + "') right top/" + NT.w + 'px ' + NT.h + 'px no-repeat';
+  const NOTCH_URL = KD.notch.mask(22, 10, 18);   // tamanho M: botão de 44px
   const punch = side => 'radial-gradient(circle var(--fm-pr) at ' + (side === 'l' ? '0' : '100%') + ' ' + DV + 'px,#000 calc(100% - .5px),transparent 100%)';
   const MASK = [NOTCH_URL, punch('l'), punch('r'), 'linear-gradient(#000 0 0)'];
   const maskCss = '-webkit-mask:' + MASK.join(',') + ';-webkit-mask-composite:xor,xor,xor;mask:' + MASK.join(',') + ';mask-composite:exclude,exclude,exclude';
@@ -2183,6 +2192,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     rc.style.cssText = 'position:absolute;left:0;top:0;width:' + wr.width + 'px;height:' + wr.height + 'px;box-sizing:border-box;padding:18px 22px;display:flex;flex-direction:column-reverse;justify-content:flex-end;gap:6px;pointer-events:none';
     [...w.children].filter(c => !c.hasAttribute('data-fm-host')).forEach(c => { const k = c.cloneNode(true); k.style.opacity = '1'; k.style.transform = 'none'; rc.appendChild(k); });
     const mn = rc.querySelector('[data-mesn]'); if (mn) mn.style.fontSize = '62px'; if (rc.children[1]) rc.children[1].style.marginRight = '64px';
+    // a cópia precisa ter exatamente a altura dos filhos reais, senão o título dá um pulo de 1px quando o overlay sai
+    [...w.children].filter(c => !c.hasAttribute('data-fm-host')).forEach((c, i) => { const k = rc.children[i]; if (k) { k.style.height = c.getBoundingClientRect().height + 'px'; k.style.flex = 'none'; } });
     ov.innerHTML = bgLayer(PR) + '<div data-fm-rcw style="position:absolute;inset:0"></div>' + expandedHtml(d, wr.width, gr.height) + btnHtml();
     const rcw = ov.querySelector('[data-fm-rcw]'); rcw.appendChild(rc);
     rcw.insertAdjacentHTML('beforeend', '<div data-r="txt" style="position:absolute;left:' + (PR + 8) + 'px;right:' + (PR + 8) + 'px;top:' + DV + 'px;border-top:1.5px dashed rgba(10,10,10,.28)"></div><div style="position:absolute;left:26px;right:26px;top:' + (DV + 20) + 'px">' + fecharHtml(d) + '</div>');
