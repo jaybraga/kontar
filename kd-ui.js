@@ -1510,8 +1510,11 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   };
   // recorte justo de cada arte (medido em pixels com KD.logo.medir(); null = ainda não medido, usa o viewBox original)
   const VB = {
-    'Nubank|compacta': null, 'Nubank|extensa': null, 'Itaú|compacta': null, 'Itaú|extensa': null, 'C6|compacta': null, 'C6|extensa': null,
-    'Mercado Pago|compacta': null, 'Mercado Pago|extensa': null, 'Amazon|compacta': null, 'Amazon|extensa': null
+    'Nubank|compacta': '0 0 264 145.75', 'Nubank|extensa': '0 0 263.87 145.57',
+    'Itaú|compacta': '60.25 213.5 376.5 175.75', 'Itaú|extensa': '60.25 213.5 376.5 175.75',
+    'C6|compacta': '0 0 562.25 297.75', 'C6|extensa': '0 0 1515.31 297.56',
+    'Mercado Pago|compacta': '5.25 26.5 208.75 90.75', 'Mercado Pago|extensa': '5.5 0 594.74 151.31',
+    'Amazon|compacta': '4.42 0.44 247.47 254.97', 'Amazon|extensa': '0 0 1646.5 472.75'
   };
   // nomes que o app usa pra mesma marca
   const ALIAS = { 'itau': 'Itaú', 'itaú azul': 'Itaú', 'itau azul': 'Itaú', 'nubank pj': 'Nubank', 'nubank pessoal': 'Nubank', 'nubank conta': 'Nubank', 'cdb mercado pago': 'Mercado Pago', 'mercadopago': 'Mercado Pago', 'mercado pago': 'Mercado Pago', 'c6 bank': 'C6', 'c6': 'C6', 'amazon': 'Amazon', 'nubank': 'Nubank' };
