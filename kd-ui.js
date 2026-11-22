@@ -447,7 +447,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       lv = !pw ? 0 : pw.length < 8 || pts <= 3 ? 1 : pts <= 5 ? 2 : 3, same = !!pw && pw === c, lst = a => a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' e ' + a[a.length - 1], miss = [];
     if (pw.length < 8) miss.push('mais ' + (8 - pw.length) + (8 - pw.length === 1 ? ' caractere' : ' caracteres')); if (!/[A-Z]/.test(pw)) miss.push('maiúscula'); if (!/[a-z]/.test(pw)) miss.push('minúscula'); if (!/\d/.test(pw)) miss.push('número'); if (!/[^A-Za-z0-9]/.test(pw)) miss.push('símbolo');
     return { lv, same, ok: lv >= 2 && same, pct: ['0%', '33.3%', '66.6%', '100%'][lv], col: ['#26262B', '#FF4436', '#F5B83D', '#00E08A'][lv], lbl: ['', 'Fraca', 'Média', 'Forte'][lv],
-      hint: !pw ? 'Mínimo 8 caracteres' : lv === 1 ? 'Falta ' + lst(miss.slice(0, 2)) : lv === 2 && miss.length ? 'Melhore com ' + lst(miss.slice(0, 2)) : (c && !same) ? 'As senhas não são iguais' : !c ? 'Repita a senha acima' : 'Tudo certo',
+      hint: !pw ? 'Mínimo 8 caracteres' : lv === 1 ? 'Falta ' + lst(miss.slice(0, 2)) : (c && !same) ? 'As senhas não são iguais' : lv === 2 && miss.length ? 'Melhore com ' + lst(miss.slice(0, 2)) : !c ? 'Repita a senha acima' : 'Tudo certo',
       hintC: !pw ? '#7C7C85' : lv === 1 || (c && !same) ? '#FF6A5C' : lv === 3 && same ? '#00E08A' : '#B4B4BC' };
   };
   KD.sendReset = () => sb().auth.resetPasswordForEmail(KD.user.email, { redirectTo: location.origin + location.pathname });

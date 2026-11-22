@@ -298,7 +298,7 @@ input:focus{border-color:var(--bone);background:rgba(0,0,0,.55)}
     liq(); parallax(); pwEye();
     const e = $('#e'), p1 = $('#p1'), p2 = $('#p2'), go = $('#go'), mb = $('#mb'), ml = $('#ml'), mh = $('#mh'), x = $('#x');
     const ok = () => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.value.trim());
-    const upd = () => { const c = KD.pwCheck(p1.value, p2.value); mb.style.width = c.pct; mb.style.background = c.col; ml.style.color = c.lv ? c.col : '#7C7C85'; ml.textContent = c.lbl || 'Força'; mh.textContent = c.hint; mh.style.color = c.hintC; go.disabled = !(c.ok && ok()); };
+    const upd = () => { const c = KD.pwCheck(p1.value, p2.value); mb.style.width = c.pct; mb.style.background = c.col; ml.style.color = c.lv ? c.col : '#7C7C85'; ml.textContent = c.lbl || 'Força'; mh.textContent = c.hint; mh.style.color = c.hintC; if (c.ok && !ok()) { mh.textContent = e.value.trim() ? 'Falta um e-mail válido' : 'Falta o e-mail'; mh.style.color = '#F5B83D'; } go.disabled = !(c.ok && ok()); };
     [e, p1, p2].forEach(i => i.addEventListener('input', upd));
     const back = () => login(sb); $('#vo').onclick = back; $('#vo').onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); back(); } };
     $('#f').addEventListener('submit', async ev => { ev.preventDefault(); if (go.disabled || go.classList.contains('busy')) return; x.textContent = '';
