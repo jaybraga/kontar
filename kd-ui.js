@@ -2036,11 +2036,13 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   window.addEventListener('keydown', e => { if (e.key === 'Escape') { if (modal) return fechaModal(); if (H) return fechaHist(); } if (e.key !== 'Escape' || !L || !S || S.busy) return; if (S.pop) return closePop(); close(); });
 })();
 
-/* Kontar · "Fechar o mês" na Home (mockup 9-fechar-mes-A-expandido-v2)
+/* Kontar · "Fechar o mês" na Home (mockup 10-fechar-mes-2-card-unico)
    A partir do dia 5, enquanto alguma fonte (conta ou cartão) estiver sem extrato/fatura do mês anterior, o card branco do mês
-   se divide: em cima continua o mês, embaixo fica o "Fechar o mês" reduzido. Clicar nele expande o card na coluna (cobrindo o Saldo)
-   com a lista completa e o botão Importar onde falta; o recorte do canto vira o X de fechar (mesmo mecanismo do card Sobra).
-   "Em dia" = existe lote de importação aprovado daquela fonte com período indo até o fim do mês anterior (tolerância de 3 dias). */
+   ganha embaixo, depois de um divisor perfurado, o resumo do fechamento (barrinhas + "X de Y fontes em dia"). O indent do canto
+   superior direito (tamanho M, botão cinza com seta ↙) expande o card na coluna onde ele estiver, cobrindo o que houver nela:
+   lista completa de fontes com Importar onde falta. O X (recorte do mesmo canto) recolhe.
+   Geometria do recorte: HANDOFF §5.4 (arco concêntrico com o botão, folga 10, concordância 18). "Em dia" = existe lote aprovado da
+   fonte com período até o fim do mês anterior (tolerância de 3 dias). */
 (function () {
   'use strict';
   const KD = window.KD, FM = (KD.fm = {});
@@ -2050,7 +2052,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   const dm = s => s.slice(8, 10) + '/' + s.slice(5, 7);
   const LOGOKEY = { 'Itaú Azul': 'Itaú', 'Nubank PJ': 'Nubank', 'Nubank Pessoal': 'Nubank', 'CDB Mercado Pago': 'Mercado Pago' };
-  let batches = [], loaded = false, sig = '', open = false, anim = false, ov = null, split = false;
+  const DV = 112, PR = 10;   // y do divisor perfurado e raio das perfurações
+  let batches = [], loaded = false, sig = '', open = false, anim = false, ov = null;
 
   /* ---------- dados ---------- */
   async function carregar() {
@@ -2074,121 +2077,173 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       f.last = last; f.ok = !!last && last >= limIso;
     });
     const ok = fontes.filter(f => f.ok).length, pend = fontes.length - ok;
-    return { nome, fontes, ok, pend, total: fontes.length, show: loaded && fontes.length > 0 && T.getDate() >= 5 && pend > 0 };
+    return { nome, fontes, ok, pend, total: fontes.length, show: loaded === true && fontes.length > 0 && T.getDate() >= 5 && pend > 0 };
   };
 
+  /* ---------- recorte do canto (HANDOFF §5.4): arco concêntrico com o botão ---------- */
+  const f2 = n => Math.round(n * 100) / 100;
+  function corner(rb, g, F) {
+    const R = rb + g, dd = Math.sqrt((R + F) ** 2 - (rb - F) ** 2), S = Math.ceil(rb + dd + F) + 2, cx = S - rb, cy = rb, x1 = cx - dd, k = R / (R + F);
+    const C1 = [x1, F], B = [cx, cy], C2 = [S - F, cy + dd];
+    const P1 = [B[0] + (C1[0] - B[0]) * k, B[1] + (C1[1] - B[1]) * k], P2 = [B[0] + (C2[0] - B[0]) * k, B[1] + (C2[1] - B[1]) * k];
+    const d = 'M' + f2(x1) + ',0A' + F + ',' + F + ' 0 0 1 ' + f2(P1[0]) + ',' + f2(P1[1]) + 'A' + R + ',' + R + ' 0 0 0 ' + f2(P2[0]) + ',' + f2(P2[1]) + 'A' + F + ',' + F + ' 0 0 1 ' + S + ',' + f2(cy + dd) + 'L' + (S + 2) + ',' + f2(cy + dd) + 'L' + (S + 2) + ',-2L' + f2(x1) + ',-2Z';
+    return { w: S, h: Math.ceil(cy + dd) + 2, d };
+  }
+  const NT = corner(22, 10, 18);   // tamanho M: botão de 44px
+  const NOTCH_URL = "url('data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="' + NT.w + '" height="' + NT.h + '" overflow="visible"><path d="' + NT.d + '"/></svg>') + "') right top/" + NT.w + 'px ' + NT.h + 'px no-repeat';
+  const punch = side => 'radial-gradient(circle var(--fm-pr) at ' + (side === 'l' ? '0' : '100%') + ' ' + DV + 'px,#000 calc(100% - .5px),transparent 100%)';
+  const MASK = [NOTCH_URL, punch('l'), punch('r'), 'linear-gradient(#000 0 0)'];
+  const maskCss = '-webkit-mask:' + MASK.join(',') + ';-webkit-mask-composite:xor,xor,xor;mask:' + MASK.join(',') + ';mask-composite:exclude,exclude,exclude';
+  const bgLayer = pr => '<div aria-hidden="true" data-fm-bg style="position:absolute;inset:0;z-index:-1;border-radius:30px;background:' + W + ';--fm-pr:' + pr + 'px;pointer-events:none;transition:--fm-pr .35s ' + EE + ';' + maskCss + '"></div>';
+
   /* ---------- peças visuais ---------- */
-  const notch = (NN, NF, NR) => {
-    const NS = NN + NF + 4, cut = 'M0,0H' + (NN + NF) + 'A' + NF + ',' + NF + ' 0 0 0 ' + NN + ',' + NF + 'V' + (NN - NR) + 'A' + NR + ',' + NR + ' 0 0 1 ' + (NN - NR) + ',' + NN + 'H' + NF + 'A' + NF + ',' + NF + ' 0 0 0 0,' + (NN + NF) + 'Z';
-    const u = "url('data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="' + NS + '" height="' + NS + '"><path transform="translate(' + NS + ',0) scale(-1,1)" d="' + cut + '"/></svg>') + "') right 0 top 0/" + NS + 'px ' + NS + 'px no-repeat, linear-gradient(#000 0 0)';
-    return '-webkit-mask:' + u + ';-webkit-mask-composite:xor;mask:' + u + ';mask-composite:exclude';
-  };
-  const NS_ = notch(40, 12, 24), NM_ = notch(50, 14, 30);   // S (reduzido) e M (expandido), como no card Sobra
-  const ARROW = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M7 17 17 7M9 7h8v8"/></svg>';
+  const ARROW = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M17 7 7 17M7 9v8h8"/></svg>';
   const XMARK = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="display:block"><path d="M6 6l12 12M18 6 6 18"/></svg>';
   const CHECK = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
-  const segs = d => '<div style="display:flex;gap:5px">' + d.fontes.map(f => '<i style="flex:1;height:8px;border-radius:4px;background:' + (f.ok ? GRN : AMB) + ';display:block"></i>').join('') + '</div>';
+  const btnHtml = () => '<span data-fm-btn style="position:absolute;right:0;top:0;width:44px;height:44px;border-radius:50%;background:#1C1C20;box-shadow:inset 0 0 0 1px #3A3A40;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .4s ease,box-shadow .4s ease,color .4s ease"><span data-fm-ar style="position:absolute;display:flex;transition:opacity .25s ease,transform .5s ' + EE + '">' + ARROW + '</span><span data-fm-xx style="position:absolute;display:flex;opacity:0;transform:rotate(-90deg);transition:opacity .25s ease,transform .5s ' + EE + '">' + XMARK + '</span></span>';
+  const segs = (d, attr) => '<div ' + attr + ' style="display:flex;gap:5px">' + d.fontes.map(f => '<i data-bar style="flex:1;height:8px;border-radius:4px;background:' + (f.ok ? GRN : AMB) + ';display:block"></i>').join('') + '</div>';
   const logo = f => { const key = f.bank ? (LOGOKEY[f.bank] || f.bank) : null; let u = ''; try { u = key ? KD.comp.constructor.lgcUrl(key) : ''; } catch (e) {} return u ? '<span style="width:30px;height:30px;flex:none;background:url(\'' + u + '\') center/contain no-repeat"></span>' : '<span style="width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center"><i style="width:12px;height:12px;border-radius:50%;background:' + INK + ';display:block"></i></span>'; };
-  const reducedHtml = d => '<div style="position:absolute;left:26px;top:15px;right:70px"><div style="display:flex;justify-content:space-between;font-size:10px;font-weight:800;letter-spacing:.12em"><span>FECHAR ' + d.nome.toUpperCase() + '</span><span style="color:' + AMT + '">' + d.pend + (d.pend === 1 ? ' PENDENTE' : ' PENDENTES') + '</span></div><div style="margin-top:12px">' + segs(d) + '</div><div style="font-size:11px;margin-top:9px;color:rgba(10,10,10,.6)">' + d.ok + ' de ' + d.total + ' fontes em dia</div></div>';
-  const rowHtml = (f, d) => '<div style="display:flex;align-items:center;gap:14px;height:62px;flex:none;border-top:1px solid rgba(10,10,10,.14)">' + logo(f) + '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(f.label) + ' <span style="font-size:9px;font-weight:800;letter-spacing:.12em;border:1.5px solid rgba(10,10,10,.4);border-radius:99px;padding:2px 7px;margin-left:4px;vertical-align:2px">' + f.tipo + '</span></div><div style="font-size:11px;margin-top:3px;color:' + (f.ok ? 'rgba(10,10,10,.55)' : AMT) + ';font-weight:' + (f.ok ? 500 : 700) + '">'
+  const fecharHtml = d => '<div data-r="txt" style="display:flex;justify-content:space-between;font-size:10px;font-weight:800;letter-spacing:.12em"><span>FECHAR ' + d.nome.toUpperCase() + '</span><span style="color:' + AMT + '">' + d.pend + (d.pend === 1 ? ' PENDENTE' : ' PENDENTES') + '</span></div><div style="margin-top:12px">' + segs(d, '') + '</div><div data-r="txt" style="font-size:11px;margin-top:9px;color:rgba(10,10,10,.6)">' + d.ok + ' de ' + d.total + ' fontes em dia</div>';
+  const rowHtml = (f, d) => '<div data-a="row" style="display:flex;align-items:center;gap:14px;height:62px;flex:none;border-top:1px solid rgba(10,10,10,.14)">' + logo(f) + '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(f.label) + ' <span style="font-size:9px;font-weight:800;letter-spacing:.12em;border:1.5px solid rgba(10,10,10,.4);border-radius:99px;padding:2px 7px;margin-left:4px;vertical-align:2px">' + f.tipo + '</span></div><div style="font-size:11px;margin-top:3px;color:' + (f.ok ? 'rgba(10,10,10,.55)' : AMT) + ';font-weight:' + (f.ok ? 500 : 700) + '">'
     + (f.ok ? 'Em dia · ' + (f.card ? 'fatura' : 'extrato') + ' até ' + dm(f.last) : 'Falta ' + (f.card ? 'a fatura' : 'o extrato') + ' de ' + d.nome + (f.last ? ' · último até ' + dm(f.last) : '')) + '</div></div>'
     + (f.ok ? '<span style="width:26px;height:26px;border-radius:50%;background:' + GRN + ';color:#fff;display:flex;align-items:center;justify-content:center;flex:none">' + CHECK + '</span>'
       : '<span data-fm-imp="' + f.k + '" style="height:36px;display:flex;align-items:center;padding:0 18px;border-radius:99px;background:' + INK + ';color:' + W + ';font-size:11px;font-weight:900;letter-spacing:.12em;cursor:pointer;flex:none;transition:opacity .25s ease" onmouseover="this.style.opacity=.8" onmouseout="this.style.opacity=1">IMPORTAR</span>') + '</div>';
-  const expandedHtml = (d, w, h) => '<div data-fm-ec style="position:absolute;left:0;top:0;width:' + w + 'px;height:' + h + 'px;opacity:0;pointer-events:none">'
-    + '<div style="position:absolute;left:28px;top:22px;right:80px"><div style="font-size:10.5px;font-weight:700;letter-spacing:.14em;color:rgba(10,10,10,.6)">↘ FECHAR O MÊS</div><div style="font-size:60px;font-weight:700;letter-spacing:-.065em;line-height:.95;margin-top:8px">' + d.nome.charAt(0).toUpperCase() + d.nome.slice(1) + '</div></div>'
+  const expandedHtml = (d, w, h) => '<div data-fm-ec style="position:absolute;left:0;top:0;width:' + w + 'px;height:' + h + 'px;pointer-events:none">'
+    + '<div data-a="head" style="position:absolute;left:28px;top:22px;right:84px;opacity:0"><div style="font-size:10.5px;font-weight:700;letter-spacing:.14em;color:rgba(10,10,10,.6)">↘ FECHAR O MÊS</div><div style="font-size:60px;font-weight:700;letter-spacing:-.065em;line-height:.95;margin-top:8px">' + d.nome.charAt(0).toUpperCase() + d.nome.slice(1) + '</div></div>'
     + '<div style="position:absolute;left:28px;right:28px;top:122px;bottom:18px;display:flex;flex-direction:column">'
-    + '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px;flex:none"><span style="font-size:11px;font-weight:800;letter-spacing:.12em;padding-bottom:4px">' + d.ok + ' DE ' + d.total + ' FONTES EM DIA</span>'
+    + '<div data-a="count" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px;flex:none;opacity:0"><span style="font-size:11px;font-weight:800;letter-spacing:.12em;padding-bottom:4px">' + d.ok + ' DE ' + d.total + ' FONTES EM DIA</span>'
     + (d.pend ? '<span style="display:flex;align-items:flex-end;gap:10px"><b style="font-size:88px;font-weight:700;letter-spacing:-.07em;line-height:.78">' + String(d.pend).padStart(2, '0') + '</b><span style="font-size:15px;font-weight:700;line-height:1.1;letter-spacing:-.01em;color:' + AMT + ';padding-bottom:2px">' + (d.pend === 1 ? 'fonte<br>falta' : 'fontes<br>faltam') + '</span></span>' : '<span style="font-size:30px;font-weight:700;letter-spacing:-.05em;color:' + GRN + '">Tudo em dia</span>') + '</div>'
-    + '<div style="flex:none">' + segs(d) + '</div>'
+    + '<div style="flex:none">' + segs(d, '') + '</div>'
     + '<div class="kscroll" data-fm-list style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;margin-top:16px;display:flex;flex-direction:column">' + d.fontes.map(f => rowHtml(f, d)).join('') + '</div>'
-    + '<div style="flex:none;font-size:11px;color:rgba(10,10,10,.55);margin-top:12px;line-height:1.4">Importar abre a tela de revisão do extrato, já no banco escolhido.</div></div></div>';
-  const layer = (m, op) => '<div aria-hidden="true" style="position:absolute;inset:0;border-radius:30px;background:' + W + ';' + m + ';opacity:' + op + ';transition:opacity .3s ease;pointer-events:none"></div>';
-  const btnArrow = '<span style="position:absolute;right:0;top:0;width:32px;height:32px;border-radius:50%;background:' + INK + ';color:' + W + ';display:flex;align-items:center;justify-content:center">' + ARROW + '</span>';
+    + '<div data-a="note" style="flex:none;font-size:11px;color:rgba(10,10,10,.55);margin-top:12px;line-height:1.4;opacity:0">Importar abre a tela de revisão do extrato, já no banco escolhido.</div></div></div>';
+
+  /* ---------- animação: fade + slide só na vertical, ease-in-out, entradas escalonadas ---------- */
+  function play(els, opt) {   // opt: { from:[opacidade,y], to:[opacidade,y], delay, step, dur }
+    els.forEach((el, i) => {
+      if (!el) return;
+      const a = el.animate([{ opacity: opt.from[0], transform: 'translateY(' + opt.from[1] + 'px)' }, { opacity: opt.to[0], transform: 'translateY(' + opt.to[1] + 'px)' }], { duration: opt.dur, delay: opt.delay + i * (opt.step || 0), easing: EE, fill: 'both' });
+      a.onfinish = () => { el.style.opacity = String(opt.to[0]); el.style.transform = opt.to[1] ? 'translateY(' + opt.to[1] + 'px)' : ''; a.cancel(); };
+    });
+  }
 
   /* ---------- montagem no card branco do mês ---------- */
   function css() {
     if (document.getElementById('kd-fm-css')) return;
     const s = document.createElement('style'); s.id = 'kd-fm-css';
-    s.textContent = '[data-k="mes"][data-fm]{height:108px!important;overflow:visible!important;padding:14px 22px!important;transition:transform .5s ' + EE + ',height .55s ' + EE + '!important}'
-      + '[data-k="mes"][data-fm] [data-mesn]{font-size:calc(54px*var(--ks,1))!important}'
-      + '[data-k="mes"][data-fm="out"]{height:var(--rh,162px)!important;padding:18px 22px!important}'
-      + '[data-k="mes"][data-fm="out"] [data-mesn]{font-size:calc(72px*var(--ks,1))!important}'
-      + '[data-k="mes"][data-fm-hide]{opacity:0!important;transition:opacity .3s ease!important}[data-k="saldo"][data-fm-hide]{opacity:0!important;transition:opacity .3s ease .35s!important}[data-k="saldo"]:not([data-fm-hide]){transition:transform .5s ' + EE + ',opacity .3s ease}';
+    s.textContent = '@property --fm-pr{syntax:"<length>";inherits:false;initial-value:' + PR + 'px}'
+      + '[data-k="mes"][data-fm]{background:transparent!important;overflow:visible!important;flex-direction:column-reverse!important;justify-content:flex-end!important;gap:6px!important}'
+      + '[data-k="mes"][data-fm] [data-mesn]{font-size:62px!important}'
+      + '[data-k="mes"][data-fm] > div:nth-child(2){margin-right:64px}'
+      + '[data-k="mes"][data-fm-exp] > *{visibility:hidden!important}';
     document.head.appendChild(s);
   }
   function sync() {
     if (!KD.M || !KD.today) return;
-    const w = document.querySelector('[data-k="mes"]'); if (!w) { split = false; if (open || anim) { open = false; anim = false; ov = null; } sig = ''; return; }
-    const d = FM.data(), card = w.querySelector(':scope > [data-fm-card]');
+    const w = document.querySelector('[data-k="mes"]');
+    if (!w) { if (open || anim) { open = false; anim = false; ov = null; } sig = ''; return; }
+    const d = FM.data(), host = w.querySelector(':scope > [data-fm-host]');
     css();
     if (!d.show) {
       if (open && ov) { refresh(d); return; }
-      if (card && !anim) { split = false; card.style.opacity = '0'; w.setAttribute('data-fm', 'out'); setTimeout(() => { if (!split) { const c = w.querySelector(':scope > [data-fm-card]'); if (c) c.remove(); if (w.getAttribute('data-fm') === 'out') w.removeAttribute('data-fm'); } }, 620); }
+      if (host && !anim) { host.remove(); w.removeAttribute('data-fm'); w.removeAttribute('data-fm-exp'); w.style.cursor = ''; sig = ''; }
       return;
     }
     const s = JSON.stringify([d.nome, d.fontes.map(f => [f.k, f.ok, f.last])]);
-    if (!w.hasAttribute('data-fm') || w.getAttribute('data-fm') === 'out') { split = true; w.setAttribute('data-fm', '1'); }
-    if (card && s === sig) return;
-    const first = !card; sig = s;
-    const c = card || document.createElement('div');
-    if (first) {
-      c.setAttribute('data-fm-card', '1');
-      c.style.cssText = 'position:absolute;left:0;right:0;top:120px;height:calc(var(--rh,162px) - 120px);cursor:pointer;color:' + INK + ';font-family:Helvetica,Arial,sans-serif;opacity:0;transition:opacity .4s ease .15s';
-      c.addEventListener('click', ev => { ev.stopPropagation(); abre(); });
-      w.appendChild(c); requestAnimationFrame(() => { c.style.opacity = '1'; });
+    if (!w.hasAttribute('data-fm')) w.setAttribute('data-fm', '1');
+    if (host && s === sig) return;
+    sig = s;
+    const h = host || document.createElement('div');
+    if (!host) {
+      h.setAttribute('data-fm-host', '1'); h.style.cssText = 'position:absolute;inset:0;font-family:Helvetica,Arial,sans-serif;color:' + INK;
+      w.appendChild(h);
+      if (!w.__fm) { w.__fm = 1; w.addEventListener('click', ev => { if (w.hasAttribute('data-fm') && !ev.target.closest('[data-fm-ov]')) abre(); }); }
+      w.style.cursor = 'pointer';
     }
-    c.innerHTML = layer(NS_, 1) + reducedHtml(d) + btnArrow;
+    h.innerHTML = bgLayer(PR) + '<div style="position:absolute;left:' + (PR + 8) + 'px;right:' + (PR + 8) + 'px;top:' + DV + 'px;border-top:1.5px dashed rgba(10,10,10,.28)"></div><div style="position:absolute;left:26px;right:26px;top:' + (DV + 20) + 'px">' + fecharHtml(d) + '</div>' + btnHtml();
     if (open && ov) refresh(d);
   }
   function refresh(d) {   // dados novos com o card expandido: troca só o conteúdo, sem piscar o resto
     const ec = ov.querySelector('[data-fm-ec]'); if (!ec) return;
-    const st = ec.querySelector('[data-fm-list]'), keep = st ? st.scrollTop : 0, o = ec.style.opacity, w = ec.style.width, h = ec.style.height;
+    const l = ec.querySelector('[data-fm-list]'), keep = l ? l.scrollTop : 0, w = ec.style.width, h = ec.style.height;
     ec.outerHTML = expandedHtml(d, parseFloat(w), parseFloat(h));
-    const n = ov.querySelector('[data-fm-ec]'); n.style.opacity = o; n.style.pointerEvents = 'auto'; const l = n.querySelector('[data-fm-list]'); if (l) l.scrollTop = keep;
+    const n = ov.querySelector('[data-fm-ec]'); n.style.pointerEvents = 'auto'; n.querySelectorAll('[data-a]').forEach(x => { x.style.opacity = '1'; }); const l2 = n.querySelector('[data-fm-list]'); if (l2) l2.scrollTop = keep;
   }
 
   /* ---------- expandir / recolher ---------- */
   function abre() {
     if (open || anim) return;
-    const w = document.querySelector('[data-k="mes"]'), grid = w && w.closest('[data-org-grid]'), card = w && w.querySelector(':scope > [data-fm-card]'); if (!grid || !card) return;
+    const w = document.querySelector('[data-k="mes"]'), grid = w && w.closest('[data-org-grid]'), host = w && w.querySelector(':scope > [data-fm-host]'); if (!grid || !host) return;
     anim = true; open = true;
-    const gr = grid.getBoundingClientRect(), cr = card.getBoundingClientRect(), fw = w.getBoundingClientRect().width, fh = gr.height, d = FM.data();
+    const gr = grid.getBoundingClientRect(), wr = w.getBoundingClientRect(), d = FM.data();
+    const L0 = wr.left - gr.left, T0 = wr.top - gr.top;
     ov = document.createElement('div'); ov.setAttribute('data-fm-ov', '1');
-    ov.style.cssText = 'position:absolute;left:' + (cr.left - gr.left) + 'px;top:' + (cr.top - gr.top) + 'px;width:' + cr.width + 'px;height:' + cr.height + 'px;z-index:6;overflow:hidden;font-family:Helvetica,Arial,sans-serif;color:' + INK + ';transition:left .6s ' + EE + ',top .6s ' + EE + ',width .6s ' + EE + ',height .6s ' + EE;
-    ov.innerHTML = '<span data-l="s" style="position:absolute;inset:0;display:block">' + layer(NS_, 1) + '</span><span data-l="m" style="position:absolute;inset:0;display:block">' + layer(NM_, 0) + '</span>'
-      + '<div data-fm-rc style="position:absolute;left:0;top:0;width:' + cr.width + 'px;height:' + cr.height + 'px;transition:opacity .25s ease">' + reducedHtml(d) + '</div>' + expandedHtml(d, fw, fh)
-      + '<span data-fm-ar style="position:absolute;right:0;top:0;width:32px;height:32px;border-radius:50%;background:' + INK + ';color:' + W + ';display:flex;align-items:center;justify-content:center;transition:opacity .25s ease,transform .45s ' + EE + '">' + ARROW + '</span>'
-      + '<span data-fm-x style="position:absolute;right:0;top:0;width:44px;height:44px;border-radius:50%;background:' + W + ';color:' + INK + ';display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transform:rotate(-90deg);transition:opacity .3s ease .2s,transform .5s ' + EE + ' .1s">' + XMARK + '</span>';
-    grid.appendChild(ov); card.style.visibility = 'hidden'; w.setAttribute('data-fm-hide', '1'); const sd = grid.querySelector('[data-k="saldo"]'); if (sd) sd.setAttribute('data-fm-hide', '1');
+    ov.style.cssText = 'position:absolute;left:' + L0 + 'px;top:' + T0 + 'px;width:' + wr.width + 'px;height:' + wr.height + 'px;z-index:6;overflow:hidden;background:#000;font-family:Helvetica,Arial,sans-serif;color:' + INK + ';cursor:default';
+    // cópia do estado reduzido: título e rodapé do mês vêm do próprio card, então o visual é idêntico
+    const rc = document.createElement('div'); rc.setAttribute('data-fm-rc', '1');
+    rc.style.cssText = 'position:absolute;left:0;top:0;width:' + wr.width + 'px;height:' + wr.height + 'px;box-sizing:border-box;padding:18px 22px;display:flex;flex-direction:column-reverse;justify-content:flex-end;gap:6px;pointer-events:none';
+    [...w.children].filter(c => !c.hasAttribute('data-fm-host')).forEach(c => { const k = c.cloneNode(true); k.style.opacity = '1'; k.style.transform = 'none'; rc.appendChild(k); });
+    const mn = rc.querySelector('[data-mesn]'); if (mn) mn.style.fontSize = '62px'; if (rc.children[1]) rc.children[1].style.marginRight = '64px';
+    ov.innerHTML = bgLayer(PR) + '<div data-fm-rcw style="position:absolute;inset:0"></div>' + expandedHtml(d, wr.width, gr.height) + btnHtml();
+    const rcw = ov.querySelector('[data-fm-rcw]'); rcw.appendChild(rc);
+    rcw.insertAdjacentHTML('beforeend', '<div data-r="txt" style="position:absolute;left:' + (PR + 8) + 'px;right:' + (PR + 8) + 'px;top:' + DV + 'px;border-top:1.5px dashed rgba(10,10,10,.28)"></div><div style="position:absolute;left:26px;right:26px;top:' + (DV + 20) + 'px">' + fecharHtml(d) + '</div>');
+    grid.appendChild(ov); w.setAttribute('data-fm-exp', '1');
     ov.addEventListener('click', ev => {
-      if (ev.target.closest('[data-fm-x]')) return fecha();
+      if (ev.target.closest('[data-fm-btn]')) return fecha();
       const b = ev.target.closest('[data-fm-imp]'); if (b && KD.imp && KD.imp.pick) KD.imp.pick(b.dataset.fmImp);
     });
+    const bg = ov.querySelector('[data-fm-bg]'), btn = ov.querySelector('[data-fm-btn]'), ec = ov.querySelector('[data-fm-ec]');
+    const bars0 = [...rcw.querySelectorAll('[data-bar]')], txt0 = [...rc.children].concat([...rcw.querySelectorAll('[data-r="txt"]')]);
     void ov.offsetHeight;
-    requestAnimationFrame(() => {
-      ov.style.left = '0px'; ov.style.top = '0px'; ov.style.width = fw + 'px'; ov.style.height = fh + 'px';
-      ov.querySelector('[data-l="s"] > div').style.opacity = '0'; ov.querySelector('[data-l="m"] > div').style.opacity = '1';
-      ov.querySelector('[data-fm-rc]').style.opacity = '0';
-      const ar = ov.querySelector('[data-fm-ar]'); ar.style.opacity = '0'; ar.style.transform = 'rotate(90deg) scale(.6)';
-      const x = ov.querySelector('[data-fm-x]'); x.style.opacity = '1'; x.style.transform = 'none';
-      const ec = ov.querySelector('[data-fm-ec]'); ec.style.transition = 'opacity .4s ease .25s, transform .6s ' + EE + ' .2s'; ec.style.transform = 'translateY(8px)'; void ec.offsetHeight; ec.style.opacity = '1'; ec.style.transform = 'none'; ec.style.pointerEvents = 'auto';
-    });
-    setTimeout(() => { anim = false; }, 680);
+    // 1) o conteúdo reduzido sai (barrinhas primeiro) e as perfurações se fecham
+    play(bars0, { from: [1, 0], to: [0, -8], delay: 0, step: 25, dur: 380 }); play(txt0, { from: [1, 0], to: [0, -8], delay: 40, step: 0, dur: 260 });
+    bg.style.setProperty('--fm-pr', '0.01px');
+    // 2) o card cresce até cobrir a coluna inteira; o botão vira X
+    setTimeout(() => {
+      ov.style.transition = 'left .7s ' + EE + ',top .7s ' + EE + ',width .7s ' + EE + ',height .7s ' + EE;
+      ov.style.top = '0px'; ov.style.height = gr.height + 'px';
+    }, 200);
+    setTimeout(() => {
+      btn.style.background = W; btn.style.boxShadow = 'none'; btn.style.color = INK;
+      const ar = btn.querySelector('[data-fm-ar]'), xx = btn.querySelector('[data-fm-xx]'); ar.style.opacity = '0'; ar.style.transform = 'rotate(90deg)'; xx.style.opacity = '1'; xx.style.transform = 'none';
+    }, 300);
+    // 3) o conteúdo expandido entra: barrinhas primeiro e por último
+    setTimeout(() => {
+      const bars = [...ec.querySelectorAll('[data-bar]')], rows = [...ec.querySelectorAll('[data-a="row"]')];
+      bars.forEach(b => { b.style.opacity = '0'; }); rows.forEach(r => { r.style.opacity = '0'; });
+      play(bars, { from: [0, 10], to: [1, 0], delay: 0, step: 40, dur: 800 });
+      play([ec.querySelector('[data-a="head"]')], { from: [0, 10], to: [1, 0], delay: 80, dur: 550 });
+      play([ec.querySelector('[data-a="count"]')], { from: [0, 10], to: [1, 0], delay: 140, dur: 550 });
+      play(rows, { from: [0, 10], to: [1, 0], delay: 200, step: 50, dur: 500 });
+      play([ec.querySelector('[data-a="note"]')], { from: [0, 10], to: [1, 0], delay: 200 + rows.length * 50, dur: 400 });
+      ec.style.pointerEvents = 'auto';
+    }, 450);
+    setTimeout(() => { anim = false; }, 1700);
   }
   function fecha() {
     if (!open || anim || !ov) return;
     anim = true;
-    const w = document.querySelector('[data-k="mes"]'), grid = w && w.closest('[data-org-grid]'), card = w && w.querySelector(':scope > [data-fm-card]');
-    if (w) w.removeAttribute('data-fm-hide'); const sd = grid && grid.querySelector('[data-k="saldo"]'); if (sd) sd.removeAttribute('data-fm-hide');
-    const o = ov; let L = 0, T = 120, cw = o.getBoundingClientRect().width, ch = 81;
-    if (grid && card) { card.style.visibility = 'hidden'; const gr = grid.getBoundingClientRect(), cr = card.getBoundingClientRect(); L = cr.left - gr.left; T = cr.top - gr.top; cw = cr.width; ch = cr.height; }
-    const ec = o.querySelector('[data-fm-ec]'); ec.style.transition = 'opacity .2s ease, transform .4s ' + EE; ec.style.opacity = '0'; ec.style.transform = 'translateY(8px)'; ec.style.pointerEvents = 'none';
-    const x = o.querySelector('[data-fm-x]'); x.style.transition = 'opacity .2s ease, transform .4s ' + EE; x.style.opacity = '0'; x.style.transform = 'rotate(-90deg)';
-    const rc = o.querySelector('[data-fm-rc]'); rc.style.width = cw + 'px'; rc.style.height = ch + 'px'; rc.style.transition = 'opacity .3s ease .3s'; rc.style.opacity = '1';
-    const ar = o.querySelector('[data-fm-ar]'); ar.style.transition = 'opacity .3s ease .3s, transform .45s ' + EE + ' .2s'; ar.style.opacity = '1'; ar.style.transform = 'none';
-    o.querySelector('[data-l="s"] > div').style.opacity = '1'; o.querySelector('[data-l="m"] > div').style.opacity = '0';
-    o.style.left = L + 'px'; o.style.top = T + 'px'; o.style.width = cw + 'px'; o.style.height = ch + 'px';
-    setTimeout(() => { o.remove(); if (ov === o) ov = null; open = false; anim = false; const c = document.querySelector('[data-k="mes"] > [data-fm-card]'); if (c) c.style.visibility = ''; sync(); }, 680);
+    const o = ov, w = document.querySelector('[data-k="mes"]'), grid = w && w.closest('[data-org-grid]');
+    let L0 = parseFloat(o.style.left), T0 = 0, cw = o.getBoundingClientRect().width, ch = 201;
+    if (w && grid) { const gr = grid.getBoundingClientRect(), wr = w.getBoundingClientRect(); L0 = wr.left - gr.left; T0 = wr.top - gr.top; cw = wr.width; ch = wr.height; }
+    const ec = o.querySelector('[data-fm-ec]'), rcw = o.querySelector('[data-fm-rcw]'), bg = o.querySelector('[data-fm-bg]'), btn = o.querySelector('[data-fm-btn]');
+    ec.style.pointerEvents = 'none';
+    // 1) o conteúdo expandido sai (as barrinhas começam primeiro e terminam por último)
+    play([...ec.querySelectorAll('[data-bar]')], { from: [1, 0], to: [0, -8], delay: 0, step: 30, dur: 600 });
+    play([ec.querySelector('[data-a="head"]'), ec.querySelector('[data-a="count"]')].concat([...ec.querySelectorAll('[data-a="row"]')], [ec.querySelector('[data-a="note"]')]), { from: [1, 0], to: [0, -8], delay: 60, step: 25, dur: 350 });
+    // 2) X vira seta e o card encolhe até o tamanho do card do mês
+    setTimeout(() => {
+      btn.style.background = '#1C1C20'; btn.style.boxShadow = 'inset 0 0 0 1px #3A3A40'; btn.style.color = '#fff';
+      const ar = btn.querySelector('[data-fm-ar]'), xx = btn.querySelector('[data-fm-xx]'); xx.style.opacity = '0'; xx.style.transform = 'rotate(-90deg)'; ar.style.opacity = '1'; ar.style.transform = 'none';
+    }, 550);
+    setTimeout(() => { o.style.left = L0 + 'px'; o.style.top = T0 + 'px'; o.style.width = cw + 'px'; o.style.height = ch + 'px'; }, 600);
+    // 3) as perfurações voltam e o conteúdo reduzido entra (barrinhas primeiro)
+    setTimeout(() => {
+      bg.style.setProperty('--fm-pr', PR + 'px');
+      const bars = [...rcw.querySelectorAll('[data-bar]')], txt = [...rcw.querySelector('[data-fm-rc]').children].concat([...rcw.querySelectorAll('[data-r="txt"]')]);
+      bars.forEach(b => { b.style.opacity = '0'; }); txt.forEach(t => { t.style.opacity = '0'; });
+      play(bars, { from: [0, 8], to: [1, 0], delay: 0, step: 25, dur: 420 }); play(txt, { from: [0, 8], to: [1, 0], delay: 40, dur: 300 });
+    }, 1050);
+    setTimeout(() => { o.remove(); if (ov === o) ov = null; open = false; anim = false; const ww = document.querySelector('[data-k="mes"]'); if (ww) ww.removeAttribute('data-fm-exp'); sync(); }, 1600);
   }
   window.addEventListener('keydown', e => { if (e.key === 'Escape' && open && !document.querySelector('[data-imp],[data-imp-modal],[data-imp-hist]')) fecha(); });
   window.addEventListener('kd:batches', () => carregar());
