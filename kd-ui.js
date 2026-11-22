@@ -1566,6 +1566,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (!u) return '<span style="width:' + w + 'px;height:' + h + 'px;flex:none;display:flex;align-items:center;justify-content:center"><i style="width:10px;height:10px;border-radius:50%;background:' + (corPonto || '#6A6A72') + ';display:block"></i></span>';
     return '<span aria-hidden="true" style="width:' + w + 'px;height:' + h + 'px;flex:none;display:block;background:url(\'' + u + '\') center/contain no-repeat"></span>';
   };
+  // sem logo conhecida: um ponto na cor da conta, no centro de uma caixa quadrada (pra caber onde a logo caberia)
+  LOGO.ponto = cor => 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 34 34"><circle cx="17" cy="17" r="5" fill="' + (cor || '#6A6A72') + '"/></svg>');
   // logo extensa nas faces dos cartões: mono (pintada pela tinta do cartão via máscara) ou colorida, com o fundo certo pra tinta
   const ESC_CARTAO = { 'Itaú': .5 };
   const claro = h => { const m = /^#?([0-9a-f]{6})$/i.exec(String(h || '').trim()); if (!m) return false; const n = parseInt(m[1], 16); return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255 > 0.55; };
