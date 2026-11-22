@@ -1447,7 +1447,7 @@ class Component extends DCLogic {
     document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', up); this.setState({ dd: { k: k, start: start, dy: 0, to: start } });
   }
   goPage(pg, anchor) {
-    if (this._fading) return; if (pg === this.state.page && !anchor) return; this._fading = true; clearTimeout(this._exT);
+    if (this._fading) { clearTimeout(this._gpT); this._gpT = setTimeout(() => this.goPage(pg, anchor), 380); return; } if (pg === this.state.page && !anchor) return; this._fading = true; clearTimeout(this._exT); clearTimeout(this._fdT); this._fdT = setTimeout(() => { this._fading = false; }, 1800);
     // o véu cobre só o conteúdo: começa logo abaixo da barra de menu
     let ft = '16px'; try { const ov = document.querySelector('[data-fade-ov]'), par = ov && ov.offsetParent, sc = [...document.querySelectorAll('[data-px-scroll],[data-page-scroll]')].find(e => e.getClientRects().length);
       if (par && sc) { const pr = par.getBoundingClientRect(), k = pr.height / (par.offsetHeight || 1); ft = Math.max(16, Math.round((sc.getBoundingClientRect().top - pr.top) / k)) + 'px'; } } catch (e) {}
@@ -1999,11 +1999,7 @@ class Component extends DCLogic {
   saveEdit() {
     const st = this.state; const r = Component.ROWS.find(x => x.id === st.edit); if (!r || !st.pick) return;
     const queue = !!st.alt[r.e] && !st.cats[r.id];
-    const showFlag = queue || st.pick !== r.c;
-    this.setState(s => ({ edit: null, cats: Object.assign({}, s.cats, { [r.id]: s.pick }), alt: showFlag ? Object.assign({}, s.alt, { [r.e]: s.flag }) : s.alt }));
-  }
-
-  renderVals() { KD.apply(Component, this.state.mes); const __o = this._rv0(); return KD.vals(this, __o); }
+    const showFlag = queue || st.pick !  renderVals() { KD.apply(Component, this.state.mes); const __o = this._rv0(); return KD.vals(this, __o); }
   _rv0() {
     const st = this.state, C = Component;
     const frWpx = Math.max(1280, st.vw / st.vh >= 2 && st.wd !== 'full' ? Math.round(st.vw * 0.75) : st.vw), frHpx = Math.max(st.vh, 700), zoomF = Math.max(1, Math.round(frWpx / 1960 * 1000) / 1000);

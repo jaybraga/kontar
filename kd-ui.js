@@ -846,6 +846,10 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     }, 520);
   };
   TX.openNew = function (c) {
+    if (!document.querySelector('[data-tx-host]')) {   // o painel mora na página Extrato: de outra página, vai até lá e abre
+      if (c && c.goPage) { if (c.state.page !== 'extrato') c.goPage('extrato'); let n = 0; (function espera() { if (document.querySelector('[data-tx-host]')) return TX.openNew(c); if (++n < 30) setTimeout(espera, 150); })(); }
+      return;
+    }
     comp = c; TX.close(true);
     const t = KD.today, iso = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
     const row = { id: null, e: '', obs: '', iso, cardId: null, accId: null, catId: null, c: 'Outros', total: 0, inn: 0, items: [], parts: [], nota: null, origem: 'manual' };
@@ -2282,6 +2286,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     });
   }
 
+  // posição e tamanho de layout relativos à grade: não mudam com transform (entrada animada da Home, escala da janela)
+  const lay = (el, root) => { let l = 0, t = 0, e = el; while (e && e !== root) { l += e.offsetLeft; t += e.offsetTop; e = e.offsetParent; } if (e !== root) { const a = root.getBoundingClientRect(), b = el.getBoundingClientRect(), k = (a.width / root.offsetWidth) || 1; return { l: (b.left - a.left) / k, t: (b.top - a.top) / k, w: el.offsetWidth, h: el.offsetHeight }; } return { l, t, w: el.offsetWidth, h: el.offsetHeight }; };
   const reorg = () => !!(KD.comp && KD.comp.state && KD.comp.state.org);   // modo "reorganizar cards" da Home
   function forcaFecha() { if (ov) ov.remove(); ov = null; open = false; anim = false; const w = document.querySelector('[data-k="mes"]'); if (w) w.removeAttribute('data-fm-exp'); }
 
@@ -2334,8 +2340,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (open || anim) return;
     const w = document.querySelector('[data-k="mes"]'), grid = w && w.closest('[data-org-grid]'), host = w && w.querySelector(':scope > [data-fm-host]'); if (!grid || !host) return;
     anim = true; open = true;
-    const gr = grid.getBoundingClientRect(), wr = w.getBoundingClientRect(), d = FM.data();
-    const L0 = wr.left - gr.left, T0 = wr.top - gr.top;
+    const d = FM.data(), lm = lay(w, grid), gr = { height: grid.offsetHeight }, wr = { width: lm.w, height: lm.h };
+    const L0 = lm.l, T0 = lm.t;
     ov = document.createElement('div'); ov.setAttribute('data-fm-ov', '1');
     ov.style.cssText = 'position:absolute;left:' + L0 + 'px;top:' + T0 + 'px;width:' + wr.width + 'px;height:' + wr.height + 'px;z-index:6;overflow:hidden;background:#000;will-change:opacity;contain:layout paint style;font-family:Helvetica,Arial,sans-serif;color:' + INK + ';cursor:default';
     // cópia do estado reduzido: título e rodapé do mês vêm do próprio card, então o visual é idêntico
@@ -2344,7 +2350,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     [...w.children].filter(c => !c.hasAttribute('data-fm-host')).forEach(c => { const k = c.cloneNode(true); k.style.opacity = '1'; k.style.transform = 'none'; rc.appendChild(k); });
     const mn = rc.querySelector('[data-mesn]'); if (mn) mn.style.fontSize = '62px'; if (rc.children[1]) rc.children[1].style.marginRight = '64px';
     // a cópia precisa ter exatamente a altura dos filhos reais, senão o título dá um pulo de 1px quando o overlay sai
-    [...w.children].filter(c => !c.hasAttribute('data-fm-host')).forEach((c, i) => { const k = rc.children[i]; if (k) { k.style.height = c.getBoundingClientRect().height + 'px'; k.style.flex = 'none'; } });
+    [...w.children].filter(c => !c.hasAttribute('data-fm-host')).forEach((c, i) => { const k = rc.children[i]; if (k) { k.style.height = c.offsetHeight + 'px'; k.style.flex = 'none'; } });
     ov.innerHTML = bgLayer(PR) + '<div data-fm-rcw style="position:absolute;inset:0"></div>' + expandedHtml(d, wr.width, gr.height) + btnHtml();
     const rcw = ov.querySelector('[data-fm-rcw]'); rcw.appendChild(rc);
     rcw.insertAdjacentHTML('beforeend', '<div data-r="txt" style="position:absolute;left:' + (PR + 8) + 'px;right:' + (PR + 8) + 'px;top:' + DV + 'px;border-top:1.5px dashed rgba(10,10,10,.28)"></div><div style="position:absolute;left:26px;right:26px;top:' + (DV + 20) + 'px">' + fecharHtml(d) + '</div>');
@@ -2387,8 +2393,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (!open || anim || !ov) return;
     anim = true;
     const o = ov, w = document.querySelector('[data-k="mes"]'), grid = w && w.closest('[data-org-grid]');
-    let L0 = parseFloat(o.style.left), T0 = 0, cw = o.getBoundingClientRect().width, ch = 201;
-    if (w && grid) { const gr = grid.getBoundingClientRect(), wr = w.getBoundingClientRect(); L0 = wr.left - gr.left; T0 = wr.top - gr.top; cw = wr.width; ch = wr.height; }
+    let L0 = parseFloat(o.style.left), T0 = 0, cw = o.offsetWidth, ch = 201;
+    if (w && grid) { const lm = lay(w, grid); L0 = lm.l; T0 = lm.t; cw = lm.w; ch = lm.h; }
     const ec = o.querySelector('[data-fm-ec]'), rcw = o.querySelector('[data-fm-rcw]'), bg = o.querySelector('[data-fm-bg]'), btn = o.querySelector('[data-fm-btn]');
     ec.style.pointerEvents = 'none';
     // 1) o conteúdo expandido sai (as barrinhas começam primeiro e terminam por último)
