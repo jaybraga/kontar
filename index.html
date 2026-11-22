@@ -1999,7 +1999,11 @@ class Component extends DCLogic {
   saveEdit() {
     const st = this.state; const r = Component.ROWS.find(x => x.id === st.edit); if (!r || !st.pick) return;
     const queue = !!st.alt[r.e] && !st.cats[r.id];
-    const showFlag = queue || st.pick !  renderVals() { KD.apply(Component, this.state.mes); const __o = this._rv0(); return KD.vals(this, __o); }
+    const showFlag = queue || st.pick !== r.c;
+    this.setState(s => ({ edit: null, cats: Object.assign({}, s.cats, { [r.id]: s.pick }), alt: showFlag ? Object.assign({}, s.alt, { [r.e]: s.flag }) : s.alt }));
+  }
+
+  renderVals() { KD.apply(Component, this.state.mes); const __o = this._rv0(); return KD.vals(this, __o); }
   _rv0() {
     const st = this.state, C = Component;
     const frWpx = Math.max(1280, st.vw / st.vh >= 2 && st.wd !== 'full' ? Math.round(st.vw * 0.75) : st.vw), frHpx = Math.max(st.vh, 700), zoomF = Math.max(1, Math.round(frWpx / 1960 * 1000) / 1000);
