@@ -2693,3 +2693,127 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   let raf = 0;
   new MutationObserver(() => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; try { if (!KD.M || !KD.sb) return; if (!rows && !carregando && ((KD.comp && KD.comp.state && KD.comp.state.page === 'fontes') || document.querySelector('[data-k="mes"]') || document.querySelector('[data-ce-pen]'))) FT.carregar(); montaPagina(); if ((KD.comp && KD.comp.state && KD.comp.state.page) === 'cartoes') sincCartoes(false); } catch (e) {} }); }).observe(document.documentElement, { childList: true, subtree: true });
 })();
+
+/* Kontar · estados vazios da Home (mockup vazios-B, aprovado em 22/11)
+   Dois casos, ambos só na Home:
+   · conta nova (nenhum lançamento em nenhum mês): o Saldo cede o lugar ao card "Comece em 3 passos" (interativo) e os outros cards
+     ficam esmaecidos (contorno pontilhado), centralizados, com ícone e uma frase explicando o que vai aparecer;
+   · mês sem lançamentos (conta com histórico): os cards esmaecem do mesmo jeito e o de Gastos vira o ponto de ação
+     (importar extrato do mês / lançar manualmente).
+   O card branco do mês nunca é tocado. Cada card vazio é uma camada [data-emp-host] dentro do próprio card (fora do React);
+   os filhos originais só ficam invisíveis, então o layout salvo da Home não muda. Aparece e some com fade. */
+(function () {
+  'use strict';
+  const KD = window.KD, VZ = (KD.vazios = {});
+  const EE = 'cubic-bezier(.65,0,.35,1)', FG = '#F2F0EB', INK = '#0A0A0A', GRN = '#00A86B', MU = '#7C7C85';
+  const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const PATH = {
+    wallet: '<path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><path d="M4 7.5V17a2 2 0 0 0 2 2h13a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H6.5A2.5 2.5 0 0 1 4 7.5Z"/><circle cx="16.5" cy="13.5" r="1.2"/>',
+    chart: '<path d="M5 20V10M10 20V5M15 20v-7M20 20V8"/>',
+    card: '<rect x="3" y="5.5" width="18" height="13" rx="3"/><path d="M3 10h18M7 15h3"/>',
+    receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2Z"/><path d="M9 8h6M9 12h6"/>',
+    repeat: '<path d="M17 3l3 3-3 3"/><path d="M4 11V9a3 3 0 0 1 3-3h13"/><path d="M7 21l-3-3 3-3"/><path d="M20 13v2a3 3 0 0 1-3 3H4"/>',
+    flow: '<path d="M5 8h14M15 4l4 4-4 4"/><path d="M19 16H5M9 12l-4 4 4 4"/>'
+  };
+  const ic = (k, s) => '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="display:block">' + PATH[k] + '</svg>';
+  const flagCat = () => { try { return localStorage.getItem('kd-vz-cat') === '1'; } catch (e) { return false; } };
+
+  /* ---------- o que está vazio? ---------- */
+  function estado() {
+    const M = KD.M, c = KD.comp;
+    if (!M || !c || !c.state || c.state.page !== 'home' || !M.rows) return null;
+    if (M.rows.length === 0) return { tipo: 'novo' };
+    const mi = c.state.mes, m = KD.month(mi);
+    if (m && m.LANC && m.LANC.length === 0) return { tipo: 'mes', mi, nome: cap(MESES[((mi % 12) + 12) % 12]) };
+    return null;
+  }
+
+  /* ---------- ações ---------- */
+  const importar = () => { const b = document.querySelector('[data-kd-imp]'); if (b) b.click(); };
+  const addCartao = () => { const c = KD.comp; c.goPage('cartoes'); setTimeout(() => { const t = document.querySelector('[title="Adicionar cartão"]'); if (t) t.click(); }, 2400); };
+  const verCats = () => { try { localStorage.setItem('kd-vz-cat', '1'); } catch (e) {} KD.comp.goPage('categorias'); };
+  const ACOES = { importar, cartao: addCartao, cats: verCats, manual: () => { if (KD.tx) KD.tx.openNew(KD.comp); } };
+
+  /* ---------- peças ---------- */
+  const btn = (txt, act, ghost) => '<span data-vz-a="' + act + '" style="display:inline-block;margin-top:16px;border:1.5px ' + (ghost ? 'dashed #3F3F46' : 'solid #55555C') + ';border-radius:99px;padding:10px 18px;font-size:10.5px;font-weight:900;letter-spacing:.12em;color:' + (ghost ? '#9A9AA3' : FG) + ';cursor:pointer;white-space:nowrap;transition:opacity .25s ease" onmouseover="this.style.opacity=.75" onmouseout="this.style.opacity=1">' + txt + '</span>';
+  const grande = (k, titulo, txt, acoes) => '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;height:100%;padding:18px 26px;gap:0"><div style="width:56px;height:56px;border-radius:50%;border:1.5px solid #3A3A40;display:flex;align-items:center;justify-content:center;color:#9A9AA3;margin-bottom:14px;flex:none">' + ic(k, 26) + '</div><div style="font-size:17px;font-weight:700;letter-spacing:-.02em;color:#D8D6D0">' + esc(titulo) + '</div><div style="font-size:12.5px;line-height:1.45;color:' + MU + ';margin-top:6px;max-width:300px">' + esc(txt) + '</div>' + (acoes || '') + '</div>';
+  const pequeno = (k, titulo, txt) => '<div style="display:flex;align-items:center;justify-content:center;gap:16px;height:100%;padding:14px 24px"><div style="width:48px;height:48px;border-radius:50%;border:1.5px solid #3A3A40;display:flex;align-items:center;justify-content:center;color:#9A9AA3;flex:none">' + ic(k, 22) + '</div><div style="text-align:left;max-width:230px"><div style="font-size:15px;font-weight:700;letter-spacing:-.02em;color:#D8D6D0">' + esc(titulo) + '</div><div style="font-size:12.5px;line-height:1.4;color:' + MU + ';margin-top:3px">' + esc(txt) + '</div></div></div>';
+
+  function boasVindas() {
+    const M = KD.M, banco = (M.cards || []).length + (M.accs || []).length > 0, cats = flagCat();
+    const passo = (n, ok, titulo, desc, rot, act, ghost) => '<div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;text-align:center;border-top:1px solid rgba(10,10,10,.14);padding-top:16px"><span style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex:none;' + (ok ? 'background:' + GRN + ';color:#fff' : 'border:1.5px solid rgba(10,10,10,.4)') + '">' + (ok ? '✓' : n) + '</span><b style="font-size:14px;letter-spacing:-.02em;margin-top:11px;line-height:1.2">' + titulo + '</b><span style="font-size:11px;color:rgba(10,10,10,.55);margin-top:6px;line-height:1.35">' + desc + '</span>'
+      + (ok ? '<span style="margin-top:auto;padding-top:10px;font-size:10px;font-weight:800;letter-spacing:.12em;color:' + GRN + '">PRONTO</span>' : '<span data-vz-a="' + act + '" style="margin-top:auto;font-size:9.5px;font-weight:900;letter-spacing:.12em;padding:10px 12px;border-radius:99px;cursor:pointer;white-space:nowrap;' + (ghost ? 'border:1.5px solid rgba(10,10,10,.5);color:' + INK : 'background:' + INK + ';color:#fff') + '">' + rot + '</span>') + '</div>';
+    return '<div style="display:flex;flex-direction:column;align-items:center;text-align:center;height:100%;padding:24px 24px 18px;color:' + INK + '"><div style="font-size:10px;font-weight:800;letter-spacing:.14em;color:rgba(10,10,10,.55)">BEM-VINDO AO KONTAR</div><div style="font-size:32px;font-weight:700;letter-spacing:-.05em;line-height:1;margin-top:8px">Comece em 3 passos</div><div style="font-size:12.5px;color:rgba(10,10,10,.62);line-height:1.4;margin-top:6px;max-width:320px">Leva uns 5 minutos. Cada passo libera uma parte da tela.</div>'
+      + '<div style="display:flex;gap:10px;margin-top:20px;width:100%;flex:1;min-height:0;align-items:stretch">'
+      + passo(1, banco, 'Cadastrar banco ou cartão', 'Assim o Kontar sabe de onde vêm os lançamentos', 'CADASTRAR', 'cartao')
+      + passo(2, false, 'Importar o primeiro extrato', 'OFX ou CSV do banco; o app lê e organiza', 'IMPORTAR', 'importar')
+      + passo(3, cats, 'Conferir as categorias', 'Já vêm prontas; ajuste se quiser', 'VER', 'cats', true) + '</div>'
+      + '<div style="font-size:11px;color:rgba(10,10,10,.5);margin-top:12px">Some sozinho quando você terminar.</div></div>';
+  }
+
+  /* ---------- conteúdo de cada card, por tipo de vazio ---------- */
+  function conteudo(k, e) {
+    if (e.tipo === 'novo') {
+      if (k === 'saldo') return { html: boasVindas(), claro: true };
+      if (k === 'lim') return { html: grande('card', 'Nenhum cartão ainda', 'Cada cartão ganha uma barra com o limite já usado.', btn('+ ADICIONAR CARTÃO', 'cartao')) };
+      if (k === 'gastos') return { html: grande('chart', 'O mês aparece aqui', 'Gráfico dia a dia e total gasto, a partir do primeiro extrato.', btn('IMPORTAR EXTRATO', 'importar')) };
+      if (k === 'fat') return { html: pequeno('receipt', 'Fatura aberta', 'Valor, vencimento e lançamentos aparecem aqui.') };
+      if (k === 'mini') return { html: pequeno('repeat', 'Assinaturas', 'Cobranças que se repetem, achadas sozinhas.') };
+      if (k === 'fluxo') return { html: pequeno('flow', 'Entrou e saiu', 'O que sobrou do mês, calculado sozinho.') };
+    } else {
+      if (k === 'saldo') return { html: grande('wallet', 'Sem movimento em ' + e.nome, 'Os saldos das contas continuam valendo; só não houve entradas nem saídas.') };
+      if (k === 'lim') return { html: grande('card', 'Sem uso em ' + e.nome, 'Os limites atuais continuam na página Cartões.') };
+      if (k === 'gastos') return { html: grande('chart', e.nome + ' está vazio', 'Se você tem o extrato desse mês, importe agora.', btn('IMPORTAR EXTRATO DE ' + e.nome.toUpperCase(), 'importar') + '<br>' + btn('+ LANÇAR MANUALMENTE', 'manual', true)) };
+      if (k === 'fat') return { html: pequeno('receipt', 'Fatura', 'Nenhuma fatura neste mês.') };
+      if (k === 'mini') return { html: pequeno('repeat', 'Assinaturas', 'Nenhuma cobrança neste mês.') };
+      if (k === 'fluxo') return { html: pequeno('flow', 'Fluxo do mês', 'R$ 0 entrou · R$ 0 saiu') };
+    }
+    return null;
+  }
+
+  /* ---------- montagem ---------- */
+  const ALVOS = ['saldo', 'lim', 'gastos', 'fat', 'mini', 'fluxo'];
+  function css() {
+    if (document.getElementById('kd-vz-css')) return;
+    const s = document.createElement('style'); s.id = 'kd-vz-css';
+    s.textContent = '[data-emp]{background:transparent!important;border-color:transparent!important;box-shadow:none!important}[data-emp] > *:not([data-emp-host]){visibility:hidden!important}';
+    document.head.appendChild(s);
+  }
+  function monta(card, k, e) {
+    const c = conteudo(k, e); if (!c) return;
+    const sig = e.tipo + '|' + (e.mi == null ? '' : e.mi) + '|' + (k === 'saldo' ? ((KD.M.cards || []).length + (KD.M.accs || []).length) + '|' + flagCat() : '');
+    let h = card.querySelector(':scope > [data-emp-host]');
+    if (h && h.dataset.sig === sig) return;
+    const novo = !h;
+    if (!h) {
+      h = document.createElement('div'); h.setAttribute('data-emp-host', '1');
+      h.addEventListener('click', ev => { ev.stopPropagation(); const a = ev.target.closest('[data-vz-a]'); if (a && ACOES[a.dataset.vzA]) ACOES[a.dataset.vzA](); });   // a camada não deixa o clique chegar no card de baixo
+      card.appendChild(h);
+    }
+    h.dataset.sig = sig;
+    h.style.cssText = 'position:absolute;inset:0;border-radius:30px;box-sizing:border-box;z-index:3;font-family:Helvetica,Arial,sans-serif;overflow:hidden;' + (c.claro ? 'background:' + FG + ';color:' + INK : 'border:1.5px dashed #34343A;color:#8A8A92');
+    h.innerHTML = c.html;
+    card.setAttribute('data-emp', '1');
+    if (novo && h.animate) h.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 420, easing: EE });
+  }
+  function desmonta(card) {
+    const h = card.querySelector(':scope > [data-emp-host]'); if (!h) { card.removeAttribute('data-emp'); return; }
+    const fim = () => { h.remove(); card.removeAttribute('data-emp'); const kids = [...card.children]; kids.forEach(x => x.animate && x.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 320, easing: EE })); };
+    if (h.animate) { const a = h.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, easing: EE, fill: 'forwards' }); a.onfinish = fim; } else fim();
+  }
+  let last = '', raf = 0;
+  function sync() {
+    const e = estado();
+    const sig = e ? e.tipo + '|' + e.mi + '|' + (KD.M.cards || []).length + '|' + (KD.M.accs || []).length + '|' + flagCat() : '';
+    const cards = ALVOS.map(k => [k, document.querySelector('[data-k="' + k + '"]')]).filter(x => x[1]);
+    if (!e) { if (last !== '' || cards.some(x => x[1].hasAttribute('data-emp'))) { css(); cards.forEach(x => desmonta(x[1])); } last = ''; return; }
+    css();
+    cards.forEach(x => monta(x[1], x[0], e));
+    last = sig;
+  }
+  VZ.estado = estado;
+  new MutationObserver(() => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; try { sync(); } catch (e) {} }); }).observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener('kd:fontes', () => { try { sync(); } catch (e) {} });
+})();
