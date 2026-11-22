@@ -2313,7 +2313,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   function desenha(row, animaNovo) {
     const nomes = lista(), box = row.querySelector('[data-nm-box]'), hint = row.querySelector('[data-nm-hint]');
     box.innerHTML = nomes.map(chip).join('') + (adding ? input : addBtn);
-    hint.textContent = msg || (adding ? HINT_ADD : HINT); hint.style.color = msg ? '#F0C24B' : '';
+    hint.textContent = msg || (adding ? HINT_ADD : HINT); hint.style.color = msg ? '#F0C24B' : (row.dataset.hc || '#7C7C85');
     if (adding) { const i = box.querySelector('[data-nm-in]'); i.focus(); }
     if (animaNovo) { const c = box.querySelectorAll('[data-nm-chip]'); const el = c[c.length - 1]; if (el) el.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: EE }); }
     const cnt = [...document.querySelectorAll('*')].find(e => e.children.length === 0 && /^\d+\s*campos$/i.test(e.textContent.trim())); if (cnt && !/^03/.test(cnt.textContent.trim())) cnt.textContent = cnt.textContent.replace(/^\d+/, '03');
@@ -2327,7 +2327,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const l = document.createElement('div'); l.setAttribute('style', lab.getAttribute('style') || ''); l.textContent = 'NOMES NAS TRANSFERÊNCIAS';
     const box = document.createElement('div'); box.setAttribute('data-nm-box', '1'); box.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-top:10px';
     const h = document.createElement('div'); h.setAttribute('data-nm-hint', '1'); h.setAttribute('style', (hintBase && hintBase.getAttribute('style')) || 'margin-top:8px;font-size:12px;line-height:1.4;color:#7C7C85'); h.style.marginTop = '8px';
-    row.append(l, box, h); base.after(row); desenha(row);
+    row.dataset.hc = hintBase ? getComputedStyle(hintBase).color : '#7C7C85'; row.append(l, box, h); base.after(row); desenha(row);
     row.addEventListener('click', async ev => {
       const rm = ev.target.closest('[data-nm-rm]'), ad = ev.target.closest('[data-nm-add]');
       if (rm && !busy) {
