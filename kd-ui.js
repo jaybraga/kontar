@@ -2135,6 +2135,9 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     });
   }
 
+  const reorg = () => !!(KD.comp && KD.comp.state && KD.comp.state.org);   // modo "reorganizar cards" da Home
+  function forcaFecha() { if (ov) ov.remove(); ov = null; open = false; anim = false; const w = document.querySelector('[data-k="mes"]'); if (w) w.removeAttribute('data-fm-exp'); }
+
   /* ---------- montagem no card branco do mês ---------- */
   function css() {
     if (document.getElementById('kd-fm-css')) return;
@@ -2152,6 +2155,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (!w) { if (open || anim) { open = false; anim = false; ov = null; } sig = ''; return; }
     const d = FM.data(), host = w.querySelector(':scope > [data-fm-host]');
     css();
+    if ((open || anim) && reorg()) forcaFecha();
     if (!d.show) {
       if (open && ov) { refresh(d); return; }
       if (host && !anim) { host.remove(); w.removeAttribute('data-fm'); w.removeAttribute('data-fm-exp'); w.style.cursor = ''; sig = ''; }
@@ -2165,7 +2169,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (!host) {
       h.setAttribute('data-fm-host', '1'); h.style.cssText = 'position:absolute;inset:0;font-family:Helvetica,Arial,sans-serif;color:' + INK;
       w.appendChild(h);
-      if (!w.__fm) { w.__fm = 1; w.addEventListener('click', ev => { if (w.hasAttribute('data-fm') && !ev.target.closest('[data-fm-ov]')) abre(); }); }
+      if (!w.__fm) { w.__fm = 1; w.addEventListener('click', ev => { if (reorg()) return; if (w.hasAttribute('data-fm') && !ev.target.closest('[data-fm-ov]')) abre(); }); }
       w.style.cursor = 'pointer';
     }
     h.innerHTML = bgLayer(PR) + '<div style="position:absolute;left:' + (PR + 8) + 'px;right:' + (PR + 8) + 'px;top:' + DV + 'px;border-top:1.5px dashed rgba(10,10,10,.28)"></div><div style="position:absolute;left:26px;right:26px;top:' + (DV + 20) + 'px">' + fecharHtml(d) + '</div>' + btnHtml();
@@ -2197,7 +2201,9 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     ov.innerHTML = bgLayer(PR) + '<div data-fm-rcw style="position:absolute;inset:0"></div>' + expandedHtml(d, wr.width, gr.height) + btnHtml();
     const rcw = ov.querySelector('[data-fm-rcw]'); rcw.appendChild(rc);
     rcw.insertAdjacentHTML('beforeend', '<div data-r="txt" style="position:absolute;left:' + (PR + 8) + 'px;right:' + (PR + 8) + 'px;top:' + DV + 'px;border-top:1.5px dashed rgba(10,10,10,.28)"></div><div style="position:absolute;left:26px;right:26px;top:' + (DV + 20) + 'px">' + fecharHtml(d) + '</div>');
-    grid.appendChild(ov); w.setAttribute('data-fm-exp', '1');
+    ov.style.opacity = '0'; grid.appendChild(ov);
+    requestAnimationFrame(() => { ov.style.transition = 'opacity .18s ease'; ov.style.opacity = '1'; });
+    setTimeout(() => { w.setAttribute('data-fm-exp', '1'); ov.style.transition = ''; }, 200);
     ov.addEventListener('click', ev => {
       if (ev.target.closest('[data-fm-btn]')) return fecha();
       const b = ev.target.closest('[data-fm-imp]'); if (b && KD.imp && KD.imp.pick) KD.imp.pick(b.dataset.fmImp);
@@ -2210,7 +2216,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     bg.style.setProperty('--fm-pr', '0.01px');
     // 2) o card cresce até cobrir a coluna inteira; o botão vira X
     setTimeout(() => {
-      ov.style.transition = 'left .7s ' + EE + ',top .7s ' + EE + ',width .7s ' + EE + ',height .7s ' + EE;
+      ov.style.transition = 'left .7s ' + EE + ',top .7s ' + EE + ',width .7s ' + EE + ',height .7s ' + EE + ',opacity .18s ease';
       ov.style.top = '0px'; ov.style.height = gr.height + 'px';
     }, 200);
     setTimeout(() => {
@@ -2254,7 +2260,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       bars.forEach(b => { b.style.opacity = '0'; }); txt.forEach(t => { t.style.opacity = '0'; });
       play(bars, { from: [0, 8], to: [1, 0], delay: 0, step: 25, dur: 420 }); play(txt, { from: [0, 8], to: [1, 0], delay: 40, dur: 300 });
     }, 1050);
-    setTimeout(() => { o.remove(); if (ov === o) ov = null; open = false; anim = false; const ww = document.querySelector('[data-k="mes"]'); if (ww) ww.removeAttribute('data-fm-exp'); sync(); }, 1600);
+    setTimeout(() => { const ww = document.querySelector('[data-k="mes"]'); if (ww) ww.removeAttribute('data-fm-exp'); o.style.transition = 'opacity .3s ease'; o.style.opacity = '0'; }, 1450);
+    setTimeout(() => { o.remove(); if (ov === o) ov = null; open = false; anim = false; sync(); }, 1800);
   }
   window.addEventListener('keydown', e => { if (e.key === 'Escape' && open && !document.querySelector('[data-imp],[data-imp-modal],[data-imp-hist]')) fecha(); });
   window.addEventListener('kd:batches', () => carregar());
