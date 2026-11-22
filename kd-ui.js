@@ -2110,8 +2110,9 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       + 'V' + f2(d - pr) + 'A' + pr + ',' + pr + ' 0 0 0 ' + f2(w) + ',' + f2(d + pr) + 'V' + f2(h - r) + 'A' + r + ',' + r + ' 0 0 1 ' + f2(w - r) + ',' + f2(h) + 'H' + r + 'A' + r + ',' + r + ' 0 0 1 0,' + f2(h - r)
       + 'V' + f2(d + pr) + 'A' + pr + ',' + pr + ' 0 0 0 0,' + f2(d - pr) + 'V' + r + 'A' + r + ',' + r + ' 0 0 1 ' + r + ',0Z';
   }
-  const shapeBg = el => { const w = el.offsetWidth ? el.getBoundingClientRect().width : 0, h = el.getBoundingClientRect().height; if (!w) return; const p = 'path("' + fmPath(w, h, +el.dataset.pr || PR) + '")'; el.style.clipPath = p; el.style.webkitClipPath = p; };
-  const RO = new ResizeObserver(es => es.forEach(e => shapeBg(e.target)));
+  // usa o tamanho de layout (não muda com transform: o card é escalado/movido durante o arraste dos cards da Home)
+  const shapeBg = el => { const w = el.__w || el.offsetWidth, h = el.__h || el.offsetHeight; if (!w) return; const p = 'path("' + fmPath(w, h, +el.dataset.pr || PR) + '")'; el.style.clipPath = p; el.style.webkitClipPath = p; };
+  const RO = new ResizeObserver(es => es.forEach(e => { const b = e.borderBoxSize && e.borderBoxSize[0]; e.target.__w = b ? b.inlineSize : e.contentRect.width; e.target.__h = b ? b.blockSize : e.contentRect.height; shapeBg(e.target); }));
   const watchBg = el => { if (!el || el.__ro) return; el.__ro = 1; shapeBg(el); RO.observe(el); };
   function tweenPr(el, to, ms) {   // abre/fecha as perfurações com a mesma curva ease-in-out
     const from = +el.dataset.pr || PR, t0 = performance.now(), ease = t => (t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
