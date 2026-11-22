@@ -479,14 +479,14 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
 @media (max-width:820px){.board{height:auto}.body{grid-template-columns:1fr}.T{border-right:0;border-bottom:1px solid var(--ln);min-height:260px}.hdr .cap{display:none}.days{grid-template-columns:repeat(7,1fr)}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}`;
 
-  /* Devolve uma Promise com as respostas ({nm, how, rd (centavos|null), dia}) quando o Jay/usuário clica "Abrir meu Kontar". */
+  /* Devolve uma Promise com as respostas ({nm, nomes (nomes no banco), how, rd (centavos|null), dia}) quando o Jay/usuário clica "Abrir meu Kontar". */
   function onboarding(nameGuess) {
     mount(CSS_ONB, '<main class="stage"><div class="board" id="board"><svg id="bgs" aria-hidden="true"></svg><nav class="route" id="route" aria-label="Progresso"></nav><header class="hdr"><span class="wm">' + LOGO(30) + '</span><span class="cap">Primeiro acesso</span></header>'
       + '<div class="body"><section class="T" aria-live="polite"><div class="row"><span class="num" id="num">1</span><span class="cap note" id="note"></span></div><h1 id="h"></h1></section><section class="U"><div class="desc"><span class="cap" id="tag"></span><p id="sb"></p></div><div class="ctl">'
       + '<div class="step" data-s="0"><label class="lab" for="nm">Nome</label><div class="fld"><input id="nm" type="text" placeholder="Como te chamamos?" autocomplete="given-name"></div><p class="hint">Você muda isso depois, em Minha Conta.</p></div>'
-      + '<div class="step" data-s="1" role="radiogroup" aria-label="Como começar"><button class="opt" role="radio" aria-checked="false" data-v="import"><span class="n">A</span><span><b>Importar extrato</b><small>CSV, OFX ou PDF do seu banco ou cartão.</small></span><span class="rd"></span></button><button class="opt" role="radio" aria-checked="false" data-v="manual"><span class="n">B</span><span><b>Lançar manualmente</b><small>Começa do zero e você vai adicionando.</small></span><span class="rd"></span></button><button class="opt" role="radio" aria-checked="false" data-v="demo"><span class="n">C</span><span><b>Explorar com dados demo</b><small>Veja tudo funcionando antes de usar os seus.</small></span><span class="rd"></span></button></div>'
-      + '<div class="step" data-s="2"><label class="lab" for="rd">Renda mensal</label><div class="fld"><span class="pre">R$</span><input id="rd" inputmode="numeric" placeholder="0,00"><span class="suf cap">por mês</span></div><div class="dh"><span class="lab">Dia de fechamento da fatura</span><button class="skip" type="button" id="sk">Pular essa etapa</button></div><div class="days" id="days"></div></div>'
-      + '<div class="step" data-s="3"><div class="sum" id="sum"></div></div></div>'
+      + '<div class="step" data-s="1"><label class="lab" for="nl">Seu nome completo, como no banco</label><div class="fld"><input id="nl" type="text" placeholder="Ex.: João da Silva" autocomplete="name"></div><label class="lab" for="nj" style="margin-top:8px">Nome da sua empresa (PJ), se tiver</label><div class="fld"><input id="nj" type="text" placeholder="Ex.: Silva Serviços LTDA" autocomplete="organization"></div><p class="hint">Pode deixar em branco. Dá pra adicionar mais nomes depois, em Minha Conta.</p></div><div class="step" data-s="2" role="radiogroup" aria-label="Como começar"><button class="opt" role="radio" aria-checked="false" data-v="import"><span class="n">A</span><span><b>Importar extrato</b><small>CSV, OFX ou PDF do seu banco ou cartão.</small></span><span class="rd"></span></button><button class="opt" role="radio" aria-checked="false" data-v="manual"><span class="n">B</span><span><b>Lançar manualmente</b><small>Começa do zero e você vai adicionando.</small></span><span class="rd"></span></button><button class="opt" role="radio" aria-checked="false" data-v="demo"><span class="n">C</span><span><b>Explorar com dados demo</b><small>Veja tudo funcionando antes de usar os seus.</small></span><span class="rd"></span></button></div>'
+      + '<div class="step" data-s="3"><label class="lab" for="rd">Renda mensal</label><div class="fld"><span class="pre">R$</span><input id="rd" inputmode="numeric" placeholder="0,00"><span class="suf cap">por mês</span></div><div class="dh"><span class="lab">Dia de fechamento da fatura</span><button class="skip" type="button" id="sk">Pular essa etapa</button></div><div class="days" id="days"></div></div>'
+      + '<div class="step" data-s="4"><div class="sum" id="sum"></div></div></div>'
       + '<div class="acts"><div class="lt"><button class="back" type="button" id="bk" disabled>← Voltar</button><span class="cap" id="fn"></span></div><button class="go" type="button" id="nx"><span class="t">Continuar</span><span class="ar" aria-hidden="true">' + ARROW('#fff', 2.4) + '</span></button></div></section></div></div></main>');
     return new Promise(done => {
       const drawNotch = () => { const g = $('#bgs'), b = $('#board'); if (!g || !b) return; const W = b.offsetWidth, H = b.offsetHeight, Dp = 72, gp = 18, F = 18, R = 36, D2 = 84, R2 = 42, RW = $('#route').offsetWidth, N = RW + gp + F, x = W - N; $('#nx').style.width = RW + 'px';
@@ -503,36 +503,40 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
         return 'translate(' + dxo.toFixed(2) + 'px,' + dy.toFixed(2) + 'px)'; };
       const setNum = n => { const el = $('#num'); if (!el) return; el.innerHTML = '<span class="g"></span>'; const g = el.firstChild; g.textContent = n; g.style.transform = optic(el, String(n)); };
       const ST = [
-        { n: 'Boas-vindas', h: 'Oi. Vamos<br>começar.', sb: 'Leva menos de um minuto.<br>Seus dados ficam salvos e só você vê.', note: 'Quatro paradas até o seu painel', tag: '≈ 1 min', ac: 'var(--roxo)', on: '#fff' },
+        { n: 'Boas-vindas', h: 'Oi. Vamos<br>começar.', sb: 'Leva menos de um minuto.<br>Seus dados ficam salvos e só você vê.', note: 'Cinco paradas até o seu painel', tag: '≈ 1 min', ac: 'var(--roxo)', on: '#fff' },
+        { n: 'Nome no banco', h: 'Seu nome<br>no banco.', sb: 'O Kontar usa isso pra reconhecer transferências entre as suas contas e não contar como gasto.', note: 'Opcional. Dá pra pular', tag: 'Opcional', ac: '#6EC1FF', on: '#000' },
         { n: 'Ponto de partida', h: 'Por onde<br>começar?', sb: 'Escolha um caminho pra trazer seus lançamentos. Dá pra mudar a qualquer hora.', note: 'Escolha um dos três caminhos', tag: '3 caminhos', ac: 'var(--amar)', on: '#000' },
         { n: 'Renda e fatura', h: 'Sua renda<br>e fatura.', sb: 'Com isso o Kontar já calcula<br>seus tetos e as faturas futuras.', note: 'Opcional. Dá pra pular', tag: 'Opcional', ac: 'var(--verde)', on: '#000' },
         { n: 'Tudo pronto', h: 'Pronto,<br><span id="who"></span>', sb: 'Confira o resumo.<br>O resto você ajusta<br>nos próprios cards.', note: 'Confira e abra o seu painel', tag: 'Resumo', ac: 'var(--bone)', on: '#000' }];
-      const D = { nm: nameGuess || '', how: null, rd: '', dia: null }; let i = 0;
+      const D = { nm: nameGuess || '', nl: '', nj: '', how: null, rd: '', dia: null }; let i = 0; const LAST = ST.length - 1;
+      const nomesBanco = () => { const seen = new Set(), out = []; [D.nl, D.nj].forEach(v => { const t = String(v || '').trim().replace(/\s+/g, ' '); if (t.length >= 3 && !seen.has(t.toLowerCase())) { seen.add(t.toLowerCase()); out.push(t); } }); return out; };
       $('#nm').value = D.nm;
-      $('#route').innerHTML = ST.map((_, k) => '<b>' + (k + 1) + '</b>' + (k < 3 ? '<u></u>' : '')).join('');
+      $('#route').innerHTML = ST.map((_, k) => '<b>' + (k + 1) + '</b>' + (k < LAST ? '<u></u>' : '')).join('');
       $('#days').innerHTML = Array.from({ length: 28 }, (_, k) => '<button type="button" aria-pressed="false">' + (k + 1) + '</button>').join('');
-      const HOW = { import: 'Importar extrato', manual: 'Lançar manualmente', demo: 'Dados demo' }, ok = () => i === 0 ? D.nm.trim().length > 0 : i === 1 ? !!D.how : true;
+      const HOW = { import: 'Importar extrato', manual: 'Lançar manualmente', demo: 'Dados demo' }, ok = () => i === 0 ? D.nm.trim().length > 0 : i === 2 ? !!D.how : true;
       function render() {
         const s = ST[i]; root.style.setProperty('--ac', s.ac); root.style.setProperty('--on', s.on);
         setNum(i + 1); $('#h').innerHTML = s.h; $('#sb').innerHTML = s.sb; $('#note').textContent = s.note; $('#tag').textContent = s.tag; $('#fn').textContent = s.n;
         ['#num', '#h', '#sb'].forEach(q => { const e = $(q); e.classList.remove('anim'); void e.offsetWidth; e.classList.add('anim'); });
-        if (i === 3) { $('#who').textContent = (D.nm.trim().split(/\s+/)[0] || 'você') + '.'; const rows = [['Nome', D.nm.trim()], ['Começando por', HOW[D.how]], ['Renda mensal', D.rd ? 'R$ ' + D.rd : '—'], ['Fecha a fatura', D.dia ? 'Dia ' + D.dia : '—']];
+        if (i === LAST) { $('#who').textContent = (D.nm.trim().split(/\s+/)[0] || 'você') + '.'; const nb = nomesBanco(), rows = [['Nome', D.nm.trim()], ['Nomes no banco', nb.length ? nb.length + (nb.length === 1 ? ' nome' : ' nomes') : '—'], ['Começando por', HOW[D.how]], ['Renda mensal', D.rd ? 'R$ ' + D.rd : '—'], ['Fecha a fatura', D.dia ? 'Dia ' + D.dia : '—']];
           $('#sum').innerHTML = rows.map((r, k) => '<div><i>' + (k + 1) + '</i><span>' + r[0] + '</span><b></b></div>').join(''); $$('#sum b').forEach((e, k) => { e.textContent = rows[k][1]; }); }
         $$('.step').forEach(e => e.classList.toggle('on', +e.dataset.s === i));
         $$('#route u').forEach((e, k) => e.classList.toggle('done', k < i));
         $$('#route b').forEach((e, k) => { e.classList.toggle('done', k < i); e.classList.toggle('cur', k === i); e.textContent = k < i ? '✓' : k + 1; });
-        $('#bk').disabled = i === 0; $('#nx .t').textContent = i === 3 ? 'Abrir meu Kontar' : 'Continuar'; $('#nx').disabled = !ok();
+        $('#bk').disabled = i === 0; $('#nx .t').textContent = i === LAST ? 'Abrir meu Kontar' : 'Continuar'; $('#nx').disabled = !ok();
       }
       new ResizeObserver(drawNotch).observe($('#board')); new ResizeObserver(drawNotch).observe($('#route')); new ResizeObserver(() => setNum(i + 1)).observe($('#num'));
       $('#nm').oninput = e => { D.nm = e.target.value; $('#nx').disabled = !ok(); };
       $('#nm').onkeydown = e => { if (e.key === 'Enter') $('#nx').click(); };
+      $('#nl').oninput = e => { D.nl = e.target.value; }; $('#nj').oninput = e => { D.nj = e.target.value; };
+      $('#nl').onkeydown = e => { if (e.key === 'Enter') $('#nj').focus(); }; $('#nj').onkeydown = e => { if (e.key === 'Enter') $('#nx').click(); };
       $$('.opt').forEach(b => { b.onclick = () => { D.how = b.dataset.v; $$('.opt').forEach(o => o.setAttribute('aria-checked', o === b)); $('#nx').disabled = !ok(); }; });
       $('#rd').oninput = e => { const d = e.target.value.replace(/\D/g, '').slice(0, 11); e.target.value = d ? (+d / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : ''; D.rd = e.target.value; };
       $$('#days button').forEach(b => { b.onclick = () => { const on = b.getAttribute('aria-pressed') === 'true'; $$('#days button').forEach(x => x.setAttribute('aria-pressed', 'false')); b.setAttribute('aria-pressed', !on); D.dia = on ? null : +b.textContent; }; });
-      $('#sk').onclick = () => { D.rd = ''; D.dia = null; $('#rd').value = ''; $$('#days button').forEach(x => x.setAttribute('aria-pressed', 'false')); i = 3; render(); };
+      $('#sk').onclick = () => { D.rd = ''; D.dia = null; $('#rd').value = ''; $$('#days button').forEach(x => x.setAttribute('aria-pressed', 'false')); i = LAST; render(); };
       $('#bk').onclick = () => { if (i > 0) { i--; render(); } };
-      $('#nx').onclick = () => { if (!ok()) return; if (i < 3) { i++; render(); } else { $('#nx .t').textContent = 'Abrindo…'; $('#nx').disabled = true; $('#bk').disabled = true;
-        done({ nm: D.nm.trim(), how: D.how, rd: D.rd ? parseInt(D.rd.replace(/\D/g, ''), 10) : null, dia: D.dia }); } };
+      $('#nx').onclick = () => { if (!ok()) return; if (i < LAST) { i++; render(); } else { $('#nx .t').textContent = 'Abrindo…'; $('#nx').disabled = true; $('#bk').disabled = true;
+        done({ nm: D.nm.trim(), nomes: nomesBanco(), how: D.how, rd: D.rd ? parseInt(D.rd.replace(/\D/g, ''), 10) : null, dia: D.dia }); } };
       render(); drawNotch();
     });
   }
@@ -548,9 +552,9 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
   async function saveOnboarding(sb, user, a) {
     const KD = window.KD, P = Object.assign({}, KD.M.prefs, { onboarded: true, inicio: a.how });
     if (a.rd != null) P.renda = a.rd; if (a.dia) P.diaFech = a.dia;            /* renda em centavos (inteiro), como o resto do banco */
-    KD.M.prefs = P; KD.M.profile = Object.assign({}, KD.M.profile, { nome_exibicao: a.nm });
+    KD.M.prefs = P; KD.M.profile = Object.assign({}, KD.M.profile, { nome_exibicao: a.nm }, a.nomes && a.nomes.length ? { nomes_titular: a.nomes } : {});
     if (qs('onb') === '1') return;
-    const r1 = await sb.from('profiles').upsert({ user_id: user.id, nome_exibicao: a.nm }, { onConflict: 'user_id' });
+    const r1 = await sb.from('profiles').upsert(Object.assign({ user_id: user.id, nome_exibicao: a.nm }, a.nomes && a.nomes.length ? { nomes_titular: a.nomes } : {}), { onConflict: 'user_id' });
     const r2 = await sb.from('user_prefs').upsert({ user_id: user.id, prefs: P, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
     if (r1.error || r2.error) console.error('[kontar] onboarding', r1.error || r2.error);
   }
