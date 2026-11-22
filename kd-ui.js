@@ -2738,7 +2738,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
 
   /* ---------- peças ---------- */
   const btn = (txt, act, ghost) => '<span data-vz-a="' + act + '" style="display:inline-block;margin-top:16px;border:1.5px ' + (ghost ? 'dashed #3F3F46' : 'solid #55555C') + ';border-radius:99px;padding:10px 18px;font-size:10.5px;font-weight:900;letter-spacing:.12em;color:' + (ghost ? '#9A9AA3' : FG) + ';cursor:pointer;white-space:nowrap;transition:opacity .25s ease" onmouseover="this.style.opacity=.75" onmouseout="this.style.opacity=1">' + txt + '</span>';
-  const grande = (k, titulo, txt, acoes) => '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;height:100%;padding:18px 26px;gap:0"><div style="width:56px;height:56px;border-radius:50%;border:1.5px solid #3A3A40;display:flex;align-items:center;justify-content:center;color:#9A9AA3;margin-bottom:14px;flex:none">' + ic(k, 26) + '</div><div style="font-size:17px;font-weight:700;letter-spacing:-.02em;color:#D8D6D0">' + esc(titulo) + '</div><div style="font-size:12.5px;line-height:1.45;color:' + MU + ';margin-top:6px;max-width:300px">' + esc(txt) + '</div>' + (acoes || '') + '</div>';
+  const compacto = (k, titulo, txt, acoes) => '<div style="display:flex;align-items:center;justify-content:center;gap:16px;height:100%;padding:12px 24px"><div style="width:44px;height:44px;border-radius:50%;border:1.5px solid #3A3A40;display:flex;align-items:center;justify-content:center;color:#9A9AA3;flex:none">' + ic(k, 20) + '</div><div style="text-align:left;max-width:240px"><div style="font-size:15px;font-weight:700;letter-spacing:-.02em;color:#D8D6D0">' + esc(titulo) + '</div><div style="font-size:12px;line-height:1.4;color:' + MU + ';margin-top:3px">' + esc(txt) + '</div>' + (acoes || '').replace(/margin-top:16px/g, 'margin-top:10px') + '</div></div>';
+  const grande = (k, titulo, txt, acoes) => '<!--g-->' + '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;height:100%;padding:18px 26px;gap:0"><div style="width:56px;height:56px;border-radius:50%;border:1.5px solid #3A3A40;display:flex;align-items:center;justify-content:center;color:#9A9AA3;margin-bottom:14px;flex:none">' + ic(k, 26) + '</div><div style="font-size:17px;font-weight:700;letter-spacing:-.02em;color:#D8D6D0">' + esc(titulo) + '</div><div style="font-size:12.5px;line-height:1.45;color:' + MU + ';margin-top:6px;max-width:300px">' + esc(txt) + '</div>' + (acoes || '') + '</div><!--c-->' + compacto(k, titulo, txt, acoes);
   const pequeno = (k, titulo, txt) => '<div style="display:flex;align-items:center;justify-content:center;gap:16px;height:100%;padding:14px 24px"><div style="width:48px;height:48px;border-radius:50%;border:1.5px solid #3A3A40;display:flex;align-items:center;justify-content:center;color:#9A9AA3;flex:none">' + ic(k, 22) + '</div><div style="text-align:left;max-width:230px"><div style="font-size:15px;font-weight:700;letter-spacing:-.02em;color:#D8D6D0">' + esc(titulo) + '</div><div style="font-size:12.5px;line-height:1.4;color:' + MU + ';margin-top:3px">' + esc(txt) + '</div></div></div>';
 
   function boasVindas() {
@@ -2781,6 +2782,15 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     s.textContent = '[data-emp]{background:transparent!important;border-color:transparent!important;box-shadow:none!important}[data-emp] > *:not([data-emp-host]){visibility:hidden!important}';
     document.head.appendChild(s);
   }
+  // cards grandes: se o conteúdo vertical não couber (janela menor), usa o formato compacto, com o ícone ao lado
+  function ajusta(h) {
+    if (h.__big == null) { const m = h.innerHTML.match(/^<!--g-->([\s\S]*)<!--c-->([\s\S]*)$/); if (!m) { h.__big = false; return; } h.__big = m[1]; h.__cmp = m[2]; }
+    if (h.__big === false) return;
+    const cabe = () => h.scrollHeight <= h.clientHeight + 1;
+    if (h.__mode !== 'g') { h.innerHTML = h.__big; h.__mode = 'g'; }
+    if (!cabe() && h.__mode === 'g') { h.innerHTML = h.__cmp; h.__mode = 'c'; }
+    else if (h.__mode === 'c') { h.innerHTML = h.__big; h.__mode = 'g'; if (!cabe()) { h.innerHTML = h.__cmp; h.__mode = 'c'; } }
+  }
   function monta(card, k, e) {
     const c = conteudo(k, e); if (!c) return;
     const sig = e.tipo + '|' + (e.mi == null ? '' : e.mi) + '|' + (k === 'saldo' ? ((KD.M.cards || []).length + (KD.M.accs || []).length) + '|' + flagCat() : '');
@@ -2792,9 +2802,10 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       h.addEventListener('click', ev => { ev.stopPropagation(); const a = ev.target.closest('[data-vz-a]'); if (a && ACOES[a.dataset.vzA]) ACOES[a.dataset.vzA](); });   // a camada não deixa o clique chegar no card de baixo
       card.appendChild(h);
     }
-    h.dataset.sig = sig;
+    h.dataset.sig = sig; h.__big = null; h.__mode = null;
     h.style.cssText = 'position:absolute;inset:0;border-radius:30px;box-sizing:border-box;z-index:3;font-family:Helvetica,Arial,sans-serif;overflow:hidden;' + (c.claro ? 'background:' + FG + ';color:' + INK : 'border:1.5px dashed #34343A;color:#8A8A92');
-    h.innerHTML = c.html;
+    h.innerHTML = c.html; ajusta(h);
+    if (!h.__ro && window.ResizeObserver) { h.__ro = new ResizeObserver(() => ajusta(h)); h.__ro.observe(h); }
     card.setAttribute('data-emp', '1');
     if (novo && h.animate) h.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 420, easing: EE });
   }
