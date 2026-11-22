@@ -297,17 +297,19 @@ input:focus{border-color:var(--bone);background:rgba(0,0,0,.55)}
       + '<div class="R"><form class="form" id="f" autocomplete="on" novalidate><div class="grp"><div class="fld"><input id="e" type="text" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" name="email" placeholder="E-mail" autocomplete="email" aria-label="E-mail"></div><div class="fld"><input id="p1" type="password" name="new-password" placeholder="Senha" autocomplete="new-password" aria-label="Senha"></div><div class="fld"><input id="p2" type="password" name="confirm-password" placeholder="Confirmar senha" autocomplete="new-password" aria-label="Confirmar senha"></div><div class="meter" aria-live="polite"><span id="mh">Mínimo 8 caracteres</span><span class="bar"><span id="mb"></span></span><b id="ml">Força</b></div><div class="err" id="x" role="alert" aria-live="polite"></div></div><div class="acts">' + LQ('go', 'Criar conta').replace('type="submit"', 'type="submit" disabled') + '<span class="lk" id="vo" role="button" tabindex="0">Já tenho conta</span></div></form></div></section></main>');
     liq(); parallax(); pwEye();
     const e = $('#e'), p1 = $('#p1'), p2 = $('#p2'), go = $('#go'), mb = $('#mb'), ml = $('#ml'), mh = $('#mh'), x = $('#x');
-    const ok = () => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.value.trim());
-    const upd = () => { const c = KD.pwCheck(p1.value, p2.value); mb.style.width = c.pct; mb.style.background = c.col; ml.style.color = c.lv ? c.col : '#7C7C85'; ml.textContent = c.lbl || 'Força'; mh.textContent = c.hint; mh.style.color = c.hintC; if (c.ok && !ok()) { mh.textContent = e.value.trim() ? 'Falta um e-mail válido' : 'Falta o e-mail'; mh.style.color = '#F5B83D'; } go.disabled = !(c.ok && ok()); };
+    const lax = !!CFG.aceitarUsuarioSemEmail;   // flag de teste (config.js): aceita usuário sem e-mail
+    const ok = () => { const v = e.value.trim(); return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) || (lax && /^[^\s@]{3,}$/.test(v)); };
+    if (lax) { e.placeholder = 'E-mail ou usuário'; e.setAttribute('aria-label', 'E-mail ou usuário'); e.inputMode = 'text'; }
+    const upd = () => { const c = KD.pwCheck(p1.value, p2.value); mb.style.width = c.pct; mb.style.background = c.col; ml.style.color = c.lv ? c.col : '#7C7C85'; ml.textContent = c.lbl || 'Força'; mh.textContent = c.hint; mh.style.color = c.hintC; if (c.ok && !ok()) { mh.textContent = lax ? 'Falta o usuário (mínimo 3 caracteres, sem espaço)' : e.value.trim() ? 'Falta um e-mail válido' : 'Falta o e-mail'; mh.style.color = '#F5B83D'; } go.disabled = !(c.ok && ok()); };
     [e, p1, p2].forEach(i => i.addEventListener('input', upd));
     const back = () => login(sb); $('#vo').onclick = back; $('#vo').onkeydown = ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); back(); } };
     $('#f').addEventListener('submit', async ev => { ev.preventDefault(); if (go.disabled || go.classList.contains('busy')) return; x.textContent = '';
       busyBtn(go, true, 'Criando…', 'Criar conta'); e.disabled = p1.disabled = p2.disabled = true;
-      let r; try { r = await sb.auth.signUp({ email: e.value.trim().toLowerCase(), password: p1.value, options: { emailRedirectTo: location.origin + location.pathname } }); } catch (er) { r = { error: er }; }
+      let r; try { r = await sb.auth.signUp({ email: toEmail(e.value.trim()), password: p1.value, options: { emailRedirectTo: location.origin + location.pathname } }); } catch (er) { r = { error: er }; }
       if (r.error) { busyBtn(go, false, '', 'Criar conta'); e.disabled = p1.disabled = p2.disabled = false; x.style.color = '#FF6A5C';
         x.textContent = /already|registered/i.test(r.error.message) ? 'Esse e-mail já tem conta. Volte e entre.' : /not allowed|disabled/i.test(r.error.message) ? 'A criação de contas está fechada por enquanto.' : r.error.message; return; }
       if (r.data && r.data.session) { LS.del(EXP); start(sb, r.data.session.user); return; }
-      x.style.color = '#00E08A'; x.textContent = 'Quase lá: mandamos um link de confirmação pro seu e-mail. Abra e volte pra entrar.'; busyBtn(go, false, '', 'Criar conta'); go.disabled = true; });
+      x.style.color = '#00E08A'; x.textContent = /@kontar\.app$/i.test(toEmail(e.value.trim())) ? 'Conta criada. Ela ainda precisa ser liberada por quem administra antes de entrar.' : 'Quase lá: mandamos um link de confirmação pro seu e-mail. Abra e volte pra entrar.'; busyBtn(go, false, '', 'Criar conta'); go.disabled = true; });
   }
 
   /* ================= 6. NOVA SENHA (09d) ================= */
