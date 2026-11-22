@@ -2210,14 +2210,14 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     setTimeout(() => {
       const bars = [...ec.querySelectorAll('[data-bar]')], rows = [...ec.querySelectorAll('[data-a="row"]')];
       bars.forEach(b => { b.style.opacity = '0'; }); rows.forEach(r => { r.style.opacity = '0'; });
-      play(bars, { from: [0, 10], to: [1, 0], delay: 0, step: 40, dur: 800 });
+      play(bars, { from: [0, 10], to: [1, 0], delay: 0, step: 45, dur: 900 });
       play([ec.querySelector('[data-a="head"]')], { from: [0, 10], to: [1, 0], delay: 80, dur: 550 });
       play([ec.querySelector('[data-a="count"]')], { from: [0, 10], to: [1, 0], delay: 140, dur: 550 });
-      play(rows, { from: [0, 10], to: [1, 0], delay: 200, step: 50, dur: 500 });
+      play(rows, { from: [0, 10], to: [1, 0], delay: 200, step: 50, dur: 450 });
       play([ec.querySelector('[data-a="note"]')], { from: [0, 10], to: [1, 0], delay: 200 + rows.length * 50, dur: 400 });
       ec.style.pointerEvents = 'auto';
     }, 450);
-    setTimeout(() => { anim = false; }, 1700);
+    setTimeout(() => { anim = false; }, 1800);
   }
   function fecha() {
     if (!open || anim || !ov) return;
