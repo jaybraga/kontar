@@ -857,6 +857,12 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const ab = document.querySelector('[data-tx-host]'); if (!ab) return;
     host = ab; host.style.pointerEvents = 'auto'; render(true);
   };
+  // dropdown aberto na vista expandida (inline): clicar fora do card fecha o dropdown (o card continua aberto)
+  document.addEventListener('click', ev => {
+    if (!S || !S.pop || !S.inline || !host) return;
+    if (host.contains(ev.target) || ev.target.closest('[data-pop],[data-modal],[data-dd]')) return;
+    S.pop = null; render();
+  }, true);
   TX.requestClose = function () { if (!S || S.busy) return; S.askDel = false; if (isDirty()) { S.askClose = true; S.askBack = false; render(); return; } TX.close(); };
   TX.isOpen = function (id) { return !!(S && S.row && S.row.id === id); };
   let pendingDone = null;
@@ -1402,7 +1408,16 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       else if (a === 'copylink') { ev.stopPropagation(); navigator.clipboard?.writeText(S.link || '').then(() => { S.copied = true; render(); clearTimeout(S._copyT); S._copyT = setTimeout(() => { if (S) { S.copied = false; render(); } }, 1600); }); }
       else if (a === 'lertexto') { const its = parseTexto(S.texto || ''); if (its.length) S.nota = Object.assign({}, S.nota || {}, parseTexto.meta); aceitarItens(its, S.link); }
       else if (a === 'padd') { const used = new Set(S.partes.map(p => p.catId)), n = cats().find(c => !used.has(catId(c))) || 'Outros'; S.partes.push({ catId: catId(n), valor: Math.max(0, Math.round((total() - somaPartes()) * 100) / 100) || 0.01, rotulo: '', itens: [] }); S.sel = S.partes.length - 1; S.partesDirty = true; render(); }
-      else if (a === 'pdel') { ev.stopPropagation(); S.partes.splice(+v, 1); S.sel = 0; S.partesDirty = true; render(); }
+      else if (a === 'pdel') {   // apagar parte: a linha some (fade + sobe + fecha o vão) e a faixa da barra encolhe antes de redesenhar, o inverso de quando a parte entra
+        ev.stopPropagation(); if (S._pdel) return; const k = +v, mine = S, row = host && host.querySelector('[data-pdrag="' + k + '"]'), seg = host && host.querySelector('[style*="border-radius:9999px;overflow:hidden;gap:2px"]');
+        const fim = () => { if (S !== mine) return; S._pdel = false; S.partes.splice(k, 1); S.sel = 0; S.partesDirty = true; render(); };
+        if (!row || !row.animate) { fim(); return; }
+        S._pdel = true; const h = row.offsetHeight, ease = 'cubic-bezier(.65,0,.35,1)';
+        row.style.overflow = 'hidden'; row.style.pointerEvents = 'none';
+        row.animate([{ opacity: 1, transform: 'none', height: h + 'px', marginBottom: '0px' }, { opacity: 0, transform: 'translateY(-6px)', height: '0px', marginBottom: '-8px', paddingTop: '0px', paddingBottom: '0px', borderWidth: '0px' }], { duration: 380, easing: ease, fill: 'forwards' });
+        const sg = seg && seg.children[k]; if (sg && sg.animate) sg.animate([{ flexGrow: getComputedStyle(sg).flexGrow, opacity: 1 }, { flexGrow: 0, opacity: 0 }], { duration: 380, easing: ease, fill: 'forwards' });
+        later(fim, 400);
+      }
       else if (a === 'pcat') { ev.stopPropagation(); S.pop = S.pop === 'pcat' ? null : 'pcat'; render(); }
       else if (a === 'pset') { if (S.partes[S.sel]) S.partes[S.sel].catId = catId(v); S.pop = null; S.partesDirty = true; render(); }
       else if (a === 'sel') { if (!ev.target.closest('input')) { S.sel = +v; render(); } }
