@@ -2603,9 +2603,9 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   /* ---------- status e botão nos cards de Cartões ---------- */
   function sincCartoes(forcar) {
     if (!rows || !KD.M) return;
-    document.querySelectorAll('span[title][style*="mask:url"], span[title][style*="background:url"]').forEach(sp => {
+    document.querySelectorAll('[data-ce-pen]').forEach(sp => {   // o lápis de editar de cada face carrega o nome do cartão
       const face = sp.closest('div[style*="4.29cqw"]'); if (!face || face.getBoundingClientRect().width < 250 || /#111114|rgb\(17, 17, 20\)/.test(face.getAttribute('style') || '')) return;   // só a face do cartão, não a vista de edição
-      const card = KD.M.cards.find(c => c.n === sp.getAttribute('title')); if (!card) return;
+      const card = KD.M.cards.find(c => c.n === sp.getAttribute('data-ce-pen')); if (!card) return;
       const r = rows.find(x => x.k === 'c' + card.id); if (!r) return;
       const e = FT.estado(r), sig = r.modo + '|' + r.ok + '|' + r.ultima + '|' + r.n_mes;
       let el = face.querySelector(':scope > [data-ft-card]');
