@@ -1494,6 +1494,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   KD.notch = {
     corner(rb, g, F) { const G = geo(rb, g, F); return { w: G.S, h: Math.ceil(G.cy + G.dd) + 2, vis: rb + G.dd, d: path(rb, g, F, 0) + 'L' + (G.S + 2) + ',' + f2(G.cy + G.dd) + 'L' + (G.S + 2) + ',-2L' + f2(G.x1) + ',-2Z' }; },
     edge(rb, g, F) { return path(rb, g, F, .5); },
+    // coordenadas do corte relativas à borda direita do card (x negativo = pra dentro), pra montar o contorno inteiro de um card de qualquer largura
+    rel(rb, g, F) { const G = geo(rb, g, F), k = G.R / (G.R + F), C1 = [G.x1, F], B = [G.cx, G.cy], C2 = [G.S - F, G.cy + G.dd]; const P1 = [B[0] + (C1[0] - B[0]) * k, B[1] + (C1[1] - B[1]) * k], P2 = [B[0] + (C2[0] - B[0]) * k, B[1] + (C2[1] - B[1]) * k]; return { x1: G.x1 - G.S, P1: [P1[0] - G.S, P1[1]], P2: [P2[0] - G.S, P2[1]], yEnd: G.cy + G.dd, R: G.R, F }; },
     mask(rb, g, F) { const n = KD.notch.corner(rb, g, F); return "url('data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="' + n.w + '" height="' + n.h + '" overflow="visible"><path d="' + n.d + '"/></svg>') + "') right top/" + n.w + 'px ' + n.h + 'px no-repeat'; }
   };
 })();
@@ -2099,11 +2101,23 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   };
 
   /* ---------- recorte do canto (HANDOFF §5.4): arco concêntrico com o botão ---------- */
-  const NOTCH_URL = KD.notch.mask(22, 10, 18);   // tamanho M: botão de 44px
-  const punch = side => 'radial-gradient(circle var(--fm-pr) at ' + (side === 'l' ? '0' : '100%') + ' ' + DV + 'px,#000 calc(100% - .5px),transparent 100%)';
-  const MASK = [NOTCH_URL, punch('l'), punch('r'), 'linear-gradient(#000 0 0)'];
-  const maskCss = '-webkit-mask:' + MASK.join(',') + ';-webkit-mask-composite:xor,xor,xor;mask:' + MASK.join(',') + ';mask-composite:exclude,exclude,exclude';
-  const bgLayer = pr => '<div aria-hidden="true" data-fm-bg style="position:absolute;inset:0;z-index:-1;border-radius:30px;background:' + W + ';--fm-pr:' + pr + 'px;pointer-events:none;transition:--fm-pr .35s ' + EE + ';' + maskCss + '"></div>';
+  const REL = KD.notch.rel(22, 10, 18);   // tamanho M: botão de 44px
+  const f2 = n => Math.round(n * 100) / 100;
+  // contorno do card (raio 30, recorte de canto, perfurações do divisor) desenhado em px reais da caixa, via clip-path
+  function fmPath(w, h, pr) {
+    const X = v => f2(w + v), r = 30, d = DV;
+    return 'M' + r + ',0H' + X(REL.x1) + 'A' + REL.F + ',' + REL.F + ' 0 0 1 ' + X(REL.P1[0]) + ',' + f2(REL.P1[1]) + 'A' + REL.R + ',' + REL.R + ' 0 0 0 ' + X(REL.P2[0]) + ',' + f2(REL.P2[1]) + 'A' + REL.F + ',' + REL.F + ' 0 0 1 ' + f2(w) + ',' + f2(REL.yEnd)
+      + 'V' + f2(d - pr) + 'A' + pr + ',' + pr + ' 0 0 0 ' + f2(w) + ',' + f2(d + pr) + 'V' + f2(h - r) + 'A' + r + ',' + r + ' 0 0 1 ' + f2(w - r) + ',' + f2(h) + 'H' + r + 'A' + r + ',' + r + ' 0 0 1 0,' + f2(h - r)
+      + 'V' + f2(d + pr) + 'A' + pr + ',' + pr + ' 0 0 0 0,' + f2(d - pr) + 'V' + r + 'A' + r + ',' + r + ' 0 0 1 ' + r + ',0Z';
+  }
+  const shapeBg = el => { const w = el.offsetWidth ? el.getBoundingClientRect().width : 0, h = el.getBoundingClientRect().height; if (!w) return; const p = 'path("' + fmPath(w, h, +el.dataset.pr || PR) + '")'; el.style.clipPath = p; el.style.webkitClipPath = p; };
+  const RO = new ResizeObserver(es => es.forEach(e => shapeBg(e.target)));
+  const watchBg = el => { if (!el || el.__ro) return; el.__ro = 1; shapeBg(el); RO.observe(el); };
+  function tweenPr(el, to, ms) {   // abre/fecha as perfurações com a mesma curva ease-in-out
+    const from = +el.dataset.pr || PR, t0 = performance.now(), ease = t => (t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+    (function step(now) { const t = Math.min(1, (now - t0) / ms); el.dataset.pr = String(from + (to - from) * ease(t)); shapeBg(el); if (t < 1) requestAnimationFrame(step); })(t0);
+  }
+  const bgLayer = pr => '<div aria-hidden="true" data-fm-bg data-pr="' + pr + '" style="position:absolute;inset:0;z-index:-1;background:' + W + ';pointer-events:none"></div>';
 
   /* ---------- peças visuais ---------- */
   const ARROW = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M17 7 7 17M7 9v8h8"/></svg>';
@@ -2142,8 +2156,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   function css() {
     if (document.getElementById('kd-fm-css')) return;
     const s = document.createElement('style'); s.id = 'kd-fm-css';
-    s.textContent = '@property --fm-pr{syntax:"<length>";inherits:false;initial-value:' + PR + 'px}'
-      + '[data-k="mes"][data-fm]{background:transparent!important;overflow:visible!important;flex-direction:column-reverse!important;justify-content:flex-end!important;gap:6px!important}'
+    s.textContent = '[data-k="mes"][data-fm]{background:transparent!important;overflow:visible!important;flex-direction:column-reverse!important;justify-content:flex-end!important;gap:6px!important}'
       + '[data-k="mes"][data-fm] [data-mesn]{font-size:62px!important}'
       + '[data-k="mes"][data-fm] > div:nth-child(2){margin-right:64px}'
       + '[data-k="mes"][data-fm-exp] > *{visibility:hidden!important}';
@@ -2173,6 +2186,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       w.style.cursor = 'pointer';
     }
     h.innerHTML = bgLayer(PR) + '<div style="position:absolute;left:' + (PR + 8) + 'px;right:' + (PR + 8) + 'px;top:' + DV + 'px;border-top:1.5px dashed rgba(10,10,10,.28)"></div><div style="position:absolute;left:26px;right:26px;top:' + (DV + 20) + 'px">' + fecharHtml(d) + '</div>' + btnHtml();
+    watchBg(h.querySelector('[data-fm-bg]'));
     if (open && ov) refresh(d);
   }
   function refresh(d) {   // dados novos com o card expandido: troca só o conteúdo, sem piscar o resto
@@ -2201,7 +2215,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     ov.innerHTML = bgLayer(PR) + '<div data-fm-rcw style="position:absolute;inset:0"></div>' + expandedHtml(d, wr.width, gr.height) + btnHtml();
     const rcw = ov.querySelector('[data-fm-rcw]'); rcw.appendChild(rc);
     rcw.insertAdjacentHTML('beforeend', '<div data-r="txt" style="position:absolute;left:' + (PR + 8) + 'px;right:' + (PR + 8) + 'px;top:' + DV + 'px;border-top:1.5px dashed rgba(10,10,10,.28)"></div><div style="position:absolute;left:26px;right:26px;top:' + (DV + 20) + 'px">' + fecharHtml(d) + '</div>');
-    ov.style.opacity = '0'; grid.appendChild(ov);
+    ov.style.opacity = '0'; grid.appendChild(ov); watchBg(ov.querySelector('[data-fm-bg]'));
     requestAnimationFrame(() => { ov.style.transition = 'opacity .18s ease'; ov.style.opacity = '1'; });
     setTimeout(() => { w.setAttribute('data-fm-exp', '1'); ov.style.transition = ''; }, 200);
     ov.addEventListener('click', ev => {
@@ -2213,7 +2227,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     void ov.offsetHeight;
     // 1) o conteúdo reduzido sai (barrinhas primeiro) e as perfurações se fecham
     play(bars0, { from: [1, 0], to: [0, -8], delay: 0, step: 25, dur: 380 }); play(txt0, { from: [1, 0], to: [0, -8], delay: 40, step: 0, dur: 260 });
-    bg.style.setProperty('--fm-pr', '0.01px');
+    tweenPr(bg, 0.01, 350);
     // 2) o card cresce até cobrir a coluna inteira; o botão vira X
     setTimeout(() => {
       ov.style.transition = 'left .7s ' + EE + ',top .7s ' + EE + ',width .7s ' + EE + ',height .7s ' + EE + ',opacity .18s ease';
@@ -2255,7 +2269,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     setTimeout(() => { o.style.left = L0 + 'px'; o.style.top = T0 + 'px'; o.style.width = cw + 'px'; o.style.height = ch + 'px'; }, 600);
     // 3) as perfurações voltam e o conteúdo reduzido entra (barrinhas primeiro)
     setTimeout(() => {
-      bg.style.setProperty('--fm-pr', PR + 'px');
+      tweenPr(bg, PR, 350);
       const bars = [...rcw.querySelectorAll('[data-bar]')], txt = [...rcw.querySelector('[data-fm-rc]').children].concat([...rcw.querySelectorAll('[data-r="txt"]')]);
       bars.forEach(b => { b.style.opacity = '0'; }); txt.forEach(t => { t.style.opacity = '0'; });
       play(bars, { from: [0, 8], to: [1, 0], delay: 0, step: 25, dur: 420 }); play(txt, { from: [0, 8], to: [1, 0], delay: 40, dur: 300 });
