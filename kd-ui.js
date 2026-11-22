@@ -2292,7 +2292,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     let anim = false; for (let e = el; e && e !== root.parentElement; e = e.parentElement) { const tr = getComputedStyle(e).transform; if (tr && tr !== 'none' && tr !== 'matrix(1, 0, 0, 1, 0, 0)') { anim = true; break; } }
     if (!anim) { const b = el.getBoundingClientRect(); return { l: (b.left - a.left) / k, t: (b.top - a.top) / k, w: b.width / k, h: b.height / k }; }   // sem transform: medida fracionada exata (evita fresta de subpixel)
     let l = 0, t = 0, e = el; while (e && e !== root) { l += e.offsetLeft; t += e.offsetTop; e = e.offsetParent; }
-    return { l, t, w: el.offsetWidth, h: el.offsetHeight };   // em animação: medida de layout, que ignora o transform
+    const cs = getComputedStyle(el), bb = cs.boxSizing === 'border-box', fw = bb ? parseFloat(cs.width) : NaN, fh = bb ? parseFloat(cs.height) : NaN;
+    return { l, t, w: fw > 0 ? fw : el.offsetWidth, h: fh > 0 ? fh : el.offsetHeight };   // em animação: medida de layout (fracionada), que ignora o transform
   };
   const reorg = () => !!(KD.comp && KD.comp.state && KD.comp.state.org);   // modo "reorganizar cards" da Home
   function forcaFecha() { if (ov) ov.remove(); ov = null; open = false; anim = false; const w = document.querySelector('[data-k="mes"]'); if (w) w.removeAttribute('data-fm-exp'); }
