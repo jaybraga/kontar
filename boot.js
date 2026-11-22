@@ -49,6 +49,28 @@
 
   /* botão líquido: a pílula mede o próprio texto */
   function liq() { $$('.lq').forEach(b => { const l = b.querySelector('.lb, .lbl'); const set = () => b.style.setProperty('--pw', l.offsetWidth + 'px'); set(); if (document.fonts) document.fonts.ready.then(set); }); }
+  /* botão de olho dentro de cada campo de senha: mostra/oculta o que está sendo digitado (mantém o foco e o cursor) */
+  function pwEye() {
+    const OLHO = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
+    const RISCO = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/><path d="M4 4l16 16"/></svg>';
+    document.querySelectorAll('input[type="password"]').forEach(inp => {
+      if (inp.dataset.eye) return; inp.dataset.eye = '1';
+      const w = document.createElement('div'); w.style.cssText = 'position:relative;width:100%'; inp.parentNode.insertBefore(w, inp); w.appendChild(inp); inp.style.paddingRight = '56px';
+      const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-label', 'Mostrar senha'); b.setAttribute('aria-pressed', 'false'); b.title = 'Mostrar senha';
+      b.style.cssText = 'position:absolute;right:8px;top:50%;transform:translateY(-50%);width:36px;height:36px;border:0;border-radius:50%;background:transparent;color:#7C7C85;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:color .25s ease,background .25s ease';
+      const ic = document.createElement('span'); ic.style.cssText = 'display:flex;transition:opacity .18s ease'; ic.innerHTML = OLHO; b.appendChild(ic);
+      b.onmouseenter = () => { b.style.color = '#F2F0EB'; b.style.background = 'rgba(255,255,255,.08)'; };
+      b.onmouseleave = () => { b.style.color = inp.type === 'text' ? '#F2F0EB' : '#7C7C85'; b.style.background = 'transparent'; };
+      b.addEventListener('mousedown', e => e.preventDefault());   // não tira o foco do campo
+      b.addEventListener('click', () => {
+        const ver = inp.type === 'password', a = inp.selectionStart, z = inp.selectionEnd;
+        inp.type = ver ? 'text' : 'password'; try { inp.setSelectionRange(a, z); } catch (e) {}
+        b.setAttribute('aria-pressed', ver ? 'true' : 'false'); b.setAttribute('aria-label', ver ? 'Ocultar senha' : 'Mostrar senha'); b.title = ver ? 'Ocultar senha' : 'Mostrar senha';
+        ic.style.opacity = '0'; setTimeout(() => { ic.innerHTML = ver ? RISCO : OLHO; ic.style.opacity = '1'; }, 140); b.style.color = ver ? '#F2F0EB' : '#7C7C85';
+      });
+      w.appendChild(b);
+    });
+  }
   const measure = b => { const l = b.querySelector('.lb, .lbl'); b.style.setProperty('--pw', l.offsetWidth + 'px'); };
   /* parallax da imagem canelada (±16px/±11px), suavização por tempo (dt), não por frame */
   function parallax() {
@@ -255,7 +277,7 @@ input:focus{border-color:var(--bone);background:rgba(0,0,0,.55)}
     mount(CSS_LOGIN, GOO + '<div class="bg" aria-hidden="true"></div><main class="stage"><section class="panel" aria-labelledby="t"><div class="L"><div class="img" aria-hidden="true"></div><div class="shade" aria-hidden="true"></div><span class="wm">' + LOGO(30) + '</span><div class="tt"><p class="sub">' + esc(note || 'Seus dados ficam salvos e só você vê.') + '</p></div></div>'
       + '<div class="R"><h1 id="t">Entrar.</h1><form class="form" id="f" autocomplete="on" novalidate><div class="fld"><input id="u" type="text" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" name="email" placeholder="E-mail ou usuário" autocomplete="username" aria-label="E-mail ou usuário"></div><div class="fld"><input id="p" type="password" name="password" placeholder="Senha" autocomplete="current-password" aria-label="Senha"></div><div class="err" id="x" role="alert" aria-live="polite"></div><div class="acts">' + LQ('go', 'Fazer Login') + '<span class="lk" id="r" role="button" tabindex="0">Esqueci a senha</span></div></form><div class="foot" style="margin-top:-6px"><span>Ainda não tem conta? <span class="lk" id="cc" role="button" tabindex="0">Criar conta</span></span></div>'
       + '<div class="foot"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9A9AA3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span>Esqueceu a senha? Escreva seu e-mail e toque em “Esqueci a senha”: mandamos um link pra criar outra.</span></div></div></section></main>');
-    liq(); parallax();
+    liq(); parallax(); pwEye();
     const x = $('#x'), u = $('#u'), p = $('#p'), go = $('#go'), say = (t, ok) => { x.style.color = ok ? '#00E08A' : '#FF6A5C'; x.textContent = t; };
     const lock = on => { busyBtn(go, on, 'Entrando…', 'Fazer Login'); u.disabled = p.disabled = on; };
     $('#f').addEventListener('submit', async e => { e.preventDefault(); if (go.classList.contains('busy')) return; x.textContent = '';
@@ -273,7 +295,7 @@ input:focus{border-color:var(--bone);background:rgba(0,0,0,.55)}
   function signup(sb) {
     mount(CSS_NOVA, GOO + '<div class="bg" aria-hidden="true"></div><main class="stage"><section class="panel" aria-labelledby="t"><div class="L"><div class="img" aria-hidden="true"></div><div class="shade" aria-hidden="true"></div><div class="tt"><h1 id="t">Criar<br>conta.</h1><p class="sub">Leva um minuto. Depois a gente monta o seu Kontar juntos.</p></div></div>'
       + '<div class="R"><form class="form" id="f" autocomplete="on" novalidate><div class="grp"><div class="fld"><input id="e" type="text" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" name="email" placeholder="E-mail" autocomplete="email" aria-label="E-mail"></div><div class="fld"><input id="p1" type="password" name="new-password" placeholder="Senha" autocomplete="new-password" aria-label="Senha"></div><div class="fld"><input id="p2" type="password" name="confirm-password" placeholder="Confirmar senha" autocomplete="new-password" aria-label="Confirmar senha"></div><div class="meter" aria-live="polite"><span id="mh">Mínimo 8 caracteres</span><span class="bar"><span id="mb"></span></span><b id="ml">Força</b></div><div class="err" id="x" role="alert" aria-live="polite"></div></div><div class="acts">' + LQ('go', 'Criar conta').replace('type="submit"', 'type="submit" disabled') + '<span class="lk" id="vo" role="button" tabindex="0">Já tenho conta</span></div></form></div></section></main>');
-    liq(); parallax();
+    liq(); parallax(); pwEye();
     const e = $('#e'), p1 = $('#p1'), p2 = $('#p2'), go = $('#go'), mb = $('#mb'), ml = $('#ml'), mh = $('#mh'), x = $('#x');
     const ok = () => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.value.trim());
     const upd = () => { const c = KD.pwCheck(p1.value, p2.value); mb.style.width = c.pct; mb.style.background = c.col; ml.style.color = c.lv ? c.col : '#7C7C85'; ml.textContent = c.lbl || 'Força'; mh.textContent = c.hint; mh.style.color = c.hintC; go.disabled = !(c.ok && ok()); };
@@ -292,7 +314,7 @@ input:focus{border-color:var(--bone);background:rgba(0,0,0,.55)}
   function newPassword(sb) {
     mount(CSS_NOVA, GOO + '<div class="bg" aria-hidden="true"></div><main class="stage"><section class="panel" aria-labelledby="t"><div class="L"><div class="img" aria-hidden="true"></div><div class="shade" aria-hidden="true"></div><div class="tt"><svg class="ico" width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#5B3DF5" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="10.5" width="17" height="11" rx="3"/><path d="M7.5 10.5V7.5a4.5 4.5 0 0 1 9 0v3"/><circle cx="12" cy="15" r="1.3" fill="#5B3DF5"/><path d="M12 16.3V18"/></svg><h1 id="t">Nova<br>senha.</h1><p class="sub">Escolha a senha que você vai usar daqui pra frente.</p></div></div>'
       + '<div class="R"><form class="form" id="f" autocomplete="off" novalidate><div class="grp"><div class="fld"><input id="p1" type="password" name="new-password" placeholder="Nova senha" autocomplete="new-password" aria-label="Nova senha"></div><div class="fld"><input id="p2" type="password" name="confirm-password" placeholder="Confirmar senha" autocomplete="new-password" aria-label="Confirmar senha"></div><div class="meter" aria-live="polite"><span id="mh">Mínimo 8 caracteres</span><span class="bar"><span id="mb"></span></span><b id="ml">Força</b></div></div><div class="acts">' + LQ('go', 'Salvar senha').replace('type="submit"', 'type="submit" disabled') + '<span class="wm">' + LOGO(30) + '</span></div></form></div></section></main>');
-    liq(); parallax();
+    liq(); parallax(); pwEye();
     const p1 = $('#p1'), p2 = $('#p2'), go = $('#go'), mb = $('#mb'), ml = $('#ml'), mh = $('#mh');
     const upd = () => { const c = KD.pwCheck(p1.value, p2.value); mb.style.width = c.pct; mb.style.background = c.col; ml.style.color = c.lv ? c.col : '#7C7C85'; ml.textContent = c.lbl || 'Força'; mh.textContent = c.hint; mh.style.color = c.hintC; go.disabled = !c.ok; };
     p1.addEventListener('input', upd); p2.addEventListener('input', upd);
@@ -370,7 +392,7 @@ input:focus{border-color:var(--bone)}
       + '<form class="login" id="f" novalidate><div class="uinfo"><div class="urow"><div class="who"><span class="av">' + esc(ini) + '</span><span class="t"><b>' + esc(who) + '</b><span class="em">' + esc(info.email) + '</span></span></div><span class="notme" id="nm" role="button" tabindex="0">Não é você? Entrar com outra conta</span></div><input id="p" type="password" placeholder="Senha" autocomplete="current-password" aria-label="Senha"><div class="err" id="x" role="alert" aria-live="polite"></div></div>'
       + '<div class="acts"><button class="lq" id="go" type="submit"><span class="shp" aria-hidden="true"><span class="pill"></span><span class="dot"></span></span><span class="lbl">Entrar de novo</span><span class="arr" aria-hidden="true">' + ARROW('#000') + '</span></button><span class="lk" id="r" role="button" tabindex="0">Esqueci a senha</span></div></form>'
       + '<div class="foot"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFC24A" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><span>Pra não ver mais isso, troque para “Sem limite” em Minha Conta › Duração da sessão.</span></div></div></div></section></div>');
-    liq(); const x = $('#x'), p = $('#p'), go = $('#go'), say = (t, ok) => { x.style.color = ok ? '#00E08A' : '#FF6A5C'; x.textContent = t; };
+    liq(); pwEye(); const x = $('#x'), p = $('#p'), go = $('#go'), say = (t, ok) => { x.style.color = ok ? '#00E08A' : '#FF6A5C'; x.textContent = t; };
     $('#nm').onclick = () => { LS.del(EXP); login(sb); };
     $('#f').addEventListener('submit', async e => { e.preventDefault(); if (go.classList.contains('busy')) return; x.textContent = '';
       if (!p.value) return say('Escreva sua senha.');
