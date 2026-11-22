@@ -2287,7 +2287,13 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   }
 
   // posição e tamanho de layout relativos à grade: não mudam com transform (entrada animada da Home, escala da janela)
-  const lay = (el, root) => { let l = 0, t = 0, e = el; while (e && e !== root) { l += e.offsetLeft; t += e.offsetTop; e = e.offsetParent; } if (e !== root) { const a = root.getBoundingClientRect(), b = el.getBoundingClientRect(), k = (a.width / root.offsetWidth) || 1; return { l: (b.left - a.left) / k, t: (b.top - a.top) / k, w: el.offsetWidth, h: el.offsetHeight }; } return { l, t, w: el.offsetWidth, h: el.offsetHeight }; };
+  const lay = (el, root) => {
+    const a = root.getBoundingClientRect(), k = (a.width / root.offsetWidth) || 1;
+    let anim = false; for (let e = el; e && e !== root.parentElement; e = e.parentElement) { const tr = getComputedStyle(e).transform; if (tr && tr !== 'none') { anim = true; break; } }
+    if (!anim) { const b = el.getBoundingClientRect(); return { l: (b.left - a.left) / k, t: (b.top - a.top) / k, w: b.width / k, h: b.height / k }; }   // sem transform: medida fracionada exata (evita fresta de subpixel)
+    let l = 0, t = 0, e = el; while (e && e !== root) { l += e.offsetLeft; t += e.offsetTop; e = e.offsetParent; }
+    return { l, t, w: el.offsetWidth, h: el.offsetHeight };   // em animação: medida de layout, que ignora o transform
+  };
   const reorg = () => !!(KD.comp && KD.comp.state && KD.comp.state.org);   // modo "reorganizar cards" da Home
   function forcaFecha() { if (ov) ov.remove(); ov = null; open = false; anim = false; const w = document.querySelector('[data-k="mes"]'); if (w) w.removeAttribute('data-fm-exp'); }
 
