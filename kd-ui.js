@@ -2227,7 +2227,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const T = KD.today, nome = KD.fontes.nomeMes(), R = KD.fontes.rows() || [];
     const fontes = R.map(r => ({ k: r.k, id: r.id, label: r.nome, tipo: r.modo === 'manual' ? 'MANUAL' : r.modo === 'open_finance' ? 'OPEN FINANCE' : r.card ? 'FATURA' : 'EXTRATO', card: r.card, bank: r.bank, last: r.ultima, ok: r.ok, r }));
     const ok = fontes.filter(f => f.ok).length, pend = fontes.length - ok;
-    return { nome, fontes, ok, pend, total: fontes.length, show: loaded() && fontes.length > 0 && T.getDate() >= 5 && pend > 0 };
+    return { nome, fontes, ok, pend, total: fontes.length, show: loaded() && fontes.length > 0 && KD.fontes.atrasado() && pend > 0, dia: KD.fontes.dia() };
   };
 
   /* ---------- recorte do canto (HANDOFF §5.4): arco concêntrico com o botão ---------- */
@@ -2257,7 +2257,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const btnHtml = () => '<span data-fm-btn style="position:absolute;right:0;top:0;width:44px;height:44px;border-radius:50%;background:#1C1C20;box-shadow:inset 0 0 0 1px #3A3A40;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .4s ease,box-shadow .4s ease,color .4s ease"><span data-fm-ar style="position:absolute;display:flex;transition:opacity .25s ease,transform .5s ' + EE + '">' + ARROW + '</span><span data-fm-xx style="position:absolute;display:flex;opacity:0;transform:rotate(-90deg);transition:opacity .25s ease,transform .5s ' + EE + '">' + XMARK + '</span></span>';
   const segs = (d, attr, hide) => '<div ' + attr + ' style="display:flex;gap:5px">' + d.fontes.map(f => '<i data-bar style="flex:1;height:8px;border-radius:4px;' + (hide ? 'opacity:0;' : '') + 'background:' + (f.ok ? GRN : AMB) + ';display:block"></i>').join('') + '</div>';
   const logo = f => KD.logo.slot(LOGOKEY[f.bank] || f.bank, { forma: 'compacta', fundo: 'claro', estilo: 'cor' }, 18, 34, INK);   // tokens de logo (src/logos.js), card claro
-  const fecharHtml = d => '<div data-r="txt" style="display:flex;justify-content:space-between;font-size:10px;font-weight:800;letter-spacing:.12em"><span>FECHAR ' + d.nome.toUpperCase() + '</span><span style="color:' + AMT + '">' + d.pend + (d.pend === 1 ? ' PENDENTE' : ' PENDENTES') + '</span></div><div style="margin-top:12px">' + segs(d, '') + '</div><div data-r="txt" style="font-size:11px;margin-top:9px;color:rgba(10,10,10,.6)">' + d.ok + ' de ' + d.total + ' fontes em dia</div>';
+  const fecharHtml = d => '<div data-r="txt" style="display:flex;justify-content:space-between;font-size:10px;font-weight:800;letter-spacing:.12em"><span>FECHAR ' + d.nome.toUpperCase() + '</span><span style="color:' + AMT + '">' + d.pend + (d.pend === 1 ? ' PENDENTE' : ' PENDENTES') + ' · ATRASADO</span></div><div style="margin-top:12px">' + segs(d, '') + '</div><div data-r="txt" style="font-size:11px;margin-top:9px;color:rgba(10,10,10,.6)">' + d.ok + ' de ' + d.total + ' fontes em dia · venceu dia ' + d.dia + '</div>';
   const rowHtml = (f, d) => {
     const e = KD.fontes.estado(f.r), ok = f.ok;
     return '<div data-a="row" style="opacity:0;display:flex;align-items:center;gap:14px;height:62px;flex:none;border-top:1px solid rgba(10,10,10,.14)">' + logo(f) + '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(f.label) + ' <span style="font-size:9px;font-weight:800;letter-spacing:.12em;border:1.5px solid rgba(10,10,10,.4);border-radius:99px;padding:2px 7px;margin-left:4px;vertical-align:2px">' + f.tipo + '</span></div><div style="font-size:11px;margin-top:3px;color:' + (ok ? 'rgba(10,10,10,.55)' : e.nivel === 'erro' ? '#B3261E' : AMT) + ';font-weight:' + (ok ? 500 : 700) + '">' + esc(e.txt) + '</div></div>'
@@ -2410,6 +2410,12 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     setTimeout(() => { const ww = document.querySelector('[data-k="mes"]'); if (ww) ww.removeAttribute('data-fm-exp'); o.style.transition = 'opacity .3s ease'; o.style.opacity = '0'; }, 1450);
     setTimeout(() => { o.remove(); if (ov === o) ov = null; open = false; anim = false; sync(); }, 1800);
   }
+  // clique no aviso do sino: vai pra Home e abre o card já expandido
+  FM.abreDaSino = () => {
+    const c = KD.comp; if (!c) return;
+    const tenta = () => { if (reorg() || open || anim) return; if (document.querySelector('[data-k="mes"][data-fm]')) abre(); };
+    if (c.state.page === 'home') { c.setState({ nOpen: false }); setTimeout(tenta, 500); } else { c.goPage('home'); setTimeout(tenta, 1500); }
+  };
   window.addEventListener('keydown', e => { if (e.key === 'Escape' && open && !document.querySelector('[data-imp],[data-imp-modal],[data-imp-hist]')) fecha(); });
   window.addEventListener('kd:fontes', () => sync());
   { const s = document.createElement('style'); s.textContent = 'svg:has(feTurbulence),svg:has(feGaussianBlur){will-change:transform;contain:paint}'; document.head.appendChild(s); }   // filtro de ruído/desfoque do gradiente (Saldo) é caro: camada própria, pintado uma vez e reaproveitado
@@ -2504,6 +2510,16 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   FT.mesRef = () => { const T = KD.today; return new Date(T.getFullYear(), T.getMonth() - 1, 1); };
   FT.nomeMes = () => MESES[FT.mesRef().getMonth()];
   FT.ofAtivo = () => ofAtivo;
+  FT.dia = () => { const d = KD.M && KD.M.prefs ? +KD.M.prefs.diaFechamento : 0; return d >= 1 && d <= 28 ? d : 5; };   // dia do mês em que o aviso de fechamento começa (padrão 5)
+  FT.atrasado = () => !!KD.today && KD.today.getDate() >= FT.dia();
+  FT.lembrete = () => { if (!rows || !KD.M || !KD.today || !FT.atrasado()) return null; const p = rows.filter(r => !r.ok); return p.length ? { nome: FT.nomeMes(), pend: p } : null; };
+  const renova = () => { const C = KD._C; if (C && KD.notifs) { C.NOTIFS = KD.notifs(); if (KD.comp) KD.comp.setState({}); } };   // o sino acompanha o estado das fontes
+  FT.setDia = d => {
+    d = Math.min(28, Math.max(1, d)); if (!KD.M) return d;
+    KD.M.prefs = Object.assign({}, KD.M.prefs, { diaFechamento: d });
+    if (!KD.isDemo()) KD.sb.from('user_prefs').upsert({ user_id: KD.user && KD.user.id, prefs: KD.M.prefs, updated_at: new Date().toISOString() }, { onConflict: 'user_id' }).then(r => r && r.error && console.error('[kontar] dia do lembrete', r.error));
+    renova(); window.dispatchEvent(new Event('kd:fontes')); return d;
+  };
   FT.rows = () => rows;
   FT.carregar = async () => {
     if (carregando) return carregando;
@@ -2529,7 +2545,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (r.modo === 'open_finance') return r.ok ? { txt: 'Atualizado ' + (r.ultima === iso(KD.today) ? 'hoje' : 'em ' + dm(r.ultima)), nivel: 'ok', acao: null }
       : { txt: r.conexao_status === 'expirado' ? 'Conexão expirada' + (r.ultima ? ' · último sync ' + dm(r.ultima) : '') : r.conexao_status === 'erro' ? 'A sincronização falhou' : 'Sem sincronização recente', nivel: 'erro', acao: 'reconectar', rotulo: 'RECONECTAR' };
     return r.ok ? { txt: 'Em dia · ' + doc + ' até ' + dm(r.ultima), nivel: 'ok', acao: 'reimportar', rotulo: 'REIMPORTAR' }
-      : { txt: 'Falta ' + a + ' de ' + m + (r.ultima ? ' · último até ' + dm(r.ultima) : ''), nivel: 'pend', acao: 'importar', rotulo: r.card ? 'IMPORTAR FATURA' : 'IMPORTAR EXTRATO' };
+      : { txt: (FT.atrasado() ? 'Atrasado · falta ' : 'Falta ') + a + ' de ' + m + (r.ultima ? ' · último até ' + dm(r.ultima) : ''), nivel: 'pend', acao: 'importar', rotulo: r.card ? 'IMPORTAR FATURA' : 'IMPORTAR EXTRATO' };
   };
   const aviso = msg => { const n = document.createElement('div'); n.textContent = msg; n.style.cssText = 'position:fixed;left:50%;bottom:30px;transform:translate(-50%,8px);background:#1b1b1d;color:' + FG + ';border:1px solid #2A2A2F;border-radius:30px;padding:14px 22px;font:700 13px Helvetica,Arial,sans-serif;z-index:99999;opacity:0;transition:opacity .3s ease,transform .45s ' + EE; document.body.appendChild(n); requestAnimationFrame(() => { n.style.opacity = '1'; n.style.transform = 'translate(-50%,0)'; }); setTimeout(() => { n.style.opacity = '0'; n.style.transform = 'translate(-50%,8px)'; setTimeout(() => n.remove(), 360); }, 3800); };
   FT.aviso = aviso;
@@ -2553,6 +2569,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     await FT.carregar();
   };
   window.addEventListener('kd:batches', () => FT.carregar());
+  window.addEventListener('kd:fontes', renova);
 
   /* ---------- peças ---------- */
   const UP = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex:none"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>';
@@ -2582,6 +2599,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       + '<div data-ft-a style="font-size:13px;color:' + MU + ';margin-top:12px;max-width:600px;line-height:1.45">Como cada conta e cartão chega no Kontar. Escolha o modo de cada uma; o Kontar mostra o que falta para fechar o mês.</div>'
       + '<div data-ft-a style="display:flex;justify-content:space-between;align-items:baseline;margin-top:24px;padding-bottom:10px"><span style="font-size:10.5px;font-weight:700;letter-spacing:.14em;color:' + MU + '">↘ ' + m.toUpperCase() + ' · ESTADO DE CADA FONTE</span><span style="font-size:12px;font-weight:800;letter-spacing:.1em;color:' + (ok === R.length ? GR : AMB) + '">' + ok + ' DE ' + R.length + ' EM DIA</span></div>'
       + (rows ? R.map(linha).join('') : '<div style="padding:30px 0;color:' + MU + '">Carregando…</div>') + '<div style="border-top:1px solid #2A2A2F"></div>'
+      + '<div data-ft-a style="margin-top:22px;display:flex;align-items:center;gap:14px"><span style="font-size:10.5px;font-weight:700;letter-spacing:.14em;color:' + MU + '">↘ LEMBRETE DE FECHAMENTO</span><span style="font-size:12.5px;color:#B4B4BA">Avisar a partir do dia</span><span style="display:inline-flex;align-items:center;border:1.5px solid #3A3A40;border-radius:99px;height:34px"><span data-ft-dia="-1" style="width:34px;text-align:center;font-size:16px;font-weight:800;cursor:pointer;user-select:none">−</span><b data-ft-dia-n style="min-width:26px;text-align:center;font-size:14px">' + FT.dia() + '</b><span data-ft-dia="1" style="width:34px;text-align:center;font-size:16px;font-weight:800;cursor:pointer;user-select:none">+</span></span></div>'
       + '<div data-ft-a style="margin-top:14px;font-size:11px;color:' + MU + ';line-height:1.5"><b style="color:#B4B4BA">Open Finance</b> fica apagado até ser ligado. <b style="color:#B4B4BA">Manual</b>: você lança à mão e marca "conferi" quando o mês está certo.</div></div>';
     if (primeira) {
       const els = [...host.querySelectorAll('[data-ft-a],[data-ft-row]')];
@@ -2596,7 +2614,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     layer.style.cssText = 'position:fixed;left:0;right:0;top:68px;bottom:0;z-index:40;background:#000;overflow-x:hidden;overflow-y:auto;padding:18px 24px 60px;opacity:0;transition:opacity .35s ease;pointer-events:auto';
     layer.innerHTML = '<div data-fontes-host-in="1"></div>';
     layer.addEventListener('click', ev => {
-      const a = ev.target.closest('[data-ft-acao]'), md = ev.target.closest('[data-ft-modo]');
+      const a = ev.target.closest('[data-ft-acao]'), md = ev.target.closest('[data-ft-modo]'), dd = ev.target.closest('[data-ft-dia]');
+      if (dd) { const n = FT.setDia(FT.dia() + +dd.dataset.ftDia), el = layer.querySelector('[data-ft-dia-n]'); if (el) el.textContent = n; return; }
       if (a) { const r = rows[+a.dataset.ftAcao]; if (r) FT.agir(r, FT.estado(r).acao); return; }
       if (md) { const [i, modo] = md.dataset.ftModo.split(':'), r = rows[+i]; if (r) FT.mudarModo(r, modo); }
     });
