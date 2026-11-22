@@ -2285,3 +2285,69 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   let raf = 0;
   new MutationObserver(() => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; try { if (!loaded && KD.sb && KD.M && document.querySelector('[data-k="mes"]')) { loaded = 'pend'; carregar(); } else if (loaded === true) sync(); } catch (e) {} }); }).observe(document.documentElement, { childList: true, subtree: true });
 })();
+
+/* Kontar · "Nomes nas transferências" na página Conta (mockup 11-conta-nomes)
+   Edita profiles.nomes_titular: os nomes (PF e PJ) que o importador usa pra reconhecer transferências entre as contas do próprio usuário.
+   A linha entra no bloco "Seus dados", entre E-mail e Senha, com o mesmo estilo das outras. */
+(function () {
+  'use strict';
+  const KD = window.KD, EE = 'cubic-bezier(.65,0,.35,1)';
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const HINT = 'Seu nome e o da sua empresa (PF e PJ). O Kontar usa eles pra reconhecer quando você move dinheiro entre as suas contas.';
+  const HINT_ADD = 'Enter pra adicionar · Esc pra cancelar. Pode ser nome pessoal, razão social ou nome fantasia.';
+  let adding = false, msg = '', busy = false;
+
+  const lista = () => ((KD.M && KD.M.profile && KD.M.profile.nomes_titular) || []).slice();
+  async function salva(nomes) {
+    if (KD.M && KD.M.profile) KD.M.profile.nomes_titular = nomes;
+    if (KD.raw && KD.raw.prof && KD.raw.prof[0]) KD.raw.prof[0].nomes_titular = nomes;
+    if (KD.isDemo()) return;   // conta de demonstração: fica só na memória, nada é gravado
+    const q = await KD.sb.from('profiles').update({ nomes_titular: nomes }).eq('user_id', KD.user.id);
+    if (q.error) { console.error('[kontar] nomes', q.error); msg = 'Não consegui salvar agora. Tente de novo.'; }
+  }
+  const chip = (n, k) => '<span data-nm-chip style="display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 8px 0 18px;border-radius:99px;border:2px solid #2A2A2F;background:#000;color:#F2F0EB;font-size:14px;font-weight:700;white-space:nowrap">' + esc(n)
+    + '<span data-nm-rm="' + k + '" title="Remover" style="width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#8A8A90;font-size:17px;line-height:1;cursor:pointer;transition:color .2s ease,background .2s ease" onmouseover="this.style.color=\'#F2F0EB\';this.style.background=\'#1C1C20\'" onmouseout="this.style.color=\'#8A8A90\';this.style.background=\'\'">×</span></span>';
+  const addBtn = '<span data-nm-add style="display:inline-flex;align-items:center;height:38px;padding:0 18px;border-radius:99px;border:2px dashed #3A3A40;color:#8A8A90;font-size:14px;font-weight:700;cursor:pointer;transition:border-color .2s ease,color .2s ease" onmouseover="this.style.borderColor=\'#6A6A72\';this.style.color=\'#F2F0EB\'" onmouseout="this.style.borderColor=\'#3A3A40\';this.style.color=\'#8A8A90\'">+ nome</span>';
+  const input = '<input data-nm-in maxlength="60" autocomplete="off" spellcheck="false" placeholder="Nome ou razão social" style="height:38px;box-sizing:border-box;min-width:230px;padding:0 18px;border-radius:99px;border:2px solid #F2F0EB;background:#000;color:#F2F0EB;font:700 14px Helvetica,Arial,sans-serif;outline:0">';
+
+  function desenha(row, animaNovo) {
+    const nomes = lista(), box = row.querySelector('[data-nm-box]'), hint = row.querySelector('[data-nm-hint]');
+    box.innerHTML = nomes.map(chip).join('') + (adding ? input : addBtn);
+    hint.textContent = msg || (adding ? HINT_ADD : HINT); hint.style.color = msg ? '#F0C24B' : '';
+    if (adding) { const i = box.querySelector('[data-nm-in]'); i.focus(); }
+    if (animaNovo) { const c = box.querySelectorAll('[data-nm-chip]'); const el = c[c.length - 1]; if (el) el.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: EE }); }
+    const cnt = [...document.querySelectorAll('*')].find(e => e.children.length === 0 && /^\d+\s*campos$/i.test(e.textContent.trim())); if (cnt && !/^03/.test(cnt.textContent.trim())) cnt.textContent = cnt.textContent.replace(/^\d+/, '03');
+  }
+  function monta() {
+    if (!KD.M || !KD.M.profile) return;
+    const lab = [...document.querySelectorAll('*')].find(e => e.children.length === 0 && /^e-?mail$/i.test(e.textContent.trim())); if (!lab) return;
+    const base = lab.parentElement; if (!base || base.parentElement.querySelector('[data-kd-nomes]')) return;
+    const hintBase = base.children[2];
+    const row = document.createElement('div'); row.setAttribute('data-kd-nomes', '1'); row.setAttribute('style', base.getAttribute('style') || '');
+    const l = document.createElement('div'); l.setAttribute('style', lab.getAttribute('style') || ''); l.textContent = 'NOMES NAS TRANSFERÊNCIAS';
+    const box = document.createElement('div'); box.setAttribute('data-nm-box', '1'); box.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-top:10px';
+    const h = document.createElement('div'); h.setAttribute('data-nm-hint', '1'); h.setAttribute('style', (hintBase && hintBase.getAttribute('style')) || 'margin-top:8px;font-size:12px;line-height:1.4;color:#7C7C85'); h.style.marginTop = '8px';
+    row.append(l, box, h); base.after(row); desenha(row);
+    row.addEventListener('click', async ev => {
+      const rm = ev.target.closest('[data-nm-rm]'), ad = ev.target.closest('[data-nm-add]');
+      if (rm && !busy) {
+        busy = true; const k = +rm.dataset.nmRm, c = rm.closest('[data-nm-chip]'); msg = '';
+        const an = c.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-6px)' }], { duration: 300, easing: EE, fill: 'forwards' });
+        await an.finished.catch(() => {}); const n = lista(); n.splice(k, 1); await salva(n); busy = false; desenha(row); return;
+      }
+      if (ad) { adding = true; msg = ''; desenha(row); }
+    });
+    row.addEventListener('keydown', async ev => {
+      const i = ev.target.closest && ev.target.closest('[data-nm-in]'); if (!i) return;
+      if (ev.key === 'Escape') { ev.stopPropagation(); adding = false; msg = ''; desenha(row); return; }
+      if (ev.key !== 'Enter') return;
+      ev.preventDefault(); const v = i.value.trim().replace(/\s+/g, ' '), n = lista();
+      if (v.length < 3) { msg = 'Use pelo menos 3 letras.'; desenha(row); return; }
+      if (n.some(x => KD.norm(x) === KD.norm(v))) { msg = 'Esse nome já está na lista.'; desenha(row); return; }
+      n.push(v); adding = false; msg = ''; await salva(n); desenha(row, true);
+      if (KD.isDemo()) { msg = ''; }
+    });
+    row.addEventListener('focusout', ev => { if (ev.target.matches && ev.target.matches('[data-nm-in]') && adding) setTimeout(() => { if (adding && !row.contains(document.activeElement)) { adding = false; msg = ''; desenha(row); } }, 0); });
+  }
+  new MutationObserver(() => { try { monta(); } catch (e) {} }).observe(document.documentElement, { childList: true, subtree: true });
+})();
