@@ -1478,6 +1478,130 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   };
 })();
 
+/* Kontar · tokens de logo dos bancos (um lugar só pro app inteiro)
+   KD.logo.url(banco, { forma, fundo, estilo, tinta })  → URL do SVG pronto
+   KD.logo.html(banco, opções, alturaPx)                → <span> com a logo, sem fundo nem chip
+   KD.logo.aspecto(banco, forma)                         → largura / altura da arte recortada
+   forma:  'compacta' (só a marca)  | 'extensa' (marca + nome)
+   fundo:  'escuro' | 'claro'       → escolhe as cores com contraste mínimo de 3:1 contra o fundo
+   estilo: 'cor' (cores da marca, ajustadas pro fundo) | 'mono' (uma cor só: osso no escuro, tinta no claro, ou `tinta`)
+   Todas as variantes saem dos mesmos SVGs originais (Component.LGC / LGB): formas de fundo (quadrado do Itaú, elipse do
+   Mercado Pago) são removidas, e os detalhes internos viram recortes, nunca tinta escura sobre fundo escuro. */
+(function () {
+  'use strict';
+  const KD = window.KD, LOGO = (KD.logo = {});
+  const OSSO = '#F2F0EB', TINTA = '#0A0A0A';
+  // cores por banco: [escuro, claro] — conferidas com KD.logo.auditar() (contraste >= 3:1 com #141416 e #F2F0EB)
+  const COR = {
+    'Nubank': { marca: ['#A65CFF', '#820AD1'] },
+    'Itaú': { marca: ['#FF6200', '#D95300'] },
+    'C6': { marca: [OSSO, TINTA] },
+    'Mercado Pago': { marca: ['#00BCFF', '#0A0080'], texto: [OSSO, '#0A0080'] },
+    'Amazon': { marca: [OSSO, TINTA], acento: ['#FF9900', '#C45500'] }
+  };
+  // origem de cada arte e o papel de cada forma (índice do <path> no SVG original):
+  // m = marca · t = texto · a = acento · d = detalhe (vira recorte da marca) · f = fundo (sai) · i = invertido (a marca são os vazios desta forma)
+  const SPEC = {
+    'Nubank': { compacta: { src: ['LGC', 'Nubank'], roles: 'mmff' }, extensa: { src: ['LGB', 'Nubank'], roles: 'mmff' } },
+    'Itaú': { compacta: { src: ['LGC', 'Itaú'], roles: 'ii' }, extensa: { src: ['LGC', 'Itaú'], roles: 'ii' } },
+    'C6': { compacta: { src: ['LGC', 'C6'], roles: 'fmmfff' }, extensa: { src: ['LGB', 'C6'], roles: 'mmmmmm' } },
+    'Mercado Pago': { compacta: { src: ['LGC', 'Mercado Pago'], roles: 'fmmmdf' }, extensa: { src: ['LGB', 'Mercado Pago'], roles: 'fmmmdt' } },
+    'Amazon': { compacta: { src: ['LGC', 'Amazon'], roles: 'am' }, extensa: { src: ['LGB', 'Amazon'], roles: 'maam' } }
+  };
+  // recorte justo de cada arte (medido em pixels com KD.logo.medir(); null = ainda não medido, usa o viewBox original)
+  const VB = {
+    'Nubank|compacta': null, 'Nubank|extensa': null, 'Itaú|compacta': null, 'Itaú|extensa': null, 'C6|compacta': null, 'C6|extensa': null,
+    'Mercado Pago|compacta': null, 'Mercado Pago|extensa': null, 'Amazon|compacta': null, 'Amazon|extensa': null
+  };
+  // nomes que o app usa pra mesma marca
+  const ALIAS = { 'itau': 'Itaú', 'itaú azul': 'Itaú', 'itau azul': 'Itaú', 'nubank pj': 'Nubank', 'nubank pessoal': 'Nubank', 'nubank conta': 'Nubank', 'cdb mercado pago': 'Mercado Pago', 'mercadopago': 'Mercado Pago', 'mercado pago': 'Mercado Pago', 'c6 bank': 'C6', 'c6': 'C6', 'amazon': 'Amazon', 'nubank': 'Nubank' };
+  LOGO.bancos = Object.keys(SPEC);
+  LOGO.chave = nome => { if (!nome) return null; if (SPEC[nome]) return nome; const n = String(nome).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim(); const a = Object.keys(ALIAS).find(k => k.normalize('NFD').replace(/[̀-ͯ]/g, '') === n); if (a) return ALIAS[a]; const b = LOGO.bancos.find(x => n.indexOf(x.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')) === 0); return b || null; };
+
+  const fonte = (set, k) => { const C = KD.comp && KD.comp.constructor; const v = C && C[set] && C[set][k]; return v ? decodeURIComponent(escape(atob(v))) : null; };
+  const cores = (banco, fundo, estilo, tinta) => {
+    const i = fundo === 'claro' ? 1 : 0, mono = tinta || (fundo === 'claro' ? TINTA : OSSO), c = COR[banco] || {};
+    if (estilo === 'mono') return { m: mono, t: mono, a: mono };
+    return { m: (c.marca || [OSSO, TINTA])[i], t: (c.texto || c.marca || [OSSO, TINTA])[i], a: (c.acento || c.marca || [OSSO, TINTA])[i] };
+  };
+  const cache = {};
+  LOGO.svg = (nome, o) => {
+    o = o || {}; const banco = LOGO.chave(nome); if (!banco) return null;
+    const forma = o.forma === 'extensa' ? 'extensa' : 'compacta', fundo = o.fundo === 'claro' ? 'claro' : 'escuro', estilo = o.estilo === 'mono' ? 'mono' : 'cor';
+    const sp = SPEC[banco][forma], src = fonte(sp.src[0], sp.src[1]); if (!src) return null;
+    const doc = new DOMParser().parseFromString(src, 'image/svg+xml'), svg = doc.documentElement;
+    const vb = VB[banco + '|' + forma] || svg.getAttribute('viewBox'), [vx, vy, vw, vh] = vb.split(/[\s,]+/).map(Number);
+    const paths = [...svg.querySelectorAll('path')], col = cores(banco, fundo, estilo, o.tinta);
+    const d = (p, fill) => '<path d="' + p.getAttribute('d') + '"' + (p.getAttribute('transform') ? ' transform="' + p.getAttribute('transform') + '"' : '') + ' fill="' + fill + '"/>';
+    // transforms herdados dos <g> do original (o C6 usa)
+    const tf = p => { const t = []; let e = p.parentNode; while (e && e !== svg) { if (e.getAttribute && e.getAttribute('transform')) t.unshift(e.getAttribute('transform')); e = e.parentNode; } return t.join(' '); };
+    const grp = (p, fill) => { const t = tf(p); return t ? '<g transform="' + t + '">' + d(p, fill) + '</g>' : d(p, fill); };
+    const R = sp.roles, id = 'k' + Math.random().toString(36).slice(2, 8);
+    const by = r => paths.filter((p, i) => R[i] === r);
+    let defs = '', body = '';
+    const det = by('d');
+    if (by('i').length) {   // Itaú: a marca são os vazios da forma (letras), recortadas dentro do quadrado arredondado
+      defs += '<mask id="' + id + 'i" maskUnits="userSpaceOnUse" x="' + vx + '" y="' + vy + '" width="' + vw + '" height="' + vh + '"><rect x="0" y="0" width="500" height="500" fill="#fff"/>' + by('i').map(p => grp(p, '#000')).join('') + '</mask><clipPath id="' + id + 'c"><rect x="26" y="26" width="448" height="448" rx="110"/></clipPath>';
+      body += '<g clip-path="url(#' + id + 'c)"><rect x="0" y="0" width="500" height="500" fill="' + col.m + '" mask="url(#' + id + 'i)"/></g>';
+    }
+    if (det.length) defs += '<mask id="' + id + 'd" maskUnits="userSpaceOnUse" x="' + vx + '" y="' + vy + '" width="' + vw + '" height="' + vh + '"><rect x="' + vx + '" y="' + vy + '" width="' + vw + '" height="' + vh + '" fill="#fff"/>' + det.map(p => grp(p, '#000')).join('') + '</mask>';
+    const mk = by('m'); if (mk.length) body += '<g' + (det.length ? ' mask="url(#' + id + 'd)"' : '') + '>' + mk.map(p => grp(p, col.m)).join('') + '</g>';
+    body += by('t').map(p => grp(p, col.t)).join('') + by('a').map(p => grp(p, col.a)).join('');
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + [vx, vy, vw, vh].join(' ') + '">' + (defs ? '<defs>' + defs + '</defs>' : '') + body + '</svg>';
+  };
+  LOGO.url = (nome, o) => {
+    const banco = LOGO.chave(nome); if (!banco) return '';
+    o = o || {}; const k = [banco, o.forma || 'compacta', o.fundo || 'escuro', o.estilo || 'cor', o.tinta || ''].join('|');
+    if (cache[k]) return cache[k];
+    const s = LOGO.svg(banco, o); if (!s) return '';
+    return (cache[k] = URL.createObjectURL(new Blob([s], { type: 'image/svg+xml' })));
+  };
+  LOGO.aspecto = (nome, forma) => { const banco = LOGO.chave(nome); if (!banco) return 1; const v = VB[banco + '|' + (forma === 'extensa' ? 'extensa' : 'compacta')]; if (v) { const p = v.split(/\s+/).map(Number); return p[2] / p[3]; } const s = LOGO.svg(banco, { forma }); const m = s && s.match(/viewBox="([^"]+)"/); if (!m) return 1; const p = m[1].split(/\s+/).map(Number); return p[2] / p[3]; };
+  // <span> com a logo na altura pedida; sem chip, sem fundo. Sem logo conhecida, um ponto na cor do banco.
+  LOGO.html = (nome, o, h, corPonto) => {
+    o = o || {}; h = h || 22; const u = LOGO.url(nome, o);
+    if (!u) return '<i style="width:10px;height:10px;border-radius:50%;background:' + (corPonto || '#6A6A72') + ';flex:none;display:block"></i>';
+    const w = Math.round(h * LOGO.aspecto(nome, o.forma) * 10) / 10;
+    return '<span aria-hidden="true" style="width:' + w + 'px;height:' + h + 'px;flex:none;display:block;background:url(\'' + u + '\') center/contain no-repeat"></span>';
+  };
+
+  /* ---------- ferramentas de verificação (rodam no navegador) ---------- */
+  const lum = (r, g, b) => { const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); }; return .2126 * f(r) + .7152 * f(g) + .0722 * f(b); };
+  const ratio = (a, b) => { const x = Math.max(a, b), y = Math.min(a, b); return (x + .05) / (y + .05); };
+  const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const desenha = (url, alt, fundoHex) => new Promise(res => { const im = new Image(); im.onload = () => { const w = Math.max(1, Math.round(alt * im.width / im.height)) || alt, c = document.createElement('canvas'); c.width = w; c.height = alt; const x = c.getContext('2d'); if (fundoHex) { x.fillStyle = fundoHex; x.fillRect(0, 0, w, alt); } x.drawImage(im, 0, 0, w, alt); res(x.getImageData(0, 0, w, alt)); }; im.onerror = () => res(null); im.src = url; });
+  // mede o recorte justo de cada arte (pra preencher VB): devolve { 'Banco|forma': 'x y w h' }
+  LOGO.medir = async () => {
+    const out = {};
+    for (const b of LOGO.bancos) for (const f of ['compacta', 'extensa']) {
+      const s = LOGO.svg(b, { forma: f }), m = s.match(/viewBox="([^"]+)"/)[1].split(/\s+/).map(Number);
+      const big = s.replace(/<svg /, '<svg width="' + Math.round(m[2] * 4) + '" height="' + Math.round(m[3] * 4) + '" ');
+      const u = URL.createObjectURL(new Blob([big], { type: 'image/svg+xml' })), H = Math.round(m[3] * 4) > 2000 ? 2000 : Math.round(m[3] * 4);
+      const img = await desenha(u, H); URL.revokeObjectURL(u); if (!img) continue;
+      let x0 = img.width, y0 = img.height, x1 = 0, y1 = 0;
+      for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) if (img.data[(y * img.width + x) * 4 + 3] > 8) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      const k = m[3] / img.height, pad = 0;
+      out[b + '|' + f] = [m[0] + x0 * k - pad, m[1] + y0 * k - pad, (x1 - x0 + 1) * k + pad * 2, (y1 - y0 + 1) * k + pad * 2].map(v => Math.round(v * 100) / 100).join(' ');
+    }
+    return out;
+  };
+  // contraste de cada variante contra os fundos do app: % de pixels opacos com contraste < 3:1 (deve ser 0)
+  LOGO.auditar = async () => {
+    const fundos = { escuro: ['#000000', '#141416', '#1C1C20'], claro: ['#F2F0EB', '#FFFFFF'] }, out = [];
+    for (const b of LOGO.bancos) for (const f of ['compacta', 'extensa']) for (const fu of ['escuro', 'claro']) for (const e of ['cor', 'mono']) {
+      const img = await desenha(LOGO.url(b, { forma: f, fundo: fu, estilo: e }), 80); if (!img) { out.push([b, f, fu, e, 'sem imagem']); continue; }
+      let pior = 99;
+      for (const bg of fundos[fu]) {
+        const L0 = lum(...hex(bg)); let n = 0, ruim = 0;
+        for (let i = 0; i < img.data.length; i += 4) { if (img.data[i + 3] < 250) continue; n++; if (ratio(lum(img.data[i], img.data[i + 1], img.data[i + 2]), L0) < 3) ruim++; }
+        pior = Math.min(pior, n ? 100 - ruim / n * 100 : 0);
+      }
+      out.push([b, f, fu, e, Math.round(pior * 10) / 10 + '% ok']);
+    }
+    return out;
+  };
+})();
+
 /* Kontar · geometria do recorte (indent) de canto, HANDOFF §5.4
    O recorte é um arco concêntrico com o botão (raio R = raio do botão + folga) entre duas concordâncias de raio F; sem trechos retos.
    Tudo no canto superior direito. corner() = forma do corte (máscara), edge() = contorno de 1px que acompanha o corte, mask() = css. */
