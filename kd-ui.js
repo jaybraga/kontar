@@ -933,15 +933,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   // "bank" vem do apelido pra cor (BANK, em kd.js: 'Itaú Azul', 'Nubank PJ'...) mas o acervo de logos
   // (Component.LGC) só tem a marca-mãe — sem esse mapa, essas variantes caíam num logo em branco.
   const LOGOKEY = { 'Itaú Azul': 'Itaú', 'Nubank PJ': 'Nubank', 'Nubank Pessoal': 'Nubank', 'CDB Mercado Pago': 'Mercado Pago' };
-  const bankChip = (bank, cor) => {
-    const key = bank ? (LOGOKEY[bank] || bank) : null;
-    const url = key ? comp.constructor.lgcUrl(key) : '';
-    if (!url) return '<i style="width:10px;height:10px;border-radius:50%;background:' + cor + ';flex:none"></i>'; // sem asset de logo: cai pro ponto de cor
-    const mono = key === 'C6'; // svg sem cor própria (fill preto default); recolorido via mask pra aparecer no fundo escuro
-    return mono
-      ? '<span style="width:28px;height:28px;flex:none;display:flex;align-items:center;justify-content:center"><span style="display:block;width:100%;height:58%;background:#F2F0EB;-webkit-mask:url(\'' + url + '\') center/contain no-repeat;mask:url(\'' + url + '\') center/contain no-repeat"></span></span>'
-      : '<span style="width:28px;height:28px;flex:none;background-image:url(\'' + url + '\');background-size:contain;background-repeat:no-repeat;background-position:center"></span>';
-  };
+  const bankChip = (bank, cor) => KD.logo.slot(LOGOKEY[bank] || bank, { forma: 'compacta', fundo: 'escuro', estilo: 'cor' }, 18, 34, cor);   // tokens de logo (src/logos.js);
   function popCard() {
     const opts = KD.M.cards.map(c => ({ k: 'c:' + c.id, n: c.nick || c.n, cor: c.cor, bank: c.bank })).concat(KD.M.accs.map(a => ({ k: 'a:' + a.id, n: a.nome, cor: a.cor, bank: a.bank })));
     const cur = S.cardId ? 'c:' + S.cardId : S.accId ? 'a:' + S.accId : '';
@@ -1568,6 +1560,22 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     return '<span aria-hidden="true" style="width:' + w + 'px;height:' + h + 'px;flex:none;display:block;background:url(\'' + u + '\') center/contain no-repeat"></span>';
   };
 
+  // logo num espaço fixo (alinha listas): a arte fica centrada e contida em w × h
+  LOGO.slot = (nome, o, h, w, corPonto) => {
+    const u = LOGO.url(nome, o || {});
+    if (!u) return '<span style="width:' + w + 'px;height:' + h + 'px;flex:none;display:flex;align-items:center;justify-content:center"><i style="width:10px;height:10px;border-radius:50%;background:' + (corPonto || '#6A6A72') + ';display:block"></i></span>';
+    return '<span aria-hidden="true" style="width:' + w + 'px;height:' + h + 'px;flex:none;display:block;background:url(\'' + u + '\') center/contain no-repeat"></span>';
+  };
+  // logo extensa nas faces dos cartões: mono (pintada pela tinta do cartão via máscara) ou colorida, com o fundo certo pra tinta
+  const ESC_CARTAO = { 'Itaú': .5 };
+  const claro = h => { const m = /^#?([0-9a-f]{6})$/i.exec(String(h || '').trim()); if (!m) return false; const n = parseInt(m[1], 16); return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255 > 0.55; };
+  LOGO.cartao = (nome, tinta, lm) => {
+    const b = LOGO.chave(nome); if (!b) return null;
+    const mono = !lm || !!lm[2], url = LOGO.url(b, { forma: 'extensa', estilo: mono ? 'mono' : 'cor', fundo: claro(tinta) ? 'escuro' : 'claro' }); if (!url) return null;
+    const asp = LOGO.aspecto(b, 'extensa'), h = Math.round((lm ? lm[0] : 5) * (ESC_CARTAO[b] || 1) * 100) / 100;
+    return { url, mask: mono, h, w: Math.round(h * asp * 100) / 100, asp };
+  };
+
   /* ---------- ferramentas de verificação (rodam no navegador) ---------- */
   const lum = (r, g, b) => { const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); }; return .2126 * f(r) + .7152 * f(g) + .0722 * f(b); };
   const ratio = (a, b) => { const x = Math.max(a, b), y = Math.min(a, b); return (x + .05) / (y + .05); };
@@ -1593,7 +1601,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const fundos = { escuro: ['#000000', '#141416', '#1C1C20'], claro: ['#F2F0EB', '#FFFFFF'] }, out = [];
     for (const b of LOGO.bancos) for (const f of ['compacta', 'extensa']) for (const fu of ['escuro', 'claro']) for (const e of ['cor', 'mono']) {
       const img = await desenha(LOGO.url(b, { forma: f, fundo: fu, estilo: e }), 80); if (!img) { out.push([b, f, fu, e, 'sem imagem']); continue; }
-      let pior = 99;
+      let pior = 100;
       for (const bg of fundos[fu]) {
         const L0 = lum(...hex(bg)); let n = 0, ruim = 0;
         for (let i = 0; i < img.data.length; i += 4) { if (img.data[i + 3] < 250) continue; n++; if (ratio(lum(img.data[i], img.data[i + 1], img.data[i + 2]), L0) < 3) ruim++; }
@@ -1748,13 +1756,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const chev = (sz, col) => '<svg width="' + sz + '" height="' + sz + '" viewBox="0 0 24 24" fill="none" stroke="' + (col || 'currentColor') + '" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex:none"><path d="m6 9 6 6 6-6"/></svg>';
   const checkSvg = col => '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="' + col + '" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
   const LOGOKEY = { 'Itaú Azul': 'Itaú', 'Nubank PJ': 'Nubank', 'Nubank Pessoal': 'Nubank', 'CDB Mercado Pago': 'Mercado Pago' };
-  const bankChip = (bank, cor) => {
-    const key = bank ? (LOGOKEY[bank] || bank) : null, url = key ? comp().constructor.lgcUrl(key) : '';
-    if (!url) return '<i style="width:10px;height:10px;border-radius:50%;background:' + cor + ';flex:none"></i>';
-    return key === 'C6'
-      ? '<span style="width:28px;height:28px;flex:none;display:flex;align-items:center;justify-content:center"><span style="display:block;width:100%;height:58%;background:' + FG + ';-webkit-mask:url(\'' + url + '\') center/contain no-repeat;mask:url(\'' + url + '\') center/contain no-repeat"></span></span>'
-      : '<span style="width:28px;height:28px;flex:none;background-image:url(\'' + url + '\');background-size:contain;background-repeat:no-repeat;background-position:center"></span>';
-  };
+  const bankChip = (bank, cor) => KD.logo.slot(LOGOKEY[bank] || bank, { forma: 'compacta', fundo: 'escuro', estilo: 'cor' }, 18, 34, cor);   // tokens de logo (src/logos.js);
   const popShell = (inner, w) => '<div data-pop data-dd style="position:absolute;z-index:6;left:0;' + (w ? 'width:' + w + 'px' : 'right:0') + ';top:0;max-height:320px;overflow:hidden;background:#151518;border:1px solid #2A2A2F;border-radius:22px;box-shadow:0 24px 48px rgba(0,0,0,.6);display:flex;flex-direction:column">'
     + '<div class="kscroll" data-popscroll style="flex:1;min-height:0;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px">' + inner + '</div></div>';
   const optCss = on => 'display:flex;align-items:center;gap:12px;height:44px;flex:none;border-radius:14px;border:1px solid ' + (on ? FG : '#2A2A2F') + ';background:#0D0D10;padding:0 12px;font-size:14px;font-weight:700;color:' + FG + ';cursor:pointer;white-space:nowrap;overflow:hidden';
@@ -2253,7 +2255,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const CHECK = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
   const btnHtml = () => '<span data-fm-btn style="position:absolute;right:0;top:0;width:44px;height:44px;border-radius:50%;background:#1C1C20;box-shadow:inset 0 0 0 1px #3A3A40;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .4s ease,box-shadow .4s ease,color .4s ease"><span data-fm-ar style="position:absolute;display:flex;transition:opacity .25s ease,transform .5s ' + EE + '">' + ARROW + '</span><span data-fm-xx style="position:absolute;display:flex;opacity:0;transform:rotate(-90deg);transition:opacity .25s ease,transform .5s ' + EE + '">' + XMARK + '</span></span>';
   const segs = (d, attr, hide) => '<div ' + attr + ' style="display:flex;gap:5px">' + d.fontes.map(f => '<i data-bar style="flex:1;height:8px;border-radius:4px;' + (hide ? 'opacity:0;' : '') + 'background:' + (f.ok ? GRN : AMB) + ';display:block"></i>').join('') + '</div>';
-  const logo = f => { const key = f.bank ? (LOGOKEY[f.bank] || f.bank) : null; let u = ''; try { u = key ? KD.comp.constructor.lgcUrl(key) : ''; } catch (e) {} return u ? '<span style="width:30px;height:30px;flex:none;background:url(\'' + u + '\') center/contain no-repeat"></span>' : '<span style="width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center"><i style="width:12px;height:12px;border-radius:50%;background:' + INK + ';display:block"></i></span>'; };
+  const logo = f => KD.logo.slot(LOGOKEY[f.bank] || f.bank, { forma: 'compacta', fundo: 'claro', estilo: 'cor' }, 18, 34, INK);   // tokens de logo (src/logos.js), card claro
   const fecharHtml = d => '<div data-r="txt" style="display:flex;justify-content:space-between;font-size:10px;font-weight:800;letter-spacing:.12em"><span>FECHAR ' + d.nome.toUpperCase() + '</span><span style="color:' + AMT + '">' + d.pend + (d.pend === 1 ? ' PENDENTE' : ' PENDENTES') + '</span></div><div style="margin-top:12px">' + segs(d, '') + '</div><div data-r="txt" style="font-size:11px;margin-top:9px;color:rgba(10,10,10,.6)">' + d.ok + ' de ' + d.total + ' fontes em dia</div>';
   const rowHtml = (f, d) => '<div data-a="row" style="opacity:0;display:flex;align-items:center;gap:14px;height:62px;flex:none;border-top:1px solid rgba(10,10,10,.14)">' + logo(f) + '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(f.label) + ' <span style="font-size:9px;font-weight:800;letter-spacing:.12em;border:1.5px solid rgba(10,10,10,.4);border-radius:99px;padding:2px 7px;margin-left:4px;vertical-align:2px">' + f.tipo + '</span></div><div style="font-size:11px;margin-top:3px;color:' + (f.ok ? 'rgba(10,10,10,.55)' : AMT) + ';font-weight:' + (f.ok ? 500 : 700) + '">'
     + (f.ok ? 'Em dia · ' + (f.card ? 'fatura' : 'extrato') + ' até ' + dm(f.last) : 'Falta ' + (f.card ? 'a fatura' : 'o extrato') + ' de ' + d.nome + (f.last ? ' · último até ' + dm(f.last) : '')) + '</div></div>'
