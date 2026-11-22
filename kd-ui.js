@@ -324,7 +324,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const st = document.createElement('style'); st.textContent = '.kscroll[data-dragx]{cursor:grab}'; document.head.appendChild(st);
     document.addEventListener('scroll', ev => { const el = ev.target; if (!el || !el.getAttribute) return; const pg = el.getAttribute('data-page-scroll'); if (!pg || !KD._more || !KD._more[pg]) return; if (el.scrollTop + el.clientHeight >= el.scrollHeight - 200) KD.loadMore(pg); }, true);
     const mark = () => document.querySelectorAll('.kscroll').forEach(e => { if (sx(e)) e.setAttribute('data-dragx', '1'); else e.removeAttribute('data-dragx'); });
-    new MutationObserver(() => { clearTimeout(KD._mk); KD._mk = setTimeout(mark, 200); cancelAnimationFrame(KD._lp); KD._lp = requestAnimationFrame(() => { KD.lgPass(); KD.wide(); }); }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] }); setTimeout(mark, 1500);
+    const nossas = '[data-fm-ov],[data-fm-host],[data-fontes-layer],[data-imp],[data-imp-hist],[data-imp-modal],[data-ft-card]';   // camadas animadas nossas: mudança de estilo nelas não mexe em scroll/largura
+    new MutationObserver(ms => { if (ms.every(m => m.type === 'attributes' && m.target.closest && m.target.closest(nossas))) return; clearTimeout(KD._mk); KD._mk = setTimeout(mark, 200); cancelAnimationFrame(KD._lp); KD._lp = requestAnimationFrame(() => { KD.lgPass(); KD.wide(); }); }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] }); setTimeout(mark, 1500);
     /* 2) laterais (fora do artboard) fazem parte do scroll: o scroller se estende até as bordas da janela, então a roda é nativa (mesma suavização do conteúdo) */
     KD.wide = function () {
       const ab = document.querySelector('[data-screen-label]'); if (!ab) return;
@@ -2195,7 +2196,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const w = document.createElement('div'); w.setAttribute('data-kd-hist', '1'); w.style.cssText = 'margin-top:22px;align-self:flex-start'; w.innerHTML = pillHist(34, 'Histórico de importações');
     w.firstElementChild.addEventListener('click', () => historico()); col.appendChild(w);
   }
-  new MutationObserver(() => { try { mountButton(); mountHist(); } catch (e) {} }).observe(document.documentElement, { childList: true, subtree: true });
+  let rafM = 0;   // um passe por quadro; o histórico só existe em Cartões
+  new MutationObserver(() => { if (rafM) return; rafM = requestAnimationFrame(() => { rafM = 0; try { mountButton(); if ((KD.comp && KD.comp.state && KD.comp.state.page) === 'cartoes') mountHist(); } catch (e) {} }); }).observe(document.documentElement, { childList: true, subtree: true });
   window.addEventListener('keydown', e => { if (e.key === 'Escape') { if (modal) return fechaModal(); if (H) return fechaHist(); } if (e.key !== 'Escape' || !L || !S || S.busy) return; if (S.pop) return closePop(); close(); });
 })();
 
@@ -2335,7 +2337,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const gr = grid.getBoundingClientRect(), wr = w.getBoundingClientRect(), d = FM.data();
     const L0 = wr.left - gr.left, T0 = wr.top - gr.top;
     ov = document.createElement('div'); ov.setAttribute('data-fm-ov', '1');
-    ov.style.cssText = 'position:absolute;left:' + L0 + 'px;top:' + T0 + 'px;width:' + wr.width + 'px;height:' + wr.height + 'px;z-index:6;overflow:hidden;background:#000;font-family:Helvetica,Arial,sans-serif;color:' + INK + ';cursor:default';
+    ov.style.cssText = 'position:absolute;left:' + L0 + 'px;top:' + T0 + 'px;width:' + wr.width + 'px;height:' + wr.height + 'px;z-index:6;overflow:hidden;background:#000;will-change:opacity;contain:layout paint style;font-family:Helvetica,Arial,sans-serif;color:' + INK + ';cursor:default';
     // cópia do estado reduzido: título e rodapé do mês vêm do próprio card, então o visual é idêntico
     const rc = document.createElement('div'); rc.setAttribute('data-fm-rc', '1');
     rc.style.cssText = 'position:absolute;left:0;top:0;width:' + wr.width + 'px;height:' + wr.height + 'px;box-sizing:border-box;padding:18px 22px;display:flex;flex-direction:column-reverse;justify-content:flex-end;gap:6px;pointer-events:none';
@@ -2410,6 +2412,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   }
   window.addEventListener('keydown', e => { if (e.key === 'Escape' && open && !document.querySelector('[data-imp],[data-imp-modal],[data-imp-hist]')) fecha(); });
   window.addEventListener('kd:fontes', () => sync());
+  { const s = document.createElement('style'); s.textContent = 'svg:has(feTurbulence),svg:has(feGaussianBlur){will-change:transform;contain:paint}'; document.head.appendChild(s); }   // filtro de ruído/desfoque do gradiente (Saldo) é caro: camada própria, pintado uma vez e reaproveitado
   FM.refresh = carregar;
 
   let raf = 0;
@@ -2479,7 +2482,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     });
     row.addEventListener('focusout', ev => { if (ev.target.matches && ev.target.matches('[data-nm-in]') && adding) setTimeout(() => { if (adding && !row.contains(document.activeElement)) { adding = false; msg = ''; desenha(row); } }, 0); });
   }
-  new MutationObserver(() => { try { monta(); } catch (e) {} }).observe(document.documentElement, { childList: true, subtree: true });
+  let raf = 0;   // um passe por quadro, e só na página Conta (antes varria a página inteira a cada mudança do site)
+  new MutationObserver(() => { if (raf || (KD.comp && KD.comp.state && KD.comp.state.page) !== 'conta' || document.querySelector('[data-kd-nomes]')) return; raf = requestAnimationFrame(() => { raf = 0; try { monta(); } catch (e) {} }); }).observe(document.documentElement, { childList: true, subtree: true });
 })();
 
 /* Kontar · fontes de dados (extrato / manual / open finance): dados, página "Fontes" e status nos cards de Cartões
@@ -2616,12 +2620,13 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   function sincCartoes(forcar) {
     if (!rows || !KD.M) return;
     document.querySelectorAll('[data-ce-pen]').forEach(sp => {   // o lápis de editar de cada face carrega o nome do cartão
-      const face = sp.closest('div[style*="4.29cqw"]'); if (!face || face.getBoundingClientRect().width < 250 || /#111114|rgb\(17, 17, 20\)/.test(face.getAttribute('style') || '')) return;   // só a face do cartão, não a vista de edição
+      const face = sp.closest('div[style*="4.29cqw"]'); if (!face || /#111114|rgb\(17, 17, 20\)/.test(face.getAttribute('style') || '')) return;   // só a face do cartão, não a vista de edição
       const card = KD.M.cards.find(c => c.n === sp.getAttribute('data-ce-pen')); if (!card) return;
       const r = rows.find(x => x.k === 'c' + card.id); if (!r) return;
       const e = FT.estado(r), sig = r.modo + '|' + r.ok + '|' + r.ultima + '|' + r.n_mes;
       let el = face.querySelector(':scope > [data-ft-card]');
-      if (el && el.dataset.sig === sig && !forcar) return;
+      if (el && el.dataset.sig === sig && !forcar) return;   // já está certo: sai antes de medir (medir força layout a cada quadro)
+      if (!el && face.getBoundingClientRect().width < 250) return;
       if (!el) {
         el = document.createElement('div'); el.setAttribute('data-ft-card', '1');
         el.style.cssText = 'position:absolute;left:4.64cqw;right:4.64cqw;top:24%;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:3';
@@ -2639,5 +2644,5 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   }
 
   let raf = 0;
-  new MutationObserver(() => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; try { if (!KD.M || !KD.sb) return; if (!rows && !carregando && ((KD.comp && KD.comp.state && KD.comp.state.page === 'fontes') || document.querySelector('[data-k="mes"]') || document.querySelector('[data-ce-pen]'))) FT.carregar(); montaPagina(); sincCartoes(false); } catch (e) {} }); }).observe(document.documentElement, { childList: true, subtree: true });
+  new MutationObserver(() => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; try { if (!KD.M || !KD.sb) return; if (!rows && !carregando && ((KD.comp && KD.comp.state && KD.comp.state.page === 'fontes') || document.querySelector('[data-k="mes"]') || document.querySelector('[data-ce-pen]'))) FT.carregar(); montaPagina(); if ((KD.comp && KD.comp.state && KD.comp.state.page) === 'cartoes') sincCartoes(false); } catch (e) {} }); }).observe(document.documentElement, { childList: true, subtree: true });
 })();
