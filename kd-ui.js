@@ -106,7 +106,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
 
 
   /* ---------------- rotas: a página atual vive no endereço (#/extrato), voltar/avançar e reload funcionam ---------------- */
-  const SLUG = { home: '', extrato: 'extrato', metas: 'metas', categorias: 'categorias', cartoes: 'cartoes', estab: 'estabelecimentos', config: 'preferencias', conta: 'conta', ajuda: 'ajuda' };
+  const SLUG = { home: '', extrato: 'extrato', metas: 'metas', categorias: 'categorias', cartoes: 'cartoes', estab: 'estabelecimentos', fontes: 'fontes', config: 'preferencias', conta: 'conta', ajuda: 'ajuda' };
   const REV = Object.fromEntries(Object.entries(SLUG).filter(e => e[1]).map(e => [e[1], e[0]]));
   KD.pageFromHash = () => { const h = String(location.hash || '').replace(/^#\/?/, '').split(/[?&/]/)[0].toLowerCase(); return h === '' ? 'home' : (REV[h] || null); };
   KD.urlFor = pg => location.pathname + location.search + (SLUG[pg] ? '#/' + SLUG[pg] : '');
@@ -2204,31 +2204,16 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const dm = s => s.slice(8, 10) + '/' + s.slice(5, 7);
   const LOGOKEY = { 'Itaú Azul': 'Itaú', 'Nubank PJ': 'Nubank', 'Nubank Pessoal': 'Nubank', 'CDB Mercado Pago': 'Mercado Pago' };
   const DV = 112, PR = 10;   // y do divisor perfurado e raio das perfurações
-  let batches = [], loaded = false, sig = '', open = false, anim = false, ov = null;
+  let sig = '', open = false, anim = false, ov = null;
 
-  /* ---------- dados ---------- */
-  async function carregar() {
-    try {
-      const q = await KD.sb.from('import_batches').select('id,status,destino,card_id,account_id,periodo_fim,created_at').neq('status', 'descartado');
-      let list = q.error ? [] : (q.data || []);
-      const sem = list.filter(b => !b.periodo_fim).map(b => b.id);   // lotes antigos, sem período gravado: usa a data da última transação do lote
-      if (sem.length) { const t = await KD.sb.from('transactions').select('batch_id,data_compra').in('batch_id', sem); const mx = {}; (t.data || []).forEach(x => { const d = String(x.data_compra).slice(0, 10); if (!mx[x.batch_id] || d > mx[x.batch_id]) mx[x.batch_id] = d; }); list = list.map(b => b.periodo_fim ? b : Object.assign({}, b, { periodo_fim: mx[b.id] || null })); }
-      batches = list;
-    } catch (e) { batches = []; }
-    loaded = true; sync();
-  }
+  /* ---------- dados: o estado de cada fonte vem de KD.fontes (kontar_fontes_mes no banco), por modo ---------- */
+  const carregar = () => KD.fontes.carregar();
+  const loaded = () => !!KD.fontes.rows();
   FM.data = () => {
-    const T = KD.today, ref = new Date(T.getFullYear(), T.getMonth() - 1, 1), fimMes = new Date(T.getFullYear(), T.getMonth(), 0), lim = new Date(fimMes); lim.setDate(lim.getDate() - 3);
-    const limIso = iso(lim), nome = MESES[ref.getMonth()], norm = KD.norm;
-    const fontes = KD.M.accs.filter(a => a.tipo !== 'investimento').map(a => ({ k: 'a' + a.id, id: a.id, label: a.nome, tipo: 'EXTRATO', card: false, bank: a.bank }))
-      .concat(KD.M.cards.map(c => ({ k: 'c' + c.id, id: c.id, label: c.nick || c.n, tipo: 'FATURA', card: true, bank: c.bank })));
-    fontes.forEach(f => {
-      const bs = batches.filter(b => (f.card ? b.card_id === f.id : b.account_id === f.id) || (!b.card_id && !b.account_id && b.destino && norm(b.destino) === norm(f.label)));
-      const last = bs.map(b => b.periodo_fim).filter(Boolean).sort().pop() || null;
-      f.last = last; f.ok = !!last && last >= limIso;
-    });
+    const T = KD.today, nome = KD.fontes.nomeMes(), R = KD.fontes.rows() || [];
+    const fontes = R.map(r => ({ k: r.k, id: r.id, label: r.nome, tipo: r.modo === 'manual' ? 'MANUAL' : r.modo === 'open_finance' ? 'OPEN FINANCE' : r.card ? 'FATURA' : 'EXTRATO', card: r.card, bank: r.bank, last: r.ultima, ok: r.ok, r }));
     const ok = fontes.filter(f => f.ok).length, pend = fontes.length - ok;
-    return { nome, fontes, ok, pend, total: fontes.length, show: loaded === true && fontes.length > 0 && T.getDate() >= 5 && pend > 0 };
+    return { nome, fontes, ok, pend, total: fontes.length, show: loaded() && fontes.length > 0 && T.getDate() >= 5 && pend > 0 };
   };
 
   /* ---------- recorte do canto (HANDOFF §5.4): arco concêntrico com o botão ---------- */
@@ -2259,10 +2244,12 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const segs = (d, attr, hide) => '<div ' + attr + ' style="display:flex;gap:5px">' + d.fontes.map(f => '<i data-bar style="flex:1;height:8px;border-radius:4px;' + (hide ? 'opacity:0;' : '') + 'background:' + (f.ok ? GRN : AMB) + ';display:block"></i>').join('') + '</div>';
   const logo = f => KD.logo.slot(LOGOKEY[f.bank] || f.bank, { forma: 'compacta', fundo: 'claro', estilo: 'cor' }, 18, 34, INK);   // tokens de logo (src/logos.js), card claro
   const fecharHtml = d => '<div data-r="txt" style="display:flex;justify-content:space-between;font-size:10px;font-weight:800;letter-spacing:.12em"><span>FECHAR ' + d.nome.toUpperCase() + '</span><span style="color:' + AMT + '">' + d.pend + (d.pend === 1 ? ' PENDENTE' : ' PENDENTES') + '</span></div><div style="margin-top:12px">' + segs(d, '') + '</div><div data-r="txt" style="font-size:11px;margin-top:9px;color:rgba(10,10,10,.6)">' + d.ok + ' de ' + d.total + ' fontes em dia</div>';
-  const rowHtml = (f, d) => '<div data-a="row" style="opacity:0;display:flex;align-items:center;gap:14px;height:62px;flex:none;border-top:1px solid rgba(10,10,10,.14)">' + logo(f) + '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(f.label) + ' <span style="font-size:9px;font-weight:800;letter-spacing:.12em;border:1.5px solid rgba(10,10,10,.4);border-radius:99px;padding:2px 7px;margin-left:4px;vertical-align:2px">' + f.tipo + '</span></div><div style="font-size:11px;margin-top:3px;color:' + (f.ok ? 'rgba(10,10,10,.55)' : AMT) + ';font-weight:' + (f.ok ? 500 : 700) + '">'
-    + (f.ok ? 'Em dia · ' + (f.card ? 'fatura' : 'extrato') + ' até ' + dm(f.last) : 'Falta ' + (f.card ? 'a fatura' : 'o extrato') + ' de ' + d.nome + (f.last ? ' · último até ' + dm(f.last) : '')) + '</div></div>'
-    + (f.ok ? '<span style="width:26px;height:26px;border-radius:50%;background:' + GRN + ';color:#fff;display:flex;align-items:center;justify-content:center;flex:none">' + CHECK + '</span>'
-      : '<span data-fm-imp="' + f.k + '" style="height:36px;display:flex;align-items:center;padding:0 18px;border-radius:99px;background:' + INK + ';color:' + W + ';font-size:11px;font-weight:900;letter-spacing:.12em;cursor:pointer;flex:none;transition:opacity .25s ease" onmouseover="this.style.opacity=.8" onmouseout="this.style.opacity=1">IMPORTAR</span>') + '</div>';
+  const rowHtml = (f, d) => {
+    const e = KD.fontes.estado(f.r), ok = f.ok;
+    return '<div data-a="row" style="opacity:0;display:flex;align-items:center;gap:14px;height:62px;flex:none;border-top:1px solid rgba(10,10,10,.14)">' + logo(f) + '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(f.label) + ' <span style="font-size:9px;font-weight:800;letter-spacing:.12em;border:1.5px solid rgba(10,10,10,.4);border-radius:99px;padding:2px 7px;margin-left:4px;vertical-align:2px">' + f.tipo + '</span></div><div style="font-size:11px;margin-top:3px;color:' + (ok ? 'rgba(10,10,10,.55)' : e.nivel === 'erro' ? '#B3261E' : AMT) + ';font-weight:' + (ok ? 500 : 700) + '">' + esc(e.txt) + '</div></div>'
+      + (ok ? '<span style="width:26px;height:26px;border-radius:50%;background:' + GRN + ';color:#fff;display:flex;align-items:center;justify-content:center;flex:none">' + CHECK + '</span>'
+        : e.acao ? '<span data-fm-acao="' + f.k + '" style="height:36px;display:flex;align-items:center;padding:0 18px;border-radius:99px;background:' + INK + ';color:' + W + ';font-size:11px;font-weight:900;letter-spacing:.12em;cursor:pointer;flex:none;white-space:nowrap;transition:opacity .25s ease" onmouseover="this.style.opacity=.8" onmouseout="this.style.opacity=1">' + (e.acao === 'importar' ? 'IMPORTAR' : e.rotulo) + '</span>' : '') + '</div>';
+  };
   const expandedHtml = (d, w, h) => '<div data-fm-ec style="position:absolute;left:0;top:0;width:' + w + 'px;height:' + h + 'px;pointer-events:none">'
     + '<div data-a="head" style="position:absolute;left:28px;top:22px;right:84px;opacity:0"><div style="font-size:10.5px;font-weight:700;letter-spacing:.14em;color:rgba(10,10,10,.6)">↘ FECHAR O MÊS</div><div style="font-size:60px;font-weight:700;letter-spacing:-.065em;line-height:.95;margin-top:8px">' + d.nome.charAt(0).toUpperCase() + d.nome.slice(1) + '</div></div>'
     + '<div style="position:absolute;left:28px;right:28px;top:122px;bottom:18px;display:flex;flex-direction:column">'
@@ -2352,7 +2339,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     setTimeout(() => { w.setAttribute('data-fm-exp', '1'); ov.style.transition = ''; }, 200);
     ov.addEventListener('click', ev => {
       if (ev.target.closest('[data-fm-btn]')) return fecha();
-      const b = ev.target.closest('[data-fm-imp]'); if (b && KD.imp && KD.imp.pick) KD.imp.pick(b.dataset.fmImp);
+      const b = ev.target.closest('[data-fm-acao]'); if (b) { const r = (KD.fontes.rows() || []).find(x => x.k === b.dataset.fmAcao); if (r) KD.fontes.agir(r, KD.fontes.estado(r).acao); }
     });
     const bg = ov.querySelector('[data-fm-bg]'), btn = ov.querySelector('[data-fm-btn]'), ec = ov.querySelector('[data-fm-ec]');
     const bars0 = [...rcw.querySelectorAll('[data-bar]')], txt0 = [...rc.children].concat([...rcw.querySelectorAll('[data-r="txt"]')]);
@@ -2410,11 +2397,11 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     setTimeout(() => { o.remove(); if (ov === o) ov = null; open = false; anim = false; sync(); }, 1800);
   }
   window.addEventListener('keydown', e => { if (e.key === 'Escape' && open && !document.querySelector('[data-imp],[data-imp-modal],[data-imp-hist]')) fecha(); });
-  window.addEventListener('kd:batches', () => carregar());
+  window.addEventListener('kd:fontes', () => sync());
   FM.refresh = carregar;
 
   let raf = 0;
-  new MutationObserver(() => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; try { if (!loaded && KD.sb && KD.M && document.querySelector('[data-k="mes"]')) { loaded = 'pend'; carregar(); } else if (loaded === true) sync(); } catch (e) {} }); }).observe(document.documentElement, { childList: true, subtree: true });
+  new MutationObserver(() => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; try { if (loaded()) sync(); } catch (e) {} }); }).observe(document.documentElement, { childList: true, subtree: true });   // os dados chegam por KD.fontes (fontes.js carrega)
 })();
 
 /* Kontar · "Nomes nas transferências" na página Conta (mockup 11-conta-nomes)
@@ -2481,4 +2468,150 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     row.addEventListener('focusout', ev => { if (ev.target.matches && ev.target.matches('[data-nm-in]') && adding) setTimeout(() => { if (adding && !row.contains(document.activeElement)) { adding = false; msg = ''; desenha(row); } }, 0); });
   }
   new MutationObserver(() => { try { monta(); } catch (e) {} }).observe(document.documentElement, { childList: true, subtree: true });
+})();
+
+/* Kontar · fontes de dados (extrato / manual / open finance): dados, página "Fontes" e status nos cards de Cartões
+   Um lugar só pro estado de cada fonte no mês anterior: a função kontar_fontes_mes() do banco (migração 14).
+   O Fechar o mês, a página Fontes e os cards de Cartões leem daqui (KD.fontes) e se atualizam pelo evento 'kd:fontes'.
+   Open Finance fica dormente: a pílula aparece apagada enquanto feature_flags.open_finance = false. */
+(function () {
+  'use strict';
+  const KD = window.KD, FT = (KD.fontes = {});
+  const EE = 'cubic-bezier(.65,0,.35,1)', FG = '#F2F0EB', MU = '#8A8A90', INK = '#0A0A0A', GR = '#6AFF2A', AMB = '#FFC24A', RD = '#FF5A4A';
+  const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const dm = s => s ? String(s).slice(8, 10) + '/' + String(s).slice(5, 7) : '';
+  const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  let rows = null, ofAtivo = false, carregando = null;
+
+  /* ---------- dados ---------- */
+  FT.mesRef = () => { const T = KD.today; return new Date(T.getFullYear(), T.getMonth() - 1, 1); };
+  FT.nomeMes = () => MESES[FT.mesRef().getMonth()];
+  FT.ofAtivo = () => ofAtivo;
+  FT.rows = () => rows;
+  FT.carregar = async () => {
+    if (carregando) return carregando;
+    carregando = (async () => {
+      try {
+        const [q, f] = await Promise.all([KD.sb.rpc('kontar_fontes_mes', { p_ref: iso(KD.today) }), KD.sb.from('feature_flags').select('ativo').eq('chave', 'open_finance').maybeSingle()]);
+        ofAtivo = !!(f.data && f.data.ativo);
+        if (q.error) throw q.error;
+        rows = (q.data || []).map(r => {
+          const card = r.tipo === 'cartao' ? KD.M.cards.find(c => c.id === r.id) : null, acc = r.tipo === 'conta' ? KD.M.accs.find(a => a.id === r.id) : null;
+          return Object.assign({}, r, { k: (r.tipo === 'cartao' ? 'c' : 'a') + r.id, card: r.tipo === 'cartao', bank: (card || acc || {}).bank || r.nome, cor: (card || acc || {}).cor, sub: card ? 'Cartão · final ' + (card.fin || '····') : 'Conta corrente' });
+        });
+      } catch (e) { console.error('[kontar] fontes', e); rows = rows || []; }
+      carregando = null; window.dispatchEvent(new Event('kd:fontes'));
+    })();
+    return carregando;
+  };
+  // texto do estado e a ação certa pra cada modo
+  FT.estado = r => {
+    const m = FT.nomeMes(), doc = r.card ? 'fatura' : 'extrato', a = r.card ? 'a fatura' : 'o extrato';
+    if (r.modo === 'manual') return r.ok ? { txt: 'Conferido em ' + dm(r.ultima) + (r.n_mes ? ' · ' + r.n_mes + (r.n_mes === 1 ? ' lançamento' : ' lançamentos') : ''), nivel: 'ok', acao: 'desmarcar', rotulo: 'DESMARCAR' }
+      : { txt: (r.n_mes || 0) + (r.n_mes === 1 ? ' lançamento' : ' lançamentos') + ' em ' + m + ' · falta conferir', nivel: 'pend', acao: 'conferir', rotulo: 'CONFERI' };
+    if (r.modo === 'open_finance') return r.ok ? { txt: 'Atualizado ' + (r.ultima === iso(KD.today) ? 'hoje' : 'em ' + dm(r.ultima)), nivel: 'ok', acao: null }
+      : { txt: r.conexao_status === 'expirado' ? 'Conexão expirada' + (r.ultima ? ' · último sync ' + dm(r.ultima) : '') : r.conexao_status === 'erro' ? 'A sincronização falhou' : 'Sem sincronização recente', nivel: 'erro', acao: 'reconectar', rotulo: 'RECONECTAR' };
+    return r.ok ? { txt: 'Em dia · ' + doc + ' até ' + dm(r.ultima), nivel: 'ok', acao: 'reimportar', rotulo: 'REIMPORTAR' }
+      : { txt: 'Falta ' + a + ' de ' + m + (r.ultima ? ' · último até ' + dm(r.ultima) : ''), nivel: 'pend', acao: 'importar', rotulo: r.card ? 'IMPORTAR FATURA' : 'IMPORTAR EXTRATO' };
+  };
+  const aviso = msg => { const n = document.createElement('div'); n.textContent = msg; n.style.cssText = 'position:fixed;left:50%;bottom:30px;transform:translate(-50%,8px);background:#1b1b1d;color:' + FG + ';border:1px solid #2A2A2F;border-radius:30px;padding:14px 22px;font:700 13px Helvetica,Arial,sans-serif;z-index:99999;opacity:0;transition:opacity .3s ease,transform .45s ' + EE; document.body.appendChild(n); requestAnimationFrame(() => { n.style.opacity = '1'; n.style.transform = 'translate(-50%,0)'; }); setTimeout(() => { n.style.opacity = '0'; n.style.transform = 'translate(-50%,8px)'; setTimeout(() => n.remove(), 360); }, 3800); };
+  FT.aviso = aviso;
+  // executa a ação de uma fonte (botão da linha, do card ou do Fechar o mês)
+  FT.agir = async (r, acao) => {
+    if (acao === 'importar' || acao === 'reimportar') { if (KD.imp && KD.imp.pick) KD.imp.pick(r.k); return; }
+    if (acao === 'reconectar') { aviso(ofAtivo ? 'Abrindo a reconexão do banco…' : 'Open Finance ainda não está ativo.'); return; }
+    if (acao === 'conferir' || acao === 'desmarcar') {
+      if (KD.isDemo()) { aviso('Conta de demonstração: marcar como conferido fica travado.'); return; }
+      const q = await KD.sb.rpc('kontar_conferir_fonte', { p_tipo: r.tipo, p_id: r.id, p_mes: iso(FT.mesRef()), p_conferido: acao === 'conferir' });
+      if (q.error) { aviso('Não consegui salvar: ' + q.error.message); return; }
+      await FT.carregar();
+    }
+  };
+  FT.mudarModo = async (r, modo) => {
+    if (modo === r.modo) return;
+    if (modo === 'open_finance' && !ofAtivo) { aviso('Open Finance ainda não está ativo.'); return; }
+    if (KD.isDemo()) { aviso('Conta de demonstração: trocar o modo fica travado.'); return; }
+    const q = await KD.sb.from(r.card ? 'cards' : 'accounts').update({ fonte_modo: modo }).eq('id', r.id);
+    if (q.error) { aviso('Não consegui trocar o modo: ' + q.error.message); return; }
+    await FT.carregar();
+  };
+  window.addEventListener('kd:batches', () => FT.carregar());
+
+  /* ---------- peças ---------- */
+  const UP = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex:none"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>';
+  const corNivel = n => n === 'ok' ? GR : n === 'erro' ? RD : AMB;
+  const botao = (e, attr, alt) => {
+    if (!e.acao) return '';
+    const branco = e.nivel !== 'ok';
+    return '<span ' + attr + ' style="justify-self:end;height:' + (alt || 40) + 'px;display:inline-flex;align-items:center;gap:8px;padding:0 20px;border-radius:99px;font-size:11px;font-weight:' + (branco ? 900 : 800) + ';letter-spacing:.12em;cursor:pointer;white-space:nowrap;transition:opacity .25s ease,border-color .25s ease;'
+      + (branco ? 'background:' + FG + ';color:' + INK : 'border:1.5px solid #55555C;color:' + FG) + '" onmouseover="this.style.opacity=.82" onmouseout="this.style.opacity=1">' + (/IMPORTAR/.test(e.rotulo) ? UP : '') + e.rotulo + '</span>';
+  };
+  const pilula = (rot, on, dis, attr) => '<span ' + (attr || '') + ' title="' + (dis ? 'Open Finance ainda não está ativo' : '') + '" style="font-size:9.5px;font-weight:800;letter-spacing:.1em;padding:6px 10px;border-radius:99px;white-space:nowrap;transition:background .25s ease,color .25s ease,border-color .25s ease;cursor:' + (dis ? 'not-allowed' : on ? 'default' : 'pointer') + ';'
+    + (on ? 'background:' + FG + ';color:' + INK : dis ? 'border:1.5px dashed #2E2E34;color:#4A4A52' : 'border:1.5px solid #3A3A40;color:#9A9AA3') + '">' + rot + '</span>';
+
+  /* ---------- página Fontes ---------- */
+  function pagina(host, primeira) {
+    const R = rows || [], m = FT.nomeMes(), ok = R.filter(r => r.ok).length;
+    const linha = (r, i) => {
+      const e = FT.estado(r), c = corNivel(e.nivel);
+      return '<div data-ft-row="' + i + '" style="display:grid;grid-template-columns:minmax(0,1.05fr) 268px minmax(0,1.35fr) 170px;align-items:center;gap:18px;min-height:68px;border-top:1px solid #2A2A2F">'
+        + '<div style="display:flex;align-items:center;gap:13px;min-width:0">' + KD.logo.slot(r.bank, { forma: 'compacta', fundo: 'escuro', estilo: 'cor' }, 22, 40, r.cor) + '<div style="min-width:0"><div style="font-size:18px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(r.nome) + '</div><div style="font-size:11px;color:' + MU + ';margin-top:3px">' + esc(r.sub) + '</div></div></div>'
+        + '<div style="display:flex;gap:5px">' + pilula('OPEN FINANCE', r.modo === 'open_finance', !ofAtivo && r.modo !== 'open_finance', 'data-ft-modo="' + i + ':open_finance"') + pilula('EXTRATO', r.modo === 'extrato', false, 'data-ft-modo="' + i + ':extrato"') + pilula('MANUAL', r.modo === 'manual', false, 'data-ft-modo="' + i + ':manual"') + '</div>'
+        + '<div style="display:flex;align-items:center;gap:9px;font-size:12.5px;font-weight:700;color:' + (e.nivel === 'ok' ? '#B4B4BA' : c) + '"><i style="width:9px;height:9px;border-radius:50%;background:' + c + ';display:block;flex:none"></i><span>' + esc(e.txt) + '</span></div>'
+        + botao(e, 'data-ft-acao="' + i + '"') + '</div>';
+    };
+    host.innerHTML = '<div style="max-width:1080px;margin:0 auto;padding:6px 0 0;font-family:Helvetica,Arial,sans-serif;color:' + FG + '">'
+      + '<div data-ft-a style="font-size:96px;font-weight:700;letter-spacing:-.065em;line-height:.9">Fontes</div>'
+      + '<div data-ft-a style="font-size:13px;color:' + MU + ';margin-top:12px;max-width:600px;line-height:1.45">Como cada conta e cartão chega no Kontar. Escolha o modo de cada uma; o Kontar mostra o que falta para fechar o mês.</div>'
+      + '<div data-ft-a style="display:flex;justify-content:space-between;align-items:baseline;margin-top:24px;padding-bottom:10px"><span style="font-size:10.5px;font-weight:700;letter-spacing:.14em;color:' + MU + '">↘ ' + m.toUpperCase() + ' · ESTADO DE CADA FONTE</span><span style="font-size:12px;font-weight:800;letter-spacing:.1em;color:' + (ok === R.length ? GR : AMB) + '">' + ok + ' DE ' + R.length + ' EM DIA</span></div>'
+      + (rows ? R.map(linha).join('') : '<div style="padding:30px 0;color:' + MU + '">Carregando…</div>') + '<div style="border-top:1px solid #2A2A2F"></div>'
+      + '<div data-ft-a style="margin-top:14px;font-size:11px;color:' + MU + ';line-height:1.5"><b style="color:#B4B4BA">Open Finance</b> fica apagado até ser ligado. <b style="color:#B4B4BA">Manual</b>: você lança à mão e marca "conferi" quando o mês está certo.</div></div>';
+    if (primeira) {
+      const els = [...host.querySelectorAll('[data-ft-a],[data-ft-row]')];
+      els.forEach((el, k) => el.animate([{ opacity: 0, transform: 'translateY(12px)' }, { opacity: 1, transform: 'none' }], { duration: 600, delay: 60 + k * 45, easing: EE, fill: 'backwards' }));
+    }
+  }
+  function montaPagina() {
+    const host = document.querySelector('[data-fontes-host]'); if (!host) return;
+    if (!host.__ft) {
+      host.__ft = 1; if (!rows) FT.carregar();
+      host.addEventListener('click', ev => {
+        const a = ev.target.closest('[data-ft-acao]'), md = ev.target.closest('[data-ft-modo]');
+        if (a) { const r = rows[+a.dataset.ftAcao]; if (r) FT.agir(r, FT.estado(r).acao); return; }
+        if (md) { const [i, modo] = md.dataset.ftModo.split(':'), r = rows[+i]; if (r) FT.mudarModo(r, modo); }
+      });
+      pagina(host, true); host.__sig = JSON.stringify(rows);
+    }
+  }
+  window.addEventListener('kd:fontes', () => { const host = document.querySelector('[data-fontes-host]'); if (host && host.__ft) { const s = JSON.stringify(rows); if (s !== host.__sig) { const prim = host.__sig === 'null'; host.__sig = s; pagina(host, prim); } } sincCartoes(true); });
+
+  /* ---------- status e botão nos cards de Cartões ---------- */
+  function sincCartoes(forcar) {
+    if (!rows || !KD.M) return;
+    document.querySelectorAll('span[title][style*="mask:url"], span[title][style*="background:url"]').forEach(sp => {
+      const face = sp.closest('div[style*="4.29cqw"]'); if (!face || face.getBoundingClientRect().width < 250 || /#111114|rgb\(17, 17, 20\)/.test(face.getAttribute('style') || '')) return;   // só a face do cartão, não a vista de edição
+      const card = KD.M.cards.find(c => c.n === sp.getAttribute('title')); if (!card) return;
+      const r = rows.find(x => x.k === 'c' + card.id); if (!r) return;
+      const e = FT.estado(r), sig = r.modo + '|' + r.ok + '|' + r.ultima + '|' + r.n_mes;
+      let el = face.querySelector(':scope > [data-ft-card]');
+      if (el && el.dataset.sig === sig && !forcar) return;
+      if (!el) {
+        el = document.createElement('div'); el.setAttribute('data-ft-card', '1');
+        el.style.cssText = 'position:absolute;left:4.64cqw;right:4.64cqw;top:24%;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:3';
+        el.addEventListener('click', ev => { ev.stopPropagation(); const b = ev.target.closest('[data-ft-cacao]'); if (b && el.__r) FT.agir(el.__r, FT.estado(el.__r).acao); });
+        el.addEventListener('pointerdown', ev => ev.stopPropagation());
+        if (getComputedStyle(face).position === 'static') face.style.position = 'relative';
+        face.appendChild(el); el.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 500, easing: EE });
+      }
+      el.__r = r; el.dataset.sig = sig;
+      const rot = r.modo === 'manual' ? 'MANUAL' : r.modo === 'open_finance' ? 'OPEN FINANCE' : 'FATURA';
+      const curto = r.modo === 'manual' ? (r.ok ? FT.nomeMes() + ' conferido' : 'falta conferir') : r.modo === 'open_finance' ? (r.ok ? 'atualizado' : 'conexão caiu') : FT.nomeMes() + (r.ok ? ' em dia' : ' pendente');
+      el.innerHTML = '<span style="display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 14px 0 11px;border-radius:99px;background:rgba(0,0,0,.30);color:#fff;font-size:11px;font-weight:800;letter-spacing:.1em"><i style="width:9px;height:9px;border-radius:50%;background:' + corNivel(e.nivel) + ';display:block"></i>' + rot + '<span style="font-weight:600;letter-spacing:0;opacity:.8">' + curto + '</span></span>'
+        + (e.nivel === 'ok' || !e.acao ? '' : '<span data-ft-cacao style="display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 16px;border-radius:99px;background:' + FG + ';color:' + INK + ';font-size:11px;font-weight:900;letter-spacing:.12em;cursor:pointer;transition:opacity .25s ease" onmouseover="this.style.opacity=.85" onmouseout="this.style.opacity=1">' + (/IMPORTAR/.test(e.rotulo) ? UP : '') + e.rotulo + '</span>');
+    });
+  }
+
+  let raf = 0;
+  new MutationObserver(() => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; try { if (!KD.M || !KD.sb) return; if (!rows && !carregando && (document.querySelector('[data-fontes-host]') || document.querySelector('[data-k="mes"]') || document.querySelector('[data-ce-pen]'))) FT.carregar(); montaPagina(); sincCartoes(false); } catch (e) {} }); }).observe(document.documentElement, { childList: true, subtree: true });
 })();
