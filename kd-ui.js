@@ -1488,7 +1488,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     'Nubank': { marca: ['#A65CFF', '#820AD1'] },
     'Itaú': { marca: ['#FF6200', '#D95300'] },
     'C6': { marca: [OSSO, TINTA] },
-    'Mercado Pago': { marca: ['#00BCFF', '#0A0080'], texto: [OSSO, '#0A0080'] },
+    'Mercado Pago': { marca: ['#00BCFF', '#0A0080'], texto: [OSSO, '#0A0080'], detalhe: [OSSO, null] },
     'Amazon': { marca: [OSSO, TINTA], acento: ['#FF9900', '#C45500'] }
   };
   // origem de cada arte e o papel de cada forma (índice do <path> no SVG original):
@@ -1516,8 +1516,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const fonte = (set, k) => { const C = KD.comp && KD.comp.constructor; const v = C && C[set] && C[set][k]; return v ? decodeURIComponent(escape(atob(v))) : null; };
   const cores = (banco, fundo, estilo, tinta) => {
     const i = fundo === 'claro' ? 1 : 0, mono = tinta || (fundo === 'claro' ? TINTA : OSSO), c = COR[banco] || {};
-    if (estilo === 'mono') return { m: mono, t: mono, a: mono };
-    return { m: (c.marca || [OSSO, TINTA])[i], t: (c.texto || c.marca || [OSSO, TINTA])[i], a: (c.acento || c.marca || [OSSO, TINTA])[i] };
+    if (estilo === 'mono') return { m: mono, t: mono, a: mono, d: null };
+    return { m: (c.marca || [OSSO, TINTA])[i], t: (c.texto || c.marca || [OSSO, TINTA])[i], a: (c.acento || c.marca || [OSSO, TINTA])[i], d: c.detalhe ? c.detalhe[i] : null };
   };
   const cache = {};
   LOGO.svg = (nome, o) => {
@@ -1527,10 +1527,12 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const doc = new DOMParser().parseFromString(src, 'image/svg+xml'), svg = doc.documentElement;
     const vb = VB[banco + '|' + forma] || svg.getAttribute('viewBox'), [vx, vy, vw, vh] = vb.split(/[\s,]+/).map(Number);
     const paths = [...svg.querySelectorAll('path')], col = cores(banco, fundo, estilo, o.tinta);
-    const d = (p, fill) => '<path d="' + p.getAttribute('d') + '"' + (p.getAttribute('transform') ? ' transform="' + p.getAttribute('transform') + '"' : '') + ' fill="' + fill + '"/>';
+    // fill-rule herdado (a Amazon usa evenodd num <g>; sem isso o vazado do "a" some)
+    const regra = p => { let e = p; while (e && e.getAttribute) { const v = e.getAttribute('fill-rule') || ((e.getAttribute('style') || '').match(/fill-rule:\s*(\w+)/) || [])[1]; if (v) return v; e = e.parentNode; } return null; };
+    const d = (p, fill, extra) => { const r = regra(p); return '<path d="' + p.getAttribute('d') + '"' + (p.getAttribute('transform') ? ' transform="' + p.getAttribute('transform') + '"' : '') + (r ? ' fill-rule="' + r + '"' : '') + ' fill="' + fill + '"' + (extra || '') + '/>'; };
     // transforms herdados dos <g> do original (o C6 usa)
     const tf = p => { const t = []; let e = p.parentNode; while (e && e !== svg) { if (e.getAttribute && e.getAttribute('transform')) t.unshift(e.getAttribute('transform')); e = e.parentNode; } return t.join(' '); };
-    const grp = (p, fill) => { const t = tf(p); return t ? '<g transform="' + t + '">' + d(p, fill) + '</g>' : d(p, fill); };
+    const grp = (p, fill, extra) => { const t = tf(p); return t ? '<g transform="' + t + '">' + d(p, fill, extra) + '</g>' : d(p, fill, extra); };
     const R = sp.roles, id = 'k' + Math.random().toString(36).slice(2, 8);
     const by = r => paths.filter((p, i) => R[i] === r);
     let defs = '', body = '';
@@ -1541,6 +1543,12 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     }
     if (det.length) defs += '<mask id="' + id + 'd" maskUnits="userSpaceOnUse" x="' + vx + '" y="' + vy + '" width="' + vw + '" height="' + vh + '"><rect x="' + vx + '" y="' + vy + '" width="' + vw + '" height="' + vh + '" fill="#fff"/>' + det.map(p => grp(p, '#000')).join('') + '</mask>';
     const mk = by('m'); if (mk.length) body += '<g' + (det.length ? ' mask="url(#' + id + 'd)"' : '') + '>' + mk.map(p => grp(p, col.m)).join('') + '</g>';
+    // detalhe com cor própria (Mercado Pago no escuro: o contorno branco ao redor das mãos), só onde encosta na marca
+    if (det.length && mk.length && col.d) {
+      const sw = Math.max(vw, vh) * 0.03;
+      defs += '<mask id="' + id + 'e" maskUnits="userSpaceOnUse" x="' + vx + '" y="' + vy + '" width="' + vw + '" height="' + vh + '">' + mk.map(p => grp(p, '#fff', ' stroke="#fff" stroke-width="' + sw + '" stroke-linejoin="round"')).join('') + '</mask>';
+      body += '<g mask="url(#' + id + 'e)">' + det.map(p => grp(p, col.d)).join('') + '</g>';
+    }
     body += by('t').map(p => grp(p, col.t)).join('') + by('a').map(p => grp(p, col.a)).join('');
     return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + [vx, vy, vw, vh].join(' ') + '">' + (defs ? '<defs>' + defs + '</defs>' : '') + body + '</svg>';
   };
