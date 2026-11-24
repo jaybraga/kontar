@@ -1611,7 +1611,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const h = 5.4; return { url: cache[k], mask: true, h, w: Math.round(h * w / 44 * 100) / 100, asp: w / 44 };
   };
   LOGO.cartao = (nome, tinta, lm) => {
-    const b = LOGO.chave(nome); if (!b) return wordmark(nome);
+    const b = LOGO.chave(nome); if (!b) return lm ? wordmark(nome) : null;   // só o cartão tem `lm`; o formulário antigo ("Outro") continua sem logo
     const mono = !lm || !!lm[2], branco = b === 'Itaú';   // o Itaú é sempre branco sobre o laranja da marca (imagem, não máscara, pra não pegar a tinta do cartão)
     const url = branco ? LOGO.url(b, { forma: 'extensa', estilo: 'mono', tinta: '#FFFFFF' }) : LOGO.url(b, { forma: 'extensa', estilo: mono ? 'mono' : 'cor', fundo: claro(tinta) ? 'escuro' : 'claro' }); if (!url) return null;
     const asp = LOGO.aspecto(b, 'extensa', branco || mono ? 'mono' : 'cor'), h = Math.round((lm ? lm[0] : 5) * (ESC_CARTAO[b] || 1) * 100) / 100;
