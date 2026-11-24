@@ -91,7 +91,7 @@
     M.cards = R.cards.filter(c => !c.removido_em).sort((a, b) => a.ordem - b.ordem).map(c => {
       const col = colorOf(c.nome, c.instituicao, c.brand_hex), cy = cycOf(c.id, T), lim = Number(c.limite) || 0;
       const used = lim && c.disponivel_informado != null ? Math.max(0, lim - Number(c.disponivel_informado)) : 0;
-      return { id: c.id, n: c.nome, informed: lim && c.disponivel_informado != null, nick: c.apelido || '', fin: c.final4 || '····', lim, used, cor: col[0], ink: c.tinta || col[1], bank: bankOf(c.nome, c.instituicao), cy,
+      return { id: c.id, acc: c.conta_pagamento_id || null, n: c.nome, informed: lim && c.disponivel_informado != null, nick: c.apelido || '', fin: c.final4 || '····', lim, used, cor: col[0], ink: c.tinta || col[1], bank: bankOf(c.nome, c.instituicao), cy,
         fe: cy ? cy.dia_fechamento : null, ve: cy ? cy.dia_vencimento : null, orig: cy ? ({ fatura: 'fatura real', chute: 'chute', manual: 'cadastro manual' })[cy.origem] || 'chute' : 'chute',
         since: cy && cy.vigencia_inicio > '2025-01-01' ? cy.vigencia_inicio : null };
     });
@@ -99,7 +99,9 @@
     const cardByIdAll = Object.fromEntries(R.cards.map(c => [c.id, c]));
 
     /* contas */
-    M.accs = R.accs.filter(a => a.ativo !== false).sort((a, b) => a.ordem - b.ordem).map(a => ({ id: a.id, nome: a.nome, saldo: Number(a.saldo) || 0, em: a.saldo_em ? pd(a.saldo_em) : T, tipo: a.tipo, funcao: a.funcao, cor: colorOf(a.nome, a.instituicao, a.cor)[0], bank: bankOf(a.nome, a.instituicao) }));
+    M.accs = R.accs.filter(a => a.ativo !== false).sort((a, b) => a.ordem - b.ordem).map(a => ({ id: a.id, inst: a.instituicao || '', fin: a.final4 || '', ordem: a.ordem, nome: a.nome, saldo: Number(a.saldo) || 0, em: a.saldo_em ? pd(a.saldo_em) : T, tipo: a.tipo, funcao: a.funcao, cor: colorOf(a.nome, a.instituicao, a.cor)[0], bank: bankOf(a.nome, a.instituicao) }));
+
+    { const ao = Object.fromEntries(M.accs.map((a, i) => [a.id, i])); M.accById = Object.fromEntries(M.accs.map(a => [a.id, a])); M.cards.sort((x, y) => (x.acc in ao ? ao[x.acc] : 9999) - (y.acc in ao ? ao[y.acc] : 9999)); }
 
     /* estabelecimentos (por chave) */
     M.maByChave = Object.fromEntries(R.ma.map(m => [m.chave, m]));
