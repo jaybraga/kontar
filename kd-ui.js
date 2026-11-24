@@ -1603,8 +1603,15 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   // logo extensa nas faces dos cartões: mono (pintada pela tinta do cartão via máscara) ou colorida, com o fundo certo pra tinta
   const ESC_CARTAO = { 'Itaú': .5 };
   const claro = h => { const m = /^#?([0-9a-f]{6})$/i.exec(String(h || '').trim()); if (!m) return false; const n = parseInt(m[1], 16); return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255 > 0.55; };
+  /* banco sem arte própria: nome em texto, usado como máscara (pega a cor do texto do cartão) */
+  const wordmark = nome => {
+    const t = String(nome || '').replace(/\s+Crédito.*$/i, '').trim().toLowerCase(); if (!t) return null;
+    const w = Math.max(60, Math.round(t.length * 21 + 8)), svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + w + ' 44"><text x="2" y="34" font-family="Helvetica Neue,Helvetica,Arial,sans-serif" font-weight="800" font-size="36" letter-spacing="-1.6" fill="#000">' + t.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</text></svg>';
+    const k = 'wm|' + t; if (!cache[k]) cache[k] = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+    const h = 5.4; return { url: cache[k], mask: true, h, w: Math.round(h * w / 44 * 100) / 100, asp: w / 44 };
+  };
   LOGO.cartao = (nome, tinta, lm) => {
-    const b = LOGO.chave(nome); if (!b) return null;
+    const b = LOGO.chave(nome); if (!b) return wordmark(nome);
     const mono = !lm || !!lm[2], branco = b === 'Itaú';   // o Itaú é sempre branco sobre o laranja da marca (imagem, não máscara, pra não pegar a tinta do cartão)
     const url = branco ? LOGO.url(b, { forma: 'extensa', estilo: 'mono', tinta: '#FFFFFF' }) : LOGO.url(b, { forma: 'extensa', estilo: mono ? 'mono' : 'cor', fundo: claro(tinta) ? 'escuro' : 'claro' }); if (!url) return null;
     const asp = LOGO.aspecto(b, 'extensa', branco || mono ? 'mono' : 'cor'), h = Math.round((lm ? lm[0] : 5) * (ESC_CARTAO[b] || 1) * 100) / 100;
@@ -2847,7 +2854,9 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const EE = 'cubic-bezier(.65,0,.35,1)', FG = '#F2F0EB', INK = '#0A0A0A', MU = '#7C7C85', GRN = '#00A86B', AMB = '#F0C24B';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-  const BANCOS = ['Nubank', 'Itaú', 'C6', 'Mercado Pago', 'Amazon'];
+  const BANCOS = ['Nubank', 'Itaú', 'C6', 'Mercado Pago', 'Amazon'];   // com logo (arte em logos.js)
+  const BANCOS_TEXTO = ['Banco do Brasil', 'Bradesco', 'BV', 'Inter', 'Neon', 'Next', 'PagBank', 'PicPay', 'Santander', 'XP'];   // sem arte ainda: aparecem como nome na cor da marca
+  const TODOS = BANCOS.concat(BANCOS_TEXTO);
   const TIPOS = [['corrente', 'CORRENTE', 'pagamento'], ['poupanca', 'POUPANÇA', 'reserva'], ['investimento', 'INVESTIMENTO', 'reserva'], ['carteira', 'CARTEIRA', 'pagamento']];
   const CORES = ['#6A4BFF', '#FF5A1F', '#00E08A', '#FFB800', '#FF3D8B', '#6AFF2A', '#B18CFF', '#FF5C5C', '#2CBFF8', '#F2F0EB'];
   const inkOn = hex => { const h = String(hex).replace('#', ''), n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16), L = (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255; return L > 0.55 ? '#000000' : '#FFFFFF'; };
@@ -2858,7 +2867,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const pagina = () => (KD.comp && KD.comp.state && KD.comp.state.page) === 'cartoes';
 
   /* ---------- logo / cor do banco ---------- */
-  const logoDe = (inst, nome, cor) => { const k = KD.logo && KD.logo.chave(inst) || KD.logo && KD.logo.chave(nome); return k ? KD.logo.slot(k, { forma: 'compacta', fundo: 'escuro', estilo: 'cor' }, 22, 40, cor) : '<img src="' + KD.logo.ponto(cor) + '" width="40" height="22" alt="">'; };
+  const logoDe = (inst, nome, cor) => { const k = KD.logo && KD.logo.chave(inst) || KD.logo && KD.logo.chave(nome); if (k) return KD.logo.slot(k, { forma: 'compacta', fundo: 'escuro', estilo: 'cor' }, 22, 40, cor); const b = KD.bankOf(nome, inst); return b ? '<span style="font-size:17px;font-weight:800;letter-spacing:-.05em;color:' + (KD.BANK[b][0] === '#0030CE' ? '#5C7CFF' : cor) + ';white-space:nowrap">' + esc(b.toLowerCase()) + '</span>' : '<img src="' + KD.logo.ponto(cor) + '" width="40" height="22" alt="">'; };
   const statusDe = a => {
     const R = KD.fontes && KD.fontes.rows && KD.fontes.rows(); const r = R && R.find(x => x.k === 'a' + a.id); if (!r) return null;
     if (r.modo === 'manual') return r.ok ? ['CONFERIDO', GRN] : ['FALTA CONFERIR', AMB];
@@ -2931,7 +2940,11 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const inp = (k, ph, v, w, mode) => '<div style="flex:1;' + (w ? 'max-width:' + w + 'px;' : '') + 'min-width:0;height:52px;border-radius:99px;border:1px solid #3A3A40;background:#0B0B0D;display:flex;align-items:center;padding:0 20px"><input data-ct-in="' + k + '" value="' + esc(v) + '" placeholder="' + ph + '" inputmode="' + (mode || 'text') + '" autocomplete="off" style="flex:1;min-width:0;background:none;border:0;outline:0;color:' + FG + ';font:inherit;font-size:14px"></div>';
   function form() {
     const conta = S.mode === 'conta', cred = !conta || S.credito;
-    const bancos = BANCOS.map(b => '<span data-ct-bk="' + b + '" style="height:54px;min-width:92px;border-radius:99px;border:1.5px solid ' + (S.banco === b ? FG : '#3A3A40') + ';background:' + (S.banco === b ? '#1C1C20' : 'transparent') + ';display:flex;align-items:center;justify-content:center;padding:0 14px;cursor:pointer;transition:border-color .25s ease,background .25s ease">' + KD.logo.slot(b, { forma: 'extensa', fundo: 'escuro', estilo: 'cor' }, 20, 70, KD.BANK[b] && KD.BANK[b][0]) + '</span>').join('')
+    const btn = (b, conteudo) => '<span data-ct-bk="' + b + '" style="height:54px;min-width:92px;border-radius:99px;border:1.5px solid ' + (S.banco === b ? FG : '#3A3A40') + ';background:' + (S.banco === b ? '#1C1C20' : 'transparent') + ';display:flex;align-items:center;justify-content:center;padding:0 14px;cursor:pointer;transition:border-color .25s ease,background .25s ease">' + conteudo + '</span>';
+    const corTxt = b => { const c = KD.BANK[b][0]; return c === '#0030CE' ? '#5C7CFF' : c === '#CC092F' ? '#E8334F' : c; };   // cor da marca legível sobre o fundo escuro do botão
+    const bancos = BANCOS.map(b => btn(b, KD.logo.slot(b, { forma: 'extensa', fundo: 'escuro', estilo: 'cor' }, 20, 70, KD.BANK[b] && KD.BANK[b][0]))).join('')
+      + BANCOS_TEXTO.map(b => btn(b, '<span style="font-size:15px;font-weight:800;letter-spacing:-.04em;color:' + corTxt(b) + ';white-space:nowrap">' + esc(b.toLowerCase()) + '</span>')).join('')
+      + '<span style="height:54px;border-radius:99px;border:1.5px dashed #3A3A40;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 16px;font-size:11px;font-weight:800;letter-spacing:.08em;color:#4A4A52">CAIXA<small style="font-size:8px;letter-spacing:.1em;color:#4A4A52">EM BREVE</small></span>'
       + '<span data-ct-bk="Outro" style="height:54px;border-radius:99px;border:1.5px solid ' + (S.banco === 'Outro' ? FG : '#3A3A40') + ';background:' + (S.banco === 'Outro' ? '#1C1C20' : 'transparent') + ';display:flex;align-items:center;padding:0 16px;font-size:11px;font-weight:800;letter-spacing:.08em;color:#9A9AA3;cursor:pointer;transition:border-color .25s ease,background .25s ease">OUTRO BANCO</span>';
     const outro = S.banco === 'Outro' ? '<div style="display:flex;gap:12px;align-items:center;margin-top:12px">' + inp('outro', 'Nome do banco', S.outro) + '<div style="display:flex;gap:8px;flex-wrap:wrap;max-width:300px">' + CORES.map(c => '<span data-ct-cor="' + c + '" style="width:26px;height:26px;border-radius:50%;background:' + c + ';cursor:pointer;box-shadow:' + (S.cor === c ? '0 0 0 2px #141416,0 0 0 4px ' + FG : 'none') + '"></span>').join('') + '</div></div>' : '';
     const tipos = conta ? lab('TIPO') + '<div style="display:flex;gap:8px;flex-wrap:wrap">' + TIPOS.map(t => '<span data-ct-tp="' + t[0] + '" style="border:1.5px solid ' + (S.tipo === t[0] ? FG : '#3A3A40') + ';border-radius:99px;padding:10px 16px;font-size:11px;font-weight:800;letter-spacing:.08em;cursor:pointer;background:' + (S.tipo === t[0] ? FG : 'transparent') + ';color:' + (S.tipo === t[0] ? INK : '#9A9AA3') + ';transition:all .25s ease">' + t[1] + '</span>').join('') + '</div>'
@@ -3012,8 +3025,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   CT.novoCartao = accId => {
     const M = KD.M, a = accId ? M.accById[accId] : (M.accs.length === 1 ? M.accs[0] : null);
     if (!a) { if (!M.accs.length) return CT.nova({ credito: true }); KD.comp.goPage('cartoes'); return; }
-    const k = KD.logo.chave(a.inst) || KD.logo.chave(a.nome);
-    abre({ mode: 'cartao', accId: a.id, contaNome: a.nome, banco: k && BANCOS.includes(k) ? k : (a.inst ? 'Outro' : null), outro: k && BANCOS.includes(k) ? '' : a.inst, cor: a.cor || CORES[0] });
+    const k = a.bank && TODOS.includes(a.bank) ? a.bank : (KD.logo.chave(a.inst) || KD.logo.chave(a.nome));
+    abre({ mode: 'cartao', accId: a.id, contaNome: a.nome, banco: k && TODOS.includes(k) ? k : (a.inst ? 'Outro' : null), outro: k && TODOS.includes(k) ? '' : a.inst, cor: a.cor || CORES[0] });
   };
   document.addEventListener('click', e => {
     const n = e.target.closest && e.target.closest('[data-ct-nova]'); if (n) { e.stopPropagation(); CT.nova(); return; }

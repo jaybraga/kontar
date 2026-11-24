@@ -37,14 +37,26 @@
   const BANK = {
     'C6': ['#FFBD4C', '#141414'], 'Itaú': ['#EB7001', '#000000'], 'Itaú Azul': ['#EB7001', '#000000'],
     'Nubank': ['#9B03D7', '#FFFFFF'], 'Nubank PJ': ['#FFFFFF', '#000000'], 'Nubank Pessoal': ['#9B03D7', '#FFFFFF'],
-    'Mercado Pago': ['#FFE600', '#000000'], 'CDB Mercado Pago': ['#FFE600', '#000000'], 'Amazon': ['#2CBFF8', '#000000'], 'Outro': ['#F2F0EB', '#000000']
+    'Mercado Pago': ['#FFE600', '#000000'], 'CDB Mercado Pago': ['#FFE600', '#000000'], 'Amazon': ['#2CBFF8', '#000000'], 'Outro': ['#F2F0EB', '#000000'],
+    /* bancos cadastrados em 24/11/2026 (pesquisa de branding: PLANNED_FEATURES.md §12). [cor do cartão, cor do texto] */
+    'Bradesco': ['#CC092F', '#FFFFFF'],          // oficial (guia de comunicação visual do Bradesco)
+    'Banco do Brasil': ['#F9DD16', '#0038A8'],   // oficial (manual da marca do BB): texto no azul institucional
+    'Santander': ['#EC0000', '#FFFFFF'],         // oficial (guia de marca global e site)
+    'Next': ['#00FF5F', '#000000'],              // theme-color do site oficial (verde "Electric")
+    'XP': ['#FBC105', '#000000'],                // amostrado do site oficial (xpi.com.br)
+    'Neon': ['#0030CE', '#FFFFFF'],              // amostrado do site oficial (azul; atenção: neon.com é outra empresa)
+    'BV': ['#0B5FFF', '#FFFFFF'],                // amostrado do site oficial (bv.com.br), a confirmar
+    'PagBank': ['#1BB99A', '#000000'],           // amostrado do site oficial, a confirmar
+    'PicPay': ['#21C25E', '#FFFFFF'],            // Simple Icons / página do PicPay, a confirmar
+    'Inter': ['#FF7A00', '#FFFFFF']              // Brandfetch, a confirmar
   };
-  const INST = { 'c6 bank': 'C6', 'c6': 'C6', 'itaú': 'Itaú', 'itau': 'Itaú', 'nubank': 'Nubank', 'mercado pago': 'Mercado Pago', 'amazon': 'Amazon' };
+  const INST = { 'c6 bank': 'C6', 'c6': 'C6', 'itaú': 'Itaú', 'itau': 'Itaú', 'nubank': 'Nubank', 'mercado pago': 'Mercado Pago', 'amazon': 'Amazon',
+    'bradesco': 'Bradesco', 'banco do brasil': 'Banco do Brasil', 'bb': 'Banco do Brasil', 'santander': 'Santander', 'next': 'Next', 'xp': 'XP', 'xp investimentos': 'XP', 'neon': 'Neon', 'bv': 'BV', 'banco bv': 'BV', 'banco votorantim': 'BV', 'pagbank': 'PagBank', 'pagseguro': 'PagBank', 'picpay': 'PicPay', 'inter': 'Inter', 'banco inter': 'Inter' };
   const bankOf = (nome, inst) => BANK[nome] ? nome : INST[String(inst || '').toLowerCase()] || null;
   const colorOf = (nome, inst, fb) => { const b = bankOf(nome, inst); return b ? BANK[b] : [fb || '#F2F0EB', inkOn(fb || '#F2F0EB')]; };
   function inkOn(hex) { const h = String(hex).replace('#', ''), n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16), L = (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255; return L > 0.55 ? '#000000' : '#FFFFFF'; }
   const CODE = n => ({ 'C6': 'C6', 'Itaú Azul': 'IT', 'Itaú': 'IT', 'Nubank': 'NU', 'Mercado Pago': 'MP', 'Amazon': 'AM' })[n] || String(n).replace(/[^A-Za-zÀ-ú0-9]/g, '').slice(0, 2).toUpperCase();
-  KD.BANK = BANK; KD.colorOf = colorOf; KD.CODE = CODE;
+  KD.BANK = BANK; KD.colorOf = colorOf; KD.CODE = CODE; KD.bankOf = bankOf;
   /* ---------- tema do cartão por cor de fundo (regra única, reutilizável por qualquer banco) ----------
      1) MARCA_INK: se a marca define a cor do texto, ela vence (Itaú = branco).
      2) senão vale a tinta gravada no cartão (banco desconhecido) ou a da tabela BANK;
