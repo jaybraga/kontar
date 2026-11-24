@@ -45,6 +45,24 @@
   function inkOn(hex) { const h = String(hex).replace('#', ''), n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16), L = (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255; return L > 0.55 ? '#000000' : '#FFFFFF'; }
   const CODE = n => ({ 'C6': 'C6', 'Itaú Azul': 'IT', 'Itaú': 'IT', 'Nubank': 'NU', 'Mercado Pago': 'MP', 'Amazon': 'AM' })[n] || String(n).replace(/[^A-Za-zÀ-ú0-9]/g, '').slice(0, 2).toUpperCase();
   KD.BANK = BANK; KD.colorOf = colorOf; KD.CODE = CODE;
+  /* ---------- tema do cartão por cor de fundo (regra única, reutilizável por qualquer banco) ----------
+     1) MARCA_INK: se a marca define a cor do texto, ela vence (Itaú = branco).
+     2) senão vale a tinta gravada no cartão (banco desconhecido) ou a da tabela BANK;
+     3) sem nenhuma, é automático: texto branco enquanto passa de 3:1 contra o fundo, senão preto.
+     O resto do cartão acompanha o texto: fundo escuro (texto branco) → botão claro; fundo claro (texto preto) → botão preto sólido
+     com texto branco e chip preto com texto branco. Para um banco novo basta cadastrar cor em BANK e, se a marca exigir, MARCA_INK. */
+  const MARCA_INK = { 'Itaú': '#FFFFFF', 'Itaú Azul': '#FFFFFF' };
+  const lumHex = h => { h = String(h || '#000000').replace('#', ''); if (h.length === 3) h = h.split('').map(c => c + c).join(''); const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); }; return .2126 * f(parseInt(h.slice(0, 2), 16)) + .7152 * f(parseInt(h.slice(2, 4), 16)) + .0722 * f(parseInt(h.slice(4, 6), 16)); };
+  const ratioHex = (a, b) => { const x = lumHex(a), y = lumHex(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
+  KD.contraste = ratioHex;
+  KD.tema = (bg, bank, tintaGravada) => {
+    const marca = bank && MARCA_INK[bank], auto = ratioHex(bg, '#FFFFFF') >= 3 ? '#FFFFFF' : '#000000';
+    const ink = marca || tintaGravada || auto, escuro = lumHex(ink) > .5;   // texto claro = cartão "escuro"
+    return { ink, escuro, ratio: ratioHex(bg, ink),
+      chipBg: escuro ? 'rgba(0,0,0,.30)' : '#0A0A0A', chipInk: '#FFFFFF',
+      btnBg: escuro ? '#F2F0EB' : '#0A0A0A', btnInk: escuro ? '#0A0A0A' : '#FFFFFF' };
+  };
+
 
   /* Categorias padrão do protótipo (§7.3): cor e ordem. O banco guarda o que o usuário mudou. */
   const CAT_DEF = { 'Trabalho': '#6A4BFF', 'Mercado': '#FF5A1F', 'Casa': '#00E08A', 'Transporte': '#FFB800', 'Assinaturas': '#FF3D8B', 'Lazer': '#6AFF2A', 'Transferência': '#78788A', 'Família': '#FF2424', 'Alimentação': '#FF4B3E', 'Saúde': '#4DA3FF', 'Outros': '#D3B073' };
@@ -91,7 +109,7 @@
     M.cards = R.cards.filter(c => !c.removido_em).sort((a, b) => a.ordem - b.ordem).map(c => {
       const col = colorOf(c.nome, c.instituicao, c.brand_hex), cy = cycOf(c.id, T), lim = Number(c.limite) || 0;
       const used = lim && c.disponivel_informado != null ? Math.max(0, lim - Number(c.disponivel_informado)) : 0;
-      return { id: c.id, acc: c.conta_pagamento_id || null, n: c.nome, informed: lim && c.disponivel_informado != null, nick: c.apelido || '', fin: c.final4 || '····', lim, used, cor: col[0], ink: c.tinta || col[1], bank: bankOf(c.nome, c.instituicao), cy,
+      return { id: c.id, acc: c.conta_pagamento_id || null, n: c.nome, informed: lim && c.disponivel_informado != null, nick: c.apelido || '', fin: c.final4 || '····', lim, used, cor: col[0], ink: KD.tema(col[0], bankOf(c.nome, c.instituicao), c.tinta || col[1]).ink, bank: bankOf(c.nome, c.instituicao), cy,
         fe: cy ? cy.dia_fechamento : null, ve: cy ? cy.dia_vencimento : null, orig: cy ? ({ fatura: 'fatura real', chute: 'chute', manual: 'cadastro manual' })[cy.origem] || 'chute' : 'chute',
         since: cy && cy.vigencia_inicio > '2025-01-01' ? cy.vigencia_inicio : null };
     });

@@ -2671,7 +2671,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       const face = sp.closest('div[style*="4.29cqw"]'); if (!face || /#111114|rgb\(17, 17, 20\)/.test(face.getAttribute('style') || '')) return;   // só a face do cartão, não a vista de edição
       const card = KD.M.cards.find(c => c.n === sp.getAttribute('data-ce-pen')); if (!card) return;
       const r = rows.find(x => x.k === 'c' + card.id); if (!r) return;
-      const e = FT.estado(r), sig = r.modo + '|' + r.ok + '|' + r.ultima + '|' + r.n_mes;
+      const e = FT.estado(r), sig = r.modo + '|' + r.ok + '|' + r.ultima + '|' + r.n_mes + '|' + card.ink + '|' + card.cor;
       let el = face.querySelector(':scope > [data-ft-card]');
       if (el && el.dataset.sig === sig && !forcar) return;   // já está certo: sai antes de medir (medir força layout a cada quadro)
       if (!el && face.getBoundingClientRect().width < 250) return;
@@ -2684,10 +2684,11 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
         face.appendChild(el); el.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 500, easing: EE });
       }
       el.__r = r; el.dataset.sig = sig;
+      const tm = KD.tema(card.cor, card.bank, card.ink);   // chip e botão acompanham o texto do cartão (regra em kd.js)
       const rot = r.modo === 'manual' ? 'MANUAL' : r.modo === 'open_finance' ? 'OPEN FINANCE' : 'FATURA';
       const curto = r.modo === 'manual' ? (r.ok ? FT.nomeMes() + ' conferido' : 'falta conferir') : r.modo === 'open_finance' ? (r.ok ? 'atualizado' : 'conexão caiu') : FT.nomeMes() + (r.ok ? ' em dia' : ' pendente');
-      el.innerHTML = '<span style="display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 14px 0 11px;border-radius:99px;background:rgba(0,0,0,.30);color:#fff;font-size:11px;font-weight:800;letter-spacing:.1em"><i style="width:9px;height:9px;border-radius:50%;background:' + corNivel(e.nivel) + ';display:block"></i>' + rot + '<span style="font-weight:600;letter-spacing:0;opacity:.8">' + curto + '</span></span>'
-        + (e.nivel === 'ok' || !e.acao ? '' : '<span data-ft-cacao style="display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 16px;border-radius:99px;background:' + FG + ';color:' + INK + ';font-size:11px;font-weight:900;letter-spacing:.12em;cursor:pointer;transition:opacity .25s ease" onmouseover="this.style.opacity=.85" onmouseout="this.style.opacity=1">' + (/IMPORTAR/.test(e.rotulo) ? UP : '') + e.rotulo + '</span>');
+      el.innerHTML = '<span style="display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 14px 0 11px;border-radius:99px;background:' + tm.chipBg + ';color:' + tm.chipInk + ';font-size:11px;font-weight:800;letter-spacing:.1em"><i style="width:9px;height:9px;border-radius:50%;background:' + corNivel(e.nivel) + ';display:block"></i>' + rot + '<span style="font-weight:600;letter-spacing:0;opacity:.8">' + curto + '</span></span>'
+        + (e.nivel === 'ok' || !e.acao ? '' : '<span data-ft-cacao style="display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 16px;border-radius:99px;background:' + tm.btnBg + ';color:' + tm.btnInk + ';font-size:11px;font-weight:900;letter-spacing:.12em;cursor:pointer;transition:opacity .25s ease" onmouseover="this.style.opacity=.85" onmouseout="this.style.opacity=1">' + (/IMPORTAR/.test(e.rotulo) ? UP : '') + e.rotulo + '</span>');
     });
   }
 
