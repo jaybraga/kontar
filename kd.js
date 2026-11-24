@@ -46,7 +46,7 @@
     'XP': ['#FBC105', '#000000'],                // amostrado do site oficial (xpi.com.br)
     'Neon': ['#0030CE', '#FFFFFF'],              // amostrado do site oficial (azul; atenção: neon.com é outra empresa)
     'BV': ['#002BAB', '#FFFFFF'],                // site oficial bv.com.br: azul dos botões e blocos (revisado em 24/11; #0B5FFF estava errado)
-    'PagBank': ['#1BB99A', '#000000'],           // site oficial: cor dos botões em todas as páginas (o amarelo #F5DE3E é de campanha); sem guia de marca. O site usa texto branco (2,4:1), aqui fica preto
+    'PagBank': ['#62BD4E', '#000000'],           // verde da arte da marca que o Jay mandou (24/11, medido em pixels). #1BB99A é o verde-água dos botões do site; o amarelo #F5DE3E é de campanha. Texto preto (8,9:1); a marca usa branco (2,3:1)
     'PicPay': ['#21C25E', '#000000'],            // CONFIRMADO: theme-color do site oficial; os botões do site usam texto preto
     'Inter': ['#FF7A00', '#FFFFFF']              // CONFIRMADO: cor dominante do site oficial inter.co, botões com texto branco (2,6:1)
   };
