@@ -1707,7 +1707,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   }
 
   // ---- 5) shape de fundo: svg dentro da face, atrás de tudo (z-index -1 numa face isolada), cortado pelo canto arredondado
-  const formaSvg = b => '<svg data-bk-forma="' + b.slug + '" viewBox="0 0 440 277.4" preserveAspectRatio="xMidYMid slice" aria-hidden="true" style="position:absolute;left:0;top:0;width:100%;height:100%;z-index:-1;pointer-events:none;opacity:0;transition:opacity .5s cubic-bezier(.65,0,.35,1)">' + b.forma + '</svg>';
+  const formaSvg = b => '<svg data-bk-forma="' + b.slug + '" viewBox="0 0 440 277.4" preserveAspectRatio="xMidYMid slice" aria-hidden="true" style="position:absolute;left:0;top:0;width:100%;height:100%;z-index:-1;pointer-events:none;border-radius:inherit;overflow:hidden;opacity:0;transition:opacity .5s cubic-bezier(.65,0,.35,1)">' + b.forma + '</svg>';
   const mesma = (a, b) => String(a || '').toUpperCase() === String(b || '').toUpperCase();
   function formas() {
     if (!KD.M || !KD.M.cards) return;
