@@ -32,7 +32,8 @@
     const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate());
   })();
 
-  /* Cores e tinta dos bancos (handoff §7.4). O banco manda; o que estiver
+  /* ATENÇÃO: as cores dos bancos cadastrados vêm do Figma (src/bancos-dados.js → src/bancos.js) e sobrescrevem esta tabela; ela só serve de reserva.
+     Cores e tinta dos bancos (handoff §7.4). O banco manda; o que estiver
      gravado na conta/cartão só vale para banco desconhecido. */
   const BANK = {
     'C6': ['#FFBD4C', '#141414'], 'Itaú': ['#EB7001', '#000000'], 'Itaú Azul': ['#EB7001', '#000000'],
@@ -67,11 +68,13 @@
   const ratioHex = (a, b) => { const x = lumHex(a), y = lumHex(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
   KD.contraste = ratioHex;
   KD.tema = (bg, bank, tintaGravada) => {
-    const marca = bank && MARCA_INK[bank], auto = ratioHex(bg, '#FFFFFF') >= 3 ? '#FFFFFF' : '#000000';
+    const br = bank && KD.BRAND && KD.BRAND[bank];   // marca do Figma (src/bancos.js): cor do texto e do chip definidas por banco
+    const marca = (br && br.ink) || (bank && MARCA_INK[bank]), auto = ratioHex(bg, '#FFFFFF') >= 3 ? '#FFFFFF' : '#000000';
     const ink = marca || tintaGravada || auto, escuro = lumHex(ink) > .5;   // texto claro = cartão "escuro"
+    const cb = br ? br.chip : (escuro ? '#F2F0EB' : '#0A0A0A'), ci = br ? br.chipInk : (escuro ? '#0A0A0A' : '#FFFFFF');
     return { ink, escuro, ratio: ratioHex(bg, ink),
-      chipBg: escuro ? '#F2F0EB' : '#0A0A0A', chipInk: escuro ? '#0A0A0A' : '#FFFFFF', chipBd: null,   // chip sólido: claro em fundo escuro, preto em fundo claro (a bolinha de status âmbar aparece nos dois)
-      btnBg: escuro ? '#F2F0EB' : '#0A0A0A', btnInk: escuro ? '#0A0A0A' : '#FFFFFF' };
+      chipBg: cb, chipInk: ci, chipBd: null,   // chip sólido: claro em fundo escuro, preto em fundo claro (a bolinha de status âmbar aparece nos dois)
+      btnBg: cb, btnInk: ci };
   };
 
 
