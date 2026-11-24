@@ -1708,6 +1708,10 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const orig = KD.logo.cartao;
     KD.logo.cartao = (nome, tinta, lm) => {
       const b = KD.banco(nome); if (!b) return orig(nome, tinta, lm);
+      if (b.slug === 'mercado-pago' && KD.logo.svg) {   // o logo do card do Figma ainda era o mono antigo: usa a versão mono nova (página Components), símbolo + texto
+        const sv = KD.logo.svg('Mercado Pago', { forma: 'extensa', estilo: 'mono', tinta: b.ink }), asp = 599.9 / 151.56;
+        if (sv) return { url: 'data:image/svg+xml,' + encodeURIComponent(sv), mask: false, h: b.logo.h, w: Math.round(b.logo.h * asp * 100) / 100, asp };
+      }
       return { url: urlLogo(b), mask: false, h: b.logo.h, w: b.logo.w, asp: b.logo.w / b.logo.h };
     };
   }
