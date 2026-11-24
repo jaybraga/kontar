@@ -2969,8 +2969,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const EE = 'cubic-bezier(.65,0,.35,1)', FG = '#F2F0EB', INK = '#0A0A0A', MU = '#7C7C85', GRN = '#00A86B', AMB = '#F0C24B';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-  const BANCOS = ['Nubank', 'Itaú', 'C6', 'Mercado Pago', 'Amazon'];   // com logo (arte em logos.js)
-  const BANCOS_TEXTO = ['Banco do Brasil', 'Bradesco', 'BV', 'Inter', 'Neon', 'Next', 'PagBank', 'PicPay', 'Santander', 'XP'];   // sem arte ainda: aparecem como nome na cor da marca
+  const BANCOS = ['Nubank', 'Itaú', 'C6', 'Mercado Pago', 'Amazon'];   // arte própria em logos.js
+  const BANCOS_TEXTO = ['Banco do Brasil', 'Bradesco', 'BV', 'Inter', 'Neon', 'Next', 'PagBank', 'PicPay', 'Santander', 'XP'];   // arte vem do Figma (src/bancos.js); se faltar, aparece o nome na cor da marca
   const TODOS = BANCOS.concat(BANCOS_TEXTO);
   const TIPOS = [['corrente', 'CORRENTE', 'pagamento'], ['poupanca', 'POUPANÇA', 'reserva'], ['investimento', 'INVESTIMENTO', 'reserva'], ['carteira', 'CARTEIRA', 'pagamento']];
   const CORES = ['#6A4BFF', '#FF5A1F', '#00E08A', '#FFB800', '#FF3D8B', '#6AFF2A', '#B18CFF', '#FF5C5C', '#2CBFF8', '#F2F0EB'];
@@ -3059,8 +3059,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const conta = S.mode === 'conta', cred = !conta || S.credito;
     const btn = (b, conteudo) => '<span data-ct-bk="' + b + '" style="height:54px;min-width:92px;border-radius:99px;border:1.5px solid ' + (S.banco === b ? FG : '#3A3A40') + ';background:' + (S.banco === b ? '#1C1C20' : 'transparent') + ';display:flex;align-items:center;justify-content:center;padding:0 14px;cursor:pointer;transition:border-color .25s ease,background .25s ease">' + conteudo + '</span>';
     const corTxt = b => legivel(KD.BANK[b][0]);
-    const bancos = BANCOS.map(b => btn(b, KD.logo.slot(b, { forma: 'extensa', fundo: 'escuro', estilo: 'cor' }, 20, 70, KD.BANK[b] && KD.BANK[b][0]))).join('')
-      + BANCOS_TEXTO.map(b => btn(b, '<span style="font-size:15px;font-weight:800;letter-spacing:-.04em;color:' + corTxt(b) + ';white-space:nowrap">' + esc(b.toLowerCase()) + '</span>')).join('')
+    const textoDe = b => '<span style="font-size:15px;font-weight:800;letter-spacing:-.04em;color:' + corTxt(b) + ';white-space:nowrap">' + esc(b.toLowerCase()) + '</span>';
+    const bancos = TODOS.map(b => btn(b, KD.logo.url(b, { forma: 'extensa', fundo: 'escuro', estilo: 'cor' }) ? KD.logo.slot(b, { forma: 'extensa', fundo: 'escuro', estilo: 'cor' }, 20, 70, KD.BANK[b] && KD.BANK[b][0]) : textoDe(b))).join('')   // todos com logo (Figma); nome em texto só se faltar arte
       + '<span style="height:54px;border-radius:99px;border:1.5px dashed #3A3A40;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 16px;font-size:11px;font-weight:800;letter-spacing:.08em;color:#4A4A52">CAIXA<small style="font-size:8px;letter-spacing:.1em;color:#4A4A52">EM BREVE</small></span>'
       + '<span data-ct-bk="Outro" style="height:54px;border-radius:99px;border:1.5px solid ' + (S.banco === 'Outro' ? FG : '#3A3A40') + ';background:' + (S.banco === 'Outro' ? '#1C1C20' : 'transparent') + ';display:flex;align-items:center;padding:0 16px;font-size:11px;font-weight:800;letter-spacing:.08em;color:#9A9AA3;cursor:pointer;transition:border-color .25s ease,background .25s ease">OUTRO BANCO</span>';
     const outro = S.banco === 'Outro' ? '<div style="display:flex;gap:12px;align-items:center;margin-top:12px">' + inp('outro', 'Nome do banco', S.outro) + '<div style="display:flex;gap:8px;flex-wrap:wrap;max-width:300px">' + CORES.map(c => '<span data-ct-cor="' + c + '" style="width:26px;height:26px;border-radius:50%;background:' + c + ';cursor:pointer;box-shadow:' + (S.cor === c ? '0 0 0 2px #141416,0 0 0 4px ' + FG : 'none') + '"></span>').join('') + '</div></div>' : '';
