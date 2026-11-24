@@ -1739,7 +1739,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       o = o || {}; const f = forma(o), m = peca(b, f), fundo = o.fundo === 'claro' ? 'claro' : 'escuro';
       let corpo, cor;
       if (o.estilo === 'mono') { corpo = m.body; cor = o.tinta || (fundo === 'claro' ? TINTA : OSSO); }
-      else if (m.cor) { corpo = m.cor; cor = null; }   // PagBank: cores do Figma
+      else if (m.cor) { corpo = fundo === 'escuro' ? m.cor.replace(/fill="(black|#000000|#000)"/g, 'fill="' + OSSO + '"') : m.cor; cor = null; }   // PagBank: cores do Figma (o preto do nome vira claro no fundo escuro)
       else { corpo = m.body; cor = KD.contraste(b.cor, FUNDO[fundo]) >= 3 ? b.cor : (fundo === 'claro' ? TINTA : OSSO); }   // tom da marca, só se passar de 3:1 no fundo; senão mono
       return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + m.vb + '">' + (cor ? '<g fill="' + cor + '">' + corpo + '</g>' : corpo) + '</svg>';
     };
