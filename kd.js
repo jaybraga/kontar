@@ -49,8 +49,8 @@
      1) MARCA_INK: se a marca define a cor do texto, ela vence (Itaú = branco).
      2) senão vale a tinta gravada no cartão (banco desconhecido) ou a da tabela BANK;
      3) sem nenhuma, é automático: texto branco enquanto passa de 3:1 contra o fundo, senão preto.
-     O resto do cartão acompanha o texto: fundo escuro (texto branco) → chip só com contorno e botão claro; fundo claro (texto preto) → botão preto sólido
-     com texto branco e chip preto com texto branco. Para um banco novo basta cadastrar cor em BANK e, se a marca exigir, MARCA_INK. */
+     O resto do cartão acompanha o texto: chip sempre só com contorno na cor do texto; fundo escuro (texto branco) → botão claro; fundo claro (texto preto) → botão preto sólido
+     com texto branco. Para um banco novo basta cadastrar cor em BANK e, se a marca exigir, MARCA_INK. */
   const MARCA_INK = { 'Itaú': '#FFFFFF', 'Itaú Azul': '#FFFFFF' };
   const lumHex = h => { h = String(h || '#000000').replace('#', ''); if (h.length === 3) h = h.split('').map(c => c + c).join(''); const f = v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); }; return .2126 * f(parseInt(h.slice(0, 2), 16)) + .7152 * f(parseInt(h.slice(2, 4), 16)) + .0722 * f(parseInt(h.slice(4, 6), 16)); };
   const ratioHex = (a, b) => { const x = lumHex(a), y = lumHex(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
@@ -59,7 +59,7 @@
     const marca = bank && MARCA_INK[bank], auto = ratioHex(bg, '#FFFFFF') >= 3 ? '#FFFFFF' : '#000000';
     const ink = marca || tintaGravada || auto, escuro = lumHex(ink) > .5;   // texto claro = cartão "escuro"
     return { ink, escuro, ratio: ratioHex(bg, ink),
-      chipBg: escuro ? 'transparent' : '#0A0A0A', chipInk: escuro ? ink : '#FFFFFF', chipBd: escuro ? ink : null,   // escuro: contorno (opção B); claro: preto sólido
+      chipBg: 'transparent', chipInk: ink, chipBd: ink,   // chip igual em fundo claro e escuro: só contorno na cor do texto (opção B)
       btnBg: escuro ? '#F2F0EB' : '#0A0A0A', btnInk: escuro ? '#0A0A0A' : '#FFFFFF' };
   };
 
