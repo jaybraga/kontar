@@ -1518,7 +1518,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     'Nubank': { compacta: { src: ['LGC', 'Nubank'], roles: 'mmff' }, extensa: { src: ['LGB', 'Nubank'], roles: 'mmff' } },
     'Itaú': { compacta: { src: ['LGC', 'Itaú'], roles: 'ii' }, extensa: { src: ['LGC', 'Itaú'], roles: 'ii' } },
     'C6': { compacta: { src: ['LGC', 'C6'], roles: 'fmmfff' }, extensa: { src: ['LGB', 'C6'], roles: 'mmmmmm' } },
-    'Mercado Pago': { compacta: { src: ['LGC', 'Mercado Pago'], roles: 'fmmmdf', cor: 'ooooof' }, extensa: { src: ['LGB', 'Mercado Pago'], roles: 'fmmmdt' } },
+    'Mercado Pago': { compacta: { src: ['LGC', 'Mercado Pago'], roles: 'fmmmdf', cor: 'ooooof' }, extensa: { src: ['LGB', 'Mercado Pago'], roles: 'fmmmdt', cor: 'ooooot' } },
     'Amazon': { compacta: { src: ['LGC', 'Amazon'], roles: 'am' }, extensa: { src: ['LGB', 'Amazon'], roles: 'maam' } }
   };
   // recorte justo de cada arte (medido em pixels com KD.logo.medir(); null = ainda não medido, usa o viewBox original)
@@ -1526,7 +1526,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     'Nubank|compacta': '0 0 264 145.75', 'Nubank|extensa': '0 0 263.87 145.57',
     'Itaú|compacta': '60.25 213.5 376.5 175.75', 'Itaú|extensa': '60.25 213.5 376.5 175.75',
     'C6|compacta': '0 0 562.25 297.75', 'C6|extensa': '0 0 1515.31 297.56',
-    'Mercado Pago|compacta': '5.25 26.5 208.75 90.75', 'Mercado Pago|compacta|cor': '0 0.06 218.8 151.5', 'Mercado Pago|extensa': '5.5 0 594.74 151.31',
+    'Mercado Pago|compacta': '5.25 26.5 208.75 90.75', 'Mercado Pago|compacta|cor': '0 0.06 218.8 151.5', 'Mercado Pago|extensa|cor': '0 0 599.9 151.56', 'Mercado Pago|extensa': '5.5 0 594.74 151.31',
     'Amazon|compacta': '4.42 0.44 247.47 254.97', 'Amazon|extensa': '0 0 1646.5 472.75'
   };
   // nomes que o app usa pra mesma marca
@@ -1605,9 +1605,10 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const claro = h => { const m = /^#?([0-9a-f]{6})$/i.exec(String(h || '').trim()); if (!m) return false; const n = parseInt(m[1], 16); return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255 > 0.55; };
   LOGO.cartao = (nome, tinta, lm) => {
     const b = LOGO.chave(nome); if (!b) return null;
-    const mono = !lm || !!lm[2], url = LOGO.url(b, { forma: 'extensa', estilo: mono ? 'mono' : 'cor', fundo: claro(tinta) ? 'escuro' : 'claro' }); if (!url) return null;
-    const asp = LOGO.aspecto(b, 'extensa'), h = Math.round((lm ? lm[0] : 5) * (ESC_CARTAO[b] || 1) * 100) / 100;
-    return { url, mask: mono, h, w: Math.round(h * asp * 100) / 100, asp };
+    const mono = !lm || !!lm[2], branco = b === 'Itaú';   // o Itaú é sempre branco sobre o laranja da marca (imagem, não máscara, pra não pegar a tinta do cartão)
+    const url = branco ? LOGO.url(b, { forma: 'extensa', estilo: 'mono', tinta: '#FFFFFF' }) : LOGO.url(b, { forma: 'extensa', estilo: mono ? 'mono' : 'cor', fundo: claro(tinta) ? 'escuro' : 'claro' }); if (!url) return null;
+    const asp = LOGO.aspecto(b, 'extensa', branco || mono ? 'mono' : 'cor'), h = Math.round((lm ? lm[0] : 5) * (ESC_CARTAO[b] || 1) * 100) / 100;
+    return { url, mask: branco ? false : mono, h, w: Math.round(h * asp * 100) / 100, asp };
   };
 
   /* ---------- ferramentas de verificação (rodam no navegador) ---------- */
