@@ -2864,10 +2864,12 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const brl0 = n => 'R$ ' + Math.round(Number(n) || 0).toLocaleString('pt-BR');
   const moedaMask = v => { const d = String(v).replace(/\D/g, '').slice(0, 11); return d ? (+d / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : ''; };
   const moedaNum = v => { const d = String(v || '').replace(/\D/g, ''); return d ? +d / 100 : 0; };
+  const misturaBranco = (hex, t) => { const h = hex.replace('#', ''), v = [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)); return '#' + v.map(c => Math.round(c + (255 - c) * t).toString(16).padStart(2, '0')).join(''); };
+  const legivel = c => { if (!c || c.length < 7) return c; for (let t = 0; t <= 1; t += .1) { const m = misturaBranco(c, t); if (KD.contraste(m, '#141416') >= 3) return m; } return '#FFFFFF'; };   // cor da marca clareada só o necessário para ler sobre o fundo escuro
   const pagina = () => (KD.comp && KD.comp.state && KD.comp.state.page) === 'cartoes';
 
   /* ---------- logo / cor do banco ---------- */
-  const logoDe = (inst, nome, cor) => { const k = KD.logo && KD.logo.chave(inst) || KD.logo && KD.logo.chave(nome); if (k) return KD.logo.slot(k, { forma: 'compacta', fundo: 'escuro', estilo: 'cor' }, 22, 40, cor); const b = KD.bankOf(nome, inst); return b ? '<span style="font-size:17px;font-weight:800;letter-spacing:-.05em;color:' + (KD.BANK[b][0] === '#0030CE' ? '#5C7CFF' : cor) + ';white-space:nowrap">' + esc(b.toLowerCase()) + '</span>' : '<img src="' + KD.logo.ponto(cor) + '" width="40" height="22" alt="">'; };
+  const logoDe = (inst, nome, cor) => { const k = KD.logo && KD.logo.chave(inst) || KD.logo && KD.logo.chave(nome); if (k) return KD.logo.slot(k, { forma: 'compacta', fundo: 'escuro', estilo: 'cor' }, 22, 40, cor); const b = KD.bankOf(nome, inst); return b ? '<span style="font-size:17px;font-weight:800;letter-spacing:-.05em;color:' + legivel(cor) + ';white-space:nowrap">' + esc(b.toLowerCase()) + '</span>' : '<img src="' + KD.logo.ponto(cor) + '" width="40" height="22" alt="">'; };
   const statusDe = a => {
     const R = KD.fontes && KD.fontes.rows && KD.fontes.rows(); const r = R && R.find(x => x.k === 'a' + a.id); if (!r) return null;
     if (r.modo === 'manual') return r.ok ? ['CONFERIDO', GRN] : ['FALTA CONFERIR', AMB];
@@ -2941,7 +2943,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   function form() {
     const conta = S.mode === 'conta', cred = !conta || S.credito;
     const btn = (b, conteudo) => '<span data-ct-bk="' + b + '" style="height:54px;min-width:92px;border-radius:99px;border:1.5px solid ' + (S.banco === b ? FG : '#3A3A40') + ';background:' + (S.banco === b ? '#1C1C20' : 'transparent') + ';display:flex;align-items:center;justify-content:center;padding:0 14px;cursor:pointer;transition:border-color .25s ease,background .25s ease">' + conteudo + '</span>';
-    const corTxt = b => { const c = KD.BANK[b][0]; return c === '#0030CE' ? '#5C7CFF' : c === '#CC092F' ? '#E8334F' : c; };   // cor da marca legível sobre o fundo escuro do botão
+    const corTxt = b => legivel(KD.BANK[b][0]);
     const bancos = BANCOS.map(b => btn(b, KD.logo.slot(b, { forma: 'extensa', fundo: 'escuro', estilo: 'cor' }, 20, 70, KD.BANK[b] && KD.BANK[b][0]))).join('')
       + BANCOS_TEXTO.map(b => btn(b, '<span style="font-size:15px;font-weight:800;letter-spacing:-.04em;color:' + corTxt(b) + ';white-space:nowrap">' + esc(b.toLowerCase()) + '</span>')).join('')
       + '<span style="height:54px;border-radius:99px;border:1.5px dashed #3A3A40;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 16px;font-size:11px;font-weight:800;letter-spacing:.08em;color:#4A4A52">CAIXA<small style="font-size:8px;letter-spacing:.1em;color:#4A4A52">EM BREVE</small></span>'

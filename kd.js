@@ -45,10 +45,10 @@
     'Next': ['#00FF5F', '#000000'],              // theme-color do site oficial (verde "Electric")
     'XP': ['#FBC105', '#000000'],                // amostrado do site oficial (xpi.com.br)
     'Neon': ['#0030CE', '#FFFFFF'],              // amostrado do site oficial (azul; atenção: neon.com é outra empresa)
-    'BV': ['#0B5FFF', '#FFFFFF'],                // amostrado do site oficial (bv.com.br), a confirmar
-    'PagBank': ['#1BB99A', '#000000'],           // amostrado do site oficial, a confirmar
-    'PicPay': ['#21C25E', '#FFFFFF'],            // Simple Icons / página do PicPay, a confirmar
-    'Inter': ['#FF7A00', '#FFFFFF']              // Brandfetch, a confirmar
+    'BV': ['#002BAB', '#FFFFFF'],                // site oficial bv.com.br: azul dos botões e blocos (revisado em 24/11; #0B5FFF estava errado)
+    'PagBank': ['#1BB99A', '#000000'],           // site oficial: cor dos botões em todas as páginas (o amarelo #F5DE3E é de campanha); sem guia de marca. O site usa texto branco (2,4:1), aqui fica preto
+    'PicPay': ['#21C25E', '#000000'],            // CONFIRMADO: theme-color do site oficial; os botões do site usam texto preto
+    'Inter': ['#FF7A00', '#FFFFFF']              // CONFIRMADO: cor dominante do site oficial inter.co, botões com texto branco (2,6:1)
   };
   const INST = { 'c6 bank': 'C6', 'c6': 'C6', 'itaú': 'Itaú', 'itau': 'Itaú', 'nubank': 'Nubank', 'mercado pago': 'Mercado Pago', 'amazon': 'Amazon',
     'bradesco': 'Bradesco', 'banco do brasil': 'Banco do Brasil', 'bb': 'Banco do Brasil', 'santander': 'Santander', 'next': 'Next', 'xp': 'XP', 'xp investimentos': 'XP', 'neon': 'Neon', 'bv': 'BV', 'banco bv': 'BV', 'banco votorantim': 'BV', 'pagbank': 'PagBank', 'pagseguro': 'PagBank', 'picpay': 'PicPay', 'inter': 'Inter', 'banco inter': 'Inter' };
