@@ -324,6 +324,10 @@
     const fatOf = (c, m) => (c.fatInf != null && c.ve && m === mIdx(T) + (T.getDate() < c.ve ? 0 : 1)) ? c.fatInf : fatOf0(c, m);
     const nFat = (c, m) => M.cash.filter(e => e.card === c.n && e.mi === m).length;
     out.FATS = M.cards.map(c => {
+      if (isCur && c.fatInf != null) {   // conectado: no mês atual, a fatura aberta que o banco informa, com o próximo vencimento
+        if (!c.fatInf) return null; const due = c.ve ? new Date(T.getFullYear(), T.getMonth() + (T.getDate() < c.ve ? 0 : 1), c.ve) : null;
+        return { n: c.nick || c.n, v: int(c.fatInf), sub: (due ? 'vence ' + dmes(due) + ' · ' : '') + 'aberta, pelo banco', cor: c.cor, ink: c.ink };
+      }
       const v = fatOf(c, mi); if (!v) return null;
       const due = c.ve ? new Date(Math.floor(mi / 12), mi % 12, Math.min(c.ve, nd)) : null;
       let close = null; if (c.fe && c.ve) { close = new Date(due.getFullYear(), due.getMonth() - (c.fe >= c.ve ? 1 : 0), c.fe); }
