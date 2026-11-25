@@ -2858,6 +2858,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     host.innerHTML = '<div style="max-width:1080px;margin:0 auto;padding:6px 0 0;font-family:Helvetica,Arial,sans-serif;color:' + FG + '">'
       + '<div data-ft-a style="font-size:96px;font-weight:700;letter-spacing:-.065em;line-height:.9">Fontes</div>'
       + '<div data-ft-a style="font-size:13px;color:' + MU + ';margin-top:12px;max-width:600px;line-height:1.45">Como cada conta e cartão chega no Kontar. Escolha o modo de cada uma; o Kontar mostra o que falta para fechar o mês.</div>'
+      + (ofAtivo ? '<div data-ft-a style="margin-top:18px"><span data-ft-conectar role="button" style="display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 20px;border:1.5px solid #55555C;border-radius:99px;font-size:11px;font-weight:900;letter-spacing:.12em;cursor:pointer;color:' + FG + ';transition:background .25s ease" onmouseover="this.style.background=\'#1C1C20\'" onmouseout="this.style.background=\'transparent\'">+ CONECTAR BANCO</span></div>' : '')
       + '<div data-ft-a style="display:flex;justify-content:space-between;align-items:baseline;margin-top:24px;padding-bottom:10px"><span style="font-size:10.5px;font-weight:700;letter-spacing:.14em;color:' + MU + '">↘ ' + m.toUpperCase() + ' · ESTADO DE CADA FONTE</span><span style="font-size:12px;font-weight:800;letter-spacing:.1em;color:' + (ok === R.length ? GR : AMB) + '">' + ok + ' DE ' + R.length + ' EM DIA</span></div>'
       + (rows ? R.map(linha).join('') : '<div style="padding:30px 0;color:' + MU + '">Carregando…</div>') + '<div style="border-top:1px solid #2A2A2F"></div>'
       + '<div data-ft-a style="margin-top:22px;display:flex;align-items:center;gap:14px"><span style="font-size:10.5px;font-weight:700;letter-spacing:.14em;color:' + MU + '">↘ LEMBRETE DE FECHAMENTO</span><span style="font-size:12.5px;color:#B4B4BA">Avisar a partir do dia</span><span style="display:inline-flex;align-items:center;border:1.5px solid #3A3A40;border-radius:99px;height:34px"><span data-ft-dia="-1" style="width:34px;text-align:center;font-size:16px;font-weight:800;cursor:pointer;user-select:none">−</span><b data-ft-dia-n style="min-width:26px;text-align:center;font-size:14px">' + FT.dia() + '</b><span data-ft-dia="1" style="width:34px;text-align:center;font-size:16px;font-weight:800;cursor:pointer;user-select:none">+</span></span></div>'
@@ -3366,6 +3367,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (k === 'conectar') { if (!flagOF()) return; const ini = { kind: f.kind, accId: f.accId }; return flFecha(() => { if (CT.conectar) CT.conectar(ini); }); }
     const kind = f.kind, accId = f.accId; flFecha(() => { if (kind === 'cartao') CT.novoCartaoForm(accId); else CT.nova(); });
   }
+  CT._u = { IC, esc, logoDe, nomeLivre, nomesUsados, brl, moedaNum, iso, TODOS, CORES, inkOn, TIPOS };
   CT.adicionar = ini => {
     if (fl || layer) return; ini = ini || {};
     FL = { step: 'tipo', kind: ini.kind || null, accId: null, pilha: [] };
@@ -3402,4 +3404,151 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const at = e.target.closest && e.target.closest('[data-ct-arqt]'); if (at) { e.stopPropagation(); arqAberto = !arqAberto; passe(); }
   }, true);
   window.addEventListener('keydown', e => { if (e.key === 'Escape') { if (fl) flFecha(); else if (layer && !(S && S.busy)) fecha(); } });
+})();
+
+/* Kontar · conectar ao banco (Open Finance via Pluggy) a partir de Contas ou de Fontes.
+   Fluxo: token → widget da Pluggy → registrar a conexão → listar o que o banco trouxe → ligar cada item a uma conta/cartão do Kontar
+   (novo ou já existente) → sincronizar. KD.contas.conectar({ kind, accId }) abre; a edge function `open-finance` faz o trabalho pesado. */
+(function () {
+  'use strict';
+  const KD = window.KD, CT = KD && KD.contas; if (!CT || !CT._u) return;
+  const { IC, esc, logoDe, nomeLivre, nomesUsados, brl, moedaNum, iso } = CT._u;
+  const EE = 'cubic-bezier(.65,0,.35,1)', FG = '#F2F0EB', INK = '#0A0A0A', MU = '#7C7C85', AMB = '#F0C24B', GRN = '#00A86B';
+  let L = null, X = null;
+  const hoje = () => KD.iso ? KD.iso(KD.today) : iso(KD.today);
+  const inv = async body => {
+    const r = await KD.sb.functions.invoke('open-finance', { body });
+    if (r.error) { let d = ''; try { const j = await r.error.context.json(); d = j.detalhe || j.erro || j.motivo || ''; } catch (e) { /* sem corpo */ } throw new Error(d || r.error.message || 'erro'); }
+    return r.data;
+  };
+  const carregaWidget = () => new Promise((ok, no) => { if (window.PluggyConnect) return ok(); const s = document.createElement('script'); s.src = 'https://cdn.pluggy.ai/pluggy-connect/v2.8.0/pluggy-connect.js'; s.onload = ok; s.onerror = () => no(new Error('Não carreguei o widget do banco. Confira a internet.')); document.head.appendChild(s); });
+
+  /* banco do item: pelo nome que o banco devolve ("itau", "C6 BANK", "AZUL ITAU VISA PLATINUM"); sem arte, vira "Outro" com o próprio nome */
+  const bancoDe = nome => { const k = KD.logo && KD.logo.chave && KD.logo.chave(nome); return k || null; };
+  const tipoConta = c => c.subtipo === 'SAVINGS_ACCOUNT' ? ['poupanca', 'reserva'] : ['corrente', 'pagamento'];
+  const corDe = b => (b && KD.BANK && KD.BANK[b]) || ['#6A4BFF', '#FFFFFF'];
+  const modoDe = (tipo, id) => { const R = KD.fontes && KD.fontes.rows && KD.fontes.rows(), r = R && R.find(x => x.k === (tipo === 'conta' ? 'a' : 'c') + id); return r ? r.modo : 'extrato'; };
+
+  /* ---------- moldura ---------- */
+  function abreMoldura() {
+    L = document.createElement('div'); L.setAttribute('data-cx-modal', '1');
+    L.style.cssText = 'position:fixed;inset:0;z-index:99984;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;overflow:auto;opacity:0;transition:opacity .3s ease;font-family:Helvetica,Arial,sans-serif;color:' + FG;
+    L.innerHTML = '<div data-cx-card style="width:min(780px,calc(100% - 48px));max-height:calc(100vh - 64px);margin:32px 0;border-radius:30px;background:#141416;border:1px solid #2A2A2F;overflow:hidden;display:flex;flex-direction:column;transform:translateY(10px);transition:transform .45s ' + EE + '"></div>';
+    document.body.appendChild(L);
+    L.addEventListener('mousedown', e => { if (e.target === L && X && !X.busy && X.fase !== 'abrindo') fecha(); });
+    L.addEventListener('click', e => {
+      const t = e.target.closest('[data-cx-x],[data-cx-t],[data-cx-ok],[data-cx-sim],[data-cx-nao]'); if (!t || !X) return;
+      if (t.hasAttribute('data-cx-x')) { if (!X.busy) fecha(); }
+      else if (t.hasAttribute('data-cx-t')) { const i = +t.getAttribute('data-cx-t'); X.itens[i].on = !X.itens[i].on; desenha(false); }
+      else if (t.hasAttribute('data-cx-ok')) importa();
+      else if (t.hasAttribute('data-cx-sim')) { const a = X.novaConta; fecha(); if (a) CT.novoCartaoForm(a); }
+      else if (t.hasAttribute('data-cx-nao')) fecha();
+    });
+    L.addEventListener('change', e => { const k = e.target.getAttribute && e.target.getAttribute('data-cx-s'); if (!k || !X) return; const [i, campo] = k.split(':'); X.itens[+i][campo] = e.target.value; desenha(false); });
+    requestAnimationFrame(() => { L.style.opacity = '1'; L.firstElementChild.style.transform = 'none'; });
+  }
+  function fecha() { if (!L) return; const l = L; L = null; X = null; l.style.opacity = '0'; l.firstElementChild.style.transform = 'translateY(10px)'; setTimeout(() => l.remove(), 320); }
+  const topo = texto => '<div style="display:flex;align-items:center;gap:16px;padding:20px 22px;min-height:78px"><span style="width:38px;flex:none"></span><span style="flex:1;text-align:center;font-size:13.5px;line-height:1.45;color:' + MU + ';text-wrap:balance">' + esc(texto) + '</span>'
+    + '<span data-cx-x role="button" aria-label="Fechar" style="height:38px;width:38px;border-radius:99px;border:1.5px solid #3A3A40;display:flex;align-items:center;justify-content:center;color:#B4B4BA;cursor:pointer;flex:none;transition:color .25s ease,border-color .25s ease" onmouseover="this.style.color=\'#F2F0EB\';this.style.borderColor=\'#55555C\'" onmouseout="this.style.color=\'#B4B4BA\';this.style.borderColor=\'#3A3A40\'">' + IC.x + '</span></div>';
+  const centro = (t, sub) => '<div style="flex:1;min-height:280px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px 48px;gap:8px"><b style="font-size:24px;letter-spacing:-.03em">' + esc(t) + '</b><span style="font-size:13.5px;color:' + MU + ';line-height:1.45;max-width:420px">' + esc(sub || '') + '</span></div>';
+  const sel = (k, valor, ops) => '<select data-cx-s="' + k + '" style="height:42px;border-radius:99px;border:1px solid #3A3A40;background:#0B0B0D;color:' + FG + ';font:inherit;font-size:13px;padding:0 14px;max-width:260px;outline:0;cursor:pointer">' + ops.map(o => '<option value="' + esc(o[0]) + '"' + (o[0] === valor ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('') + '</select>';
+
+  /* ---------- telas ---------- */
+  function desenha(anima) {
+    if (!L || !X) return; const c = L.querySelector('[data-cx-card]'); let h = '';
+    if (X.fase === 'abrindo') h = topo('Conexão segura com o seu banco') + centro(X.msg || 'Abrindo a conexão…', 'Escolha o banco na janela que abrir e autorize o acesso. O Kontar só lê, nunca movimenta dinheiro.');
+    else if (X.fase === 'erro') h = topo('Não deu certo') + centro('Não consegui conectar', X.msg || '') + '<div style="padding:0 22px 24px;display:flex;justify-content:center"><span data-cx-x style="background:' + FG + ';color:' + INK + ';border-radius:99px;font-size:12px;font-weight:900;letter-spacing:.1em;padding:15px 24px;cursor:pointer">FECHAR</span></div>';
+    else if (X.fase === 'importando') h = topo('Buscando os lançamentos do banco') + centro(X.msg || 'Importando…', 'Isso pode levar alguns segundos. Pode deixar esta janela aberta.');
+    else if (X.fase === 'cartao') h = topo('Conta conectada') + centro(X.resumo || 'Pronto.', '') + '<div style="padding:0 22px 8px;text-align:center;font-size:15px;font-weight:700;letter-spacing:-.02em">Essa conta tem cartão de crédito?</div>'
+      + '<div style="padding:10px 22px 26px;display:flex;gap:12px;justify-content:center"><span data-cx-nao style="border:1.5px solid #3A3A40;border-radius:99px;font-size:12px;font-weight:900;letter-spacing:.1em;padding:15px 26px;cursor:pointer">NÃO</span><span data-cx-sim style="background:' + FG + ';color:' + INK + ';border-radius:99px;font-size:12px;font-weight:900;letter-spacing:.1em;padding:15px 26px;cursor:pointer">SIM, ADICIONAR</span></div>';
+    else if (X.fase === 'fim') h = topo('Tudo certo') + centro(X.resumo || 'Pronto.', X.sub || '') + '<div style="padding:0 22px 24px;display:flex;justify-content:center"><span data-cx-x style="background:' + FG + ';color:' + INK + ';border-radius:99px;font-size:12px;font-weight:900;letter-spacing:.1em;padding:15px 24px;cursor:pointer">CONCLUIR</span></div>';
+    else {   // ligar
+      const M = KD.M, temBanco = X.itens.some(i => i.c.tipo === 'BANK');
+      const linhas = X.itens.map((it, i) => {
+        const cred = it.c.tipo === 'CREDIT', k = bancoDe(it.c.nome), cor = corDe(k)[0], inst = k || it.c.nome.trim();
+        const opsC = cred ? [['new', 'Novo cartão'], ...M.cards.filter(cd => modoDe('cartao', cd.id) !== 'open_finance').map(cd => [cd.id, 'Usar: ' + cd.n])] : [['new', 'Nova conta'], ...M.accs.filter(a => modoDe('conta', a.id) !== 'open_finance').map(a => [a.id, 'Usar: ' + a.nome])];
+        const host = cred && it.alvo === 'new' && !X.accId && !temBanco ? '<div style="margin-top:8px">' + sel(i + ':host', it.host, [['', 'Conta que paga a fatura…'], ...M.accs.map(a => [a.id, a.nome])]) + '</div>' : '';
+        return '<div style="display:flex;align-items:center;gap:18px;padding:18px 28px;border-top:1px solid #2A2A2F;opacity:' + (it.on ? 1 : .45) + ';transition:opacity .3s ease">'
+          + '<span data-cx-t="' + i + '" role="button" style="width:26px;height:26px;border-radius:8px;border:1.5px solid ' + (it.on ? FG : '#3A3A40') + ';background:' + (it.on ? FG : 'transparent') + ';color:' + INK + ';display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;transition:all .25s ease">' + (it.on ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>' : '') + '</span>'
+          + '<span style="width:54px;display:flex;justify-content:center;flex:none">' + logoDe(inst, it.c.nome, cor) + '</span>'
+          + '<span style="flex:1;min-width:0"><b style="display:block;font-size:17px;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(it.c.nome.trim()) + (it.c.final ? ' ···· ' + esc(it.c.final) : '') + '</b><span style="display:block;font-size:12.5px;color:' + MU + ';margin-top:3px">' + (cred ? 'Cartão de crédito' + (it.c.limite ? ' · limite R$ ' + esc(brl(it.c.limite)) : '') : (it.c.subtipo === 'SAVINGS_ACCOUNT' ? 'Poupança' : 'Conta') + ' · saldo R$ ' + esc(brl(it.c.saldo))) + '</span></span>'
+          + '<span style="flex:none">' + sel(i + ':alvo', it.alvo, opsC) + host + '</span></div>';
+      }).join('');
+      const n = X.itens.filter(i => i.on).length;
+      h = topo('O banco trouxe ' + X.itens.length + (X.itens.length === 1 ? ' item. ' : ' itens. ') + 'Confirme com quem cada um se liga no Kontar.')
+        + '<div style="flex:1;min-height:0;overflow:auto">' + linhas + '</div>'
+        + '<div style="padding:16px 22px 22px;border-top:1px solid #2A2A2F;display:flex;align-items:center;gap:16px"><span data-cx-msg style="flex:1;font-size:12.5px;color:#FF6A5C">' + esc(X.msg || '') + '</span><span data-cx-ok style="background:' + FG + ';color:' + INK + ';border-radius:99px;font-size:12px;font-weight:900;letter-spacing:.1em;padding:15px 24px;cursor:pointer;white-space:nowrap;opacity:' + (n ? 1 : .4) + '">IMPORTAR ' + n + '</span></div>';
+    }
+    c.innerHTML = h;
+    if (anima && c.animate) c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 380, easing: EE });
+  }
+
+  /* ---------- importar ---------- */
+  async function importa() {
+    if (!X || X.busy) return; const M = KD.M, sb = KD.sb, uid = KD.user.id, itens = X.itens.filter(i => i.on);
+    if (!itens.length) { X.msg = 'Marque pelo menos um item.'; return desenha(false); }
+    for (const it of itens) if (it.c.tipo === 'CREDIT' && it.alvo === 'new' && !X.accId && !itens.some(j => j.c.tipo === 'BANK') && !it.host) { X.msg = 'Escolha a conta que paga a fatura de ' + it.c.nome.trim() + '.'; return desenha(false); }
+    X.busy = true; X.fase = 'importando'; X.msg = 'Ligando as contas…'; desenha(false);
+    const dia = hoje(), ligacao = it => ({ fonte_modo: 'open_finance', conexao_id: X.conexaoId, of_conta_id: it.c.id });
+    try {
+      let accDoItem = X.accId || null, novaConta = null, ordA = Math.max(0, ...M.accs.map(a => a.ordem || 0)), ordC = Math.max(0, ...M.cards.map(c => c.ordem || 0), M.cards.length);
+      for (const it of itens.filter(i => i.c.tipo === 'BANK')) {
+        const k = bancoDe(it.c.nome), [cor] = corDe(k), [tipo, funcao] = tipoConta(it.c);
+        if (it.alvo !== 'new') {
+          const r = await sb.from('accounts').update(Object.assign({ saldo: it.c.saldo, saldo_em: dia }, ligacao(it))).eq('id', it.alvo); if (r.error) throw r.error; accDoItem = accDoItem || it.alvo;
+        } else {
+          const nome = (() => { const u = nomesUsados(), base = k || it.c.nome.trim(); return !u.has(base.toLowerCase()) ? base : (u.has((base + ' ' + (it.c.final || 'conta')).toLowerCase()) ? base + ' ' + Date.now() % 1000 : base + ' ' + (it.c.final || 'conta')); })();
+          const r = await sb.from('accounts').insert(Object.assign({ user_id: uid, nome, instituicao: k || it.c.nome.trim(), tipo, funcao, saldo: it.c.saldo, saldo_em: dia, cor, ordem: ++ordA, ativo: true, final4: it.c.final || null }, ligacao(it))).select().single();
+          if (r.error) throw r.error; accDoItem = accDoItem || r.data.id; novaConta = novaConta || r.data.id;
+        }
+      }
+      for (const it of itens.filter(i => i.c.tipo === 'CREDIT')) {
+        if (it.alvo !== 'new') { const r = await sb.from('cards').update(Object.assign({ final4: it.c.final || undefined }, ligacao(it))).eq('id', it.alvo); if (r.error) throw r.error; continue; }
+        const k = bancoDe(it.c.nome), [cor, tinta] = corDe(k), inst = k || it.c.nome.trim(), host = X.accId || (itens.some(j => j.c.tipo === 'BANK') ? accDoItem : it.host) || accDoItem;
+        const lim = it.c.limite || null, r = await sb.from('cards').insert(Object.assign({ user_id: uid, nome: nomeLivre(inst), instituicao: inst, brand_hex: cor, tinta, final4: it.c.final || null, limite: lim, disponivel_informado: it.c.disponivel != null ? it.c.disponivel : lim, limite_em: lim ? dia : null, conta_pagamento_id: host || null, ordem: ++ordC, ativo: true }, ligacao(it))).select().single();
+        if (r.error) throw r.error;
+        const y = await sb.from('card_cycles').insert({ user_id: uid, card_id: r.data.id, vigencia_inicio: dia, dia_fechamento: it.c.fecha || 1, dia_vencimento: it.c.vence || 10, regra: 'dia_fixo', origem: 'manual' }); if (y.error) throw y.error;
+      }
+      X.novaConta = novaConta || accDoItem; X.msg = 'Buscando os lançamentos…'; desenha(false);
+      const sy = await inv({ acao: 'sync' }), mine = (sy.sincronizadas || []).find(s => s.conexao === X.conexaoId) || {};
+      if (mine.status && mine.status !== 'ativo') throw new Error('A sincronização terminou com status "' + mine.status + '". Tente de novo em Fontes.');
+      try { await KD.refresh(KD.comp); if (KD.fontes && KD.fontes.carregar) KD.fontes.carregar(); } catch (e) { console.error(e); }
+      X.busy = false;
+      const resumo = (mine.novas || 0) + ' lançamentos importados' + (mine.mescladas ? ' · ' + mine.mescladas + ' mesclados com os que você já tinha' : '');
+      const temCredito = X.itens.some(i => i.c.tipo === 'CREDIT');
+      if (X.kind === 'conta' && !temCredito && novaConta) { X.fase = 'cartao'; X.resumo = resumo; } else { X.fase = 'fim'; X.resumo = resumo; X.sub = 'As compras do banco entram como pendentes de revisão, com a categoria sugerida. Confira no Extrato.'; }
+      desenha(true);
+    } catch (e) { console.error('[kontar] conectar', e); X.busy = false; X.fase = 'ligar'; X.msg = 'Não consegui importar: ' + (e.message || e); desenha(false); try { await KD.refresh(KD.comp); } catch (_) { /* segue */ } }
+  }
+
+  /* ---------- entrada ---------- */
+  CT.conectar = async ini => {
+    if (L) return; ini = ini || {};
+    if (KD.isDemo()) { X = { fase: 'erro', msg: 'Conta de demonstração: conectar ao banco fica travado.', itens: [] }; abreMoldura(); desenha(false); return; }
+    X = { kind: ini.kind || null, accId: ini.accId || null, fase: 'abrindo', msg: '', itens: [], busy: false }; abreMoldura(); desenha(false);
+    try {
+      const { accessToken } = await inv({ acao: 'connect-token' });
+      await carregaWidget();
+      await new Promise((ok, no) => {
+        const w = new window.PluggyConnect({ connectToken: accessToken, includeSandbox: false,
+          onSuccess: async d => { try { X.recebido = true; X.msg = 'Lendo o que o banco trouxe…'; desenha(false); const item = d && d.item; if (!item || !item.id) throw new Error('A conexão não devolveu o identificador do banco.');
+            const reg = await inv({ acao: 'registrar', itemId: item.id, instituicao: item.connector && item.connector.name }); X.conexaoId = reg.conexaoId;
+            const r = await inv({ acao: 'contas', itemId: item.id });
+            const lista = (r.contas || []).filter(c => c.tipo === 'BANK' || c.tipo === 'CREDIT');
+            if (!lista.length) throw new Error('O banco não trouxe nenhuma conta ou cartão.');
+            const M = KD.M; X.itens = lista.map(c => {
+              const k = bancoDe(c.nome); let alvo = 'new';
+              if (c.tipo === 'BANK') { const cand = M.accs.filter(a => a.bank === k && modoDe('conta', a.id) !== 'open_finance'); if (k && cand.length === 1) alvo = cand[0].id; }
+              else { const cand = M.cards.filter(cd => cd.fin === c.final && c.final && modoDe('cartao', cd.id) !== 'open_finance'); if (cand.length === 1) alvo = cand[0].id; }
+              return { c, on: true, alvo, host: M.accs.length === 1 ? M.accs[0].id : '' };
+            });
+            X.fase = 'ligar'; X.msg = ''; desenha(true); ok(); } catch (e) { no(e); } },
+          onError: e => no(new Error('A conexão foi recusada pelo banco' + (e && e.message ? ': ' + e.message : '') + '.')),
+          onClose: () => { if (X && X.fase === 'abrindo' && !X.recebido) { fecha(); ok(); } } });
+        w.init();
+      });
+    } catch (e) { console.error('[kontar] conectar', e); if (X) { X.fase = 'erro'; X.msg = e.message || String(e); X.busy = false; desenha(false); } }
+  };
+  document.addEventListener('click', e => { const t = e.target.closest && e.target.closest('[data-ft-conectar]'); if (t) { e.stopPropagation(); CT.conectar({}); } }, true);
+  window.addEventListener('keydown', e => { if (e.key === 'Escape' && L && X && !X.busy && X.fase !== 'abrindo') fecha(); });
 })();
