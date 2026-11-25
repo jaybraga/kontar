@@ -502,9 +502,9 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
 .fld.big input{font-size:clamp(56px,7vw,96px);font-weight:700;letter-spacing:-.06em;line-height:1;font-variant-numeric:tabular-nums;padding:0}
 .bigs{color:var(--dim);margin:2px 0 6px 20px}
 .cfade.tp{bottom:auto;top:0;height:40px;background:linear-gradient(to bottom,#111114 10%,rgba(17,17,20,0))}
-.sbk{display:flex;flex-direction:column;gap:8px}.sbk .oft .tile{height:54px}
+.sbk{display:flex;flex-direction:column;gap:8px;margin-top:4px}.sbk .oft .tile{height:54px}
 .sbk .tile .ck{background:var(--verde);color:#000}.sbk .tile[aria-pressed=false]{border-color:#2A2A2F}
-.sbk .lgd{display:flex;align-items:center;gap:8px;margin:0 0 0 20px;font-size:12.5px;color:var(--dim)}.sbk .lgd i{width:14px;height:14px;border-radius:50%;background:var(--verde);color:#000;font-style:normal;font-size:9px;font-weight:900;display:grid;place-items:center}
+.sbk .lgd{display:flex;align-items:center;gap:8px;margin:6px 0 10px 0;font-size:12.5px;color:var(--dim)}.sbk .lgd i{width:14px;height:14px;border-radius:50%;background:var(--verde);color:#000;font-style:normal;font-size:9px;font-weight:900;display:grid;place-items:center}
 .pal{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 0 20px}.pal button,.pal label{width:26px;height:26px;border-radius:50%;border:0;padding:0;cursor:pointer;position:relative;display:block;flex:none}
 .tile{height:58px;border-radius:20px;border:1.5px solid #3A3A40;background:var(--btn);display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;transition:border-color .25s,background .25s;padding:0}
 .tile:hover{border-color:#4A4A52}.tile[aria-pressed=true]{border-color:var(--ac)}
@@ -584,7 +584,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
         { n: 'Seus bancos', h: 'Seus<br>bancos.', sb: 'Marque os bancos onde você tem conta ou cartão. Depois você preenche cada um, ou deixa pra mais tarde.', note: 'Opcional. Dá pra pular', tag: 'Opcional', ac: '#FF8A5B', on: '#000' },
         { n: 'Ponto de partida', h: 'Por onde<br>começar?', sb: 'Escolha um caminho pra trazer seus lançamentos. Dá pra mudar a qualquer hora.', note: 'Escolha um dos três caminhos', tag: '3 caminhos', ac: 'var(--amar)', on: '#000' },
         { n: 'Renda', h: 'Sua<br>renda.', sb: 'Com isso o Kontar já calcula<br>seus tetos de gasto.', note: 'Opcional. Dá pra pular', tag: 'Opcional', ac: 'var(--verde)', on: '#000' },
-        { n: 'Tudo pronto', h: 'Pronto,<br><span id="who"></span>', sb: 'Confira o resumo.<br>O resto você ajusta<br>nos próprios cards.', note: 'Confira e abra o seu painel', tag: 'Resumo', ac: 'var(--bone)', on: '#000' }];
+        { n: 'Tudo pronto', h: 'Pronto,<br><span id="who"></span>', sb: 'Confira o resumo.<br>O resto você ajusta nos próprios cards.', note: 'Confira e abra o seu painel', tag: 'Resumo', ac: 'var(--bone)', on: '#000' }];
       const D = { nm: nameGuess || '', nl: '', nj: '', how: null, rd: '', dia: null, bancos: [], dados: {}, caminho: null, of: [] }; let i = 0; const LAST = ST.length - 1;
       /* ---- passo "Seus bancos": grade de logos → uma tela por banco; o passo vira anel de progresso na barra de cima ---- */
       const KD2 = window.KD, GRADE = ['Caixa', 'Nubank', 'Itaú', 'Bradesco', 'Banco do Brasil', 'Santander', 'Mercado Pago', 'PicPay', 'Inter', 'C6', 'PagBank', 'Neon', 'XP', 'Next', 'BV', 'Amazon'];   /* popularidade aproximada no Brasil */
