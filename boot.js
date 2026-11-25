@@ -519,7 +519,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
 .cr .fld{height:50px;padding:0 14px}.cr .fld input{font-size:15px}
 .bkm{min-height:16px;margin:0 0 0 20px;font-size:12.5px;color:#FF6A5C}
 .later{border:0;background:none;color:var(--dim);font-size:12.5px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;padding:0;align-self:flex-start;margin-left:20px}.later:hover{color:#fff}
-.ofw{display:flex;flex-direction:column;gap:10px}
+.ofw{gap:10px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .tall{display:flex;flex-direction:column;align-items:flex-start;gap:8px;text-align:left;min-height:200px;padding:18px;border-radius:24px;border:1.5px solid #2A2A2F;background:var(--btn);cursor:pointer;transition:border-color .3s var(--E),background .3s var(--E)}
 .tall:hover{border-color:#4A4A52}.tall[aria-checked=true]{border-color:var(--ac)}
