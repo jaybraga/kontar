@@ -415,7 +415,7 @@ button,input{font:inherit;color:inherit}
 @keyframes up{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 .cap{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase}
 .stage{min-height:100vh;display:grid;place-items:center;padding:28px 24px}
-.board{position:relative;isolation:isolate;width:min(1120px,100%);height:clamp(640px,calc(100vh - 56px),860px);min-height:0;display:grid;grid-template-rows:73px 1fr;border-radius:30px 0 0 30px;overflow:hidden}
+.board{position:relative;isolation:isolate;width:min(1240px,100%);height:740px;min-height:740px;display:grid;grid-template-rows:73px 1fr;border-radius:30px 0 0 30px;overflow:hidden}
 .board>svg{position:absolute;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
 .hdr,.ftr{display:grid;align-items:stretch}
 .hdr{grid-template-columns:auto 1fr;position:relative}.hdr::after{content:"";position:absolute;left:0;right:18px;bottom:0;height:1px;background:var(--ln)}
