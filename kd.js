@@ -125,7 +125,7 @@
     M.cards = R.cards.filter(c => !c.removido_em && !ARQ.has(c.conta_pagamento_id)).sort((a, b) => ALF(a.apelido || a.nome, b.apelido || b.nome) || a.ordem - b.ordem).map(c => {
       const col = colorOf(c.nome, c.instituicao, c.brand_hex), cy = cycOf(c.id, T), lim = Number(c.limite) || 0;
       const used = lim && c.disponivel_informado != null ? Math.max(0, lim - Number(c.disponivel_informado)) : 0;
-      return { id: c.id, acc: c.conta_pagamento_id || null, n: c.nome, informed: lim && c.disponivel_informado != null, nick: c.apelido || '', fin: c.final4 || '····', lim, used, cor: col[0], ink: KD.tema(col[0], bankOf(c.nome, c.instituicao), c.tinta || col[1]).ink, bank: bankOf(c.nome, c.instituicao), cy,
+      return { id: c.id, acc: c.conta_pagamento_id || null, destaque: (KD.destaque && KD.destaque(bankOf(c.nome, c.instituicao), '#141416')) || col[0], n: c.nome, informed: lim && c.disponivel_informado != null, nick: c.apelido || '', fin: c.final4 || '····', lim, used, cor: col[0], ink: KD.tema(col[0], bankOf(c.nome, c.instituicao), c.tinta || col[1]).ink, bank: bankOf(c.nome, c.instituicao), cy,
         fe: cy ? cy.dia_fechamento : null, ve: cy ? cy.dia_vencimento : null, orig: cy ? ({ fatura: 'fatura real', chute: 'chute', manual: 'cadastro manual' })[cy.origem] || 'chute' : 'chute',
         since: cy && cy.vigencia_inicio > '2025-01-01' ? cy.vigencia_inicio : null };
     });
@@ -133,7 +133,7 @@
     const cardByIdAll = Object.fromEntries(R.cards.map(c => [c.id, c]));
 
     /* contas */
-    M.accs = R.accs.filter(a => a.ativo !== false).sort((a, b) => ALF(a.nome, b.nome) || a.ordem - b.ordem).map(a => ({ id: a.id, inst: a.instituicao || '', fin: a.final4 || '', ordem: a.ordem, nome: a.nome, saldo: Number(a.saldo) || 0, em: a.saldo_em ? pd(a.saldo_em) : T, tipo: a.tipo, funcao: a.funcao, cor: colorOf(a.nome, a.instituicao, a.cor)[0], bank: bankOf(a.nome, a.instituicao) }));
+    M.accs = R.accs.filter(a => a.ativo !== false).sort((a, b) => ALF(a.nome, b.nome) || a.ordem - b.ordem).map(a => ({ destaque: (KD.destaque && KD.destaque(bankOf(a.nome, a.instituicao), '#141416')) || colorOf(a.nome, a.instituicao, a.cor)[0], id: a.id, inst: a.instituicao || '', fin: a.final4 || '', ordem: a.ordem, nome: a.nome, saldo: Number(a.saldo) || 0, em: a.saldo_em ? pd(a.saldo_em) : T, tipo: a.tipo, funcao: a.funcao, cor: colorOf(a.nome, a.instituicao, a.cor)[0], bank: bankOf(a.nome, a.instituicao) }));
 
     M.arq = { accs: R.accs.filter(a => a.ativo === false).map(a => ({ id: a.id, nome: a.nome, inst: a.instituicao || '', cor: colorOf(a.nome, a.instituicao, a.cor)[0], n: R.cards.filter(c => c.conta_pagamento_id === a.id && !c.removido_em).length })),
       cards: R.cards.filter(c => c.removido_em && !ARQ.has(c.conta_pagamento_id)).map(c => ({ id: c.id, nome: c.nome, inst: c.instituicao || '', cor: colorOf(c.nome, c.instituicao, c.brand_hex)[0], fin: c.final4 || '' })) };
@@ -290,7 +290,7 @@
     out.PATEV = ev6(m => m < accStart ? 0 : Math.round(M.accs.reduce((a, acc) => a + balAt(acc, m === M.CUR ? T : mEnd(m)), 0)));
 
     /* cartões e limite */
-    out.LIM = M.cards.map(c => ({ n: c.n, nick: c.nick, fin: c.fin, cor: c.cor, ink: c.ink, lim: c.lim, u: c.used, p: c.lim ? Math.round(c.used / c.lim * 100) : 0, ciclo: 'fecha ' + (c.fe || '—') + ' · vence ' + (c.ve || '—'), orig: c.orig, id: c.id, since: c.since }));
+    out.LIM = M.cards.map(c => ({ n: c.n, nick: c.nick, fin: c.fin, cor: c.cor, dst: c.destaque, ink: c.ink, lim: c.lim, u: c.used, p: c.lim ? Math.round(c.used / c.lim * 100) : 0, ciclo: 'fecha ' + (c.fe || '—') + ' · vence ' + (c.ve || '—'), orig: c.orig, id: c.id, since: c.since }));
     const W = out.LIM.filter(c => c.lim > 0), lt = W.reduce((a, c) => a + c.lim, 0), lu = W.reduce((a, c) => a + c.u, 0);
     out.lim = { tot: lt, used: lu, disp: lt - lu, pct: lt ? lu / lt * 100 : 0 };
 
