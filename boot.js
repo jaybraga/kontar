@@ -614,7 +614,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
       new ResizeObserver(ajustaLogos).observe($('#ofp'));
       /* logo na lista do que veio: o mesmo do seletor (Mercado Pago com o nome claro); o Itaú vai com o nome escrito, a pedra sozinha some na linha */
       const logoLista = b => { const L = KD2.logo; if (!L) return '';
-        if (b === 'Itaú' && L.svg) { const sv = L.svg('Itaú', { forma: 'palavra', fundo: 'escuro', estilo: 'cor' }); if (sv) return '<span aria-hidden="true" style="width:56px;height:20px;flex:none;display:block;background:url(\'data:image/svg+xml,' + encodeURIComponent(sv) + '\') left center/contain no-repeat"></span>'; }
+        if (b === 'Itaú' && L.svg) { const sv = L.svg('Itaú', { forma: 'palavra', fundo: 'escuro', estilo: 'cor' }); if (sv) return '<span aria-hidden="true" style="width:76px;height:20px;flex:none;display:block;background:url(\'data:image/svg+xml,' + encodeURIComponent(sv) + '\') center/contain no-repeat"></span>'; }
         return L.seletor ? L.seletor(b, 18, 76) : logoDe(b, 18, 76); };
       const msgOf = t => { ofErr = t || ''; const m = $('#ofm'); if (m) m.textContent = ofErr; };
       const desenhaOf = () => {
