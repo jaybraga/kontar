@@ -133,7 +133,7 @@
     const cardByIdAll = Object.fromEntries(R.cards.map(c => [c.id, c]));
 
     /* contas */
-    M.accs = R.accs.filter(a => a.ativo !== false).sort((a, b) => ALF(a.nome, b.nome) || a.ordem - b.ordem).map(a => ({ destaque: (KD.destaque && KD.destaque(bankOf(a.nome, a.instituicao), '#141416')) || colorOf(a.nome, a.instituicao, a.cor)[0], id: a.id, inst: a.instituicao || '', fin: a.final4 || '', ordem: a.ordem, nome: a.nome, saldo: Number(a.saldo) || 0, em: a.saldo_em ? pd(a.saldo_em) : T, tipo: a.tipo, funcao: a.funcao, conexao: a.conexao_id || null, grupo: a.grupo || null, modo: a.fonte_modo || 'extrato', cor: colorOf(a.nome, a.instituicao, a.cor)[0], bank: bankOf(a.nome, a.instituicao) }));
+    M.accs = R.accs.filter(a => a.ativo !== false).sort((a, b) => ALF(a.nome, b.nome) || a.ordem - b.ordem).map(a => ({ destaque: (KD.destaque && KD.destaque(bankOf(a.nome, a.instituicao), '#141416')) || colorOf(a.nome, a.instituicao, a.cor)[0], id: a.id, inst: a.instituicao || '', fin: a.final4 || '', ordem: a.ordem, nome: a.nome, saldo: Number(a.saldo) || 0, em: a.saldo_em ? pd(a.saldo_em) : T, tipo: a.tipo, funcao: a.funcao, conexao: a.conexao_id || null, grupo: a.grupo || null, modo: a.fonte_modo || 'extrato', of: a.of_conta_id || null, cor: colorOf(a.nome, a.instituicao, a.cor)[0], bank: bankOf(a.nome, a.instituicao) }));
 
     M.arq = { accs: R.accs.filter(a => a.ativo === false).map(a => ({ id: a.id, nome: a.nome, inst: a.instituicao || '', cor: colorOf(a.nome, a.instituicao, a.cor)[0], n: R.cards.filter(c => c.conta_pagamento_id === a.id && !c.removido_em).length })),
       cards: R.cards.filter(c => c.removido_em && !ARQ.has(c.conta_pagamento_id)).map(c => ({ id: c.id, nome: c.nome, inst: c.instituicao || '', cor: colorOf(c.nome, c.instituicao, c.brand_hex)[0], fin: c.final4 || '' })) };
@@ -156,7 +156,11 @@
         items: (itemsBy[l.id] || []).sort((a, b) => a.ordem - b.ordem).map(i => ({ id: i.id, nome: i.nome, qtd: Number(i.quantidade) || 1, un: i.unidade || '', valor: Number(i.valor), catId: i.category_id, partId: i.part_id })),
         nota: notaBy[l.id] || null };
     }).sort((a, b) => b.dt - a.dt || (b.created < a.created ? -1 : b.created > a.created ? 1 : 0));
-    M.rowById = Object.fromEntries(M.rows.map(r => [r.id, r]));
+    /* rendimentos do banco (ex.: Mercado Pago credita centavos todo dia, 2x): não são lançamentos para o usuário. Saem de todas as telas e totais,
+       mas ficam em M.rowsAll para o saldo dos cofrinhos. */
+    KD.isRendimento = r => r.origem === 'open_finance' && /^rendimentos?$/i.test(String(r.e || '').trim());
+    M.rowsAll = M.rows; M.rows = M.rowsAll.filter(r => !KD.isRendimento(r));
+    M.rowById = Object.fromEntries(M.rowsAll.map(r => [r.id, r]));
     // regra única (igual às visões do banco): meio transferência, vínculo de transferência ou categoria Transferência
     const isTransf = (KD.isTransf = r => r.c === 'Transferência' || r.meio === 'transferencia' || !!r.xfer);
     /* movimentação INTERNA: transferência entre as contas do próprio usuário (vínculo de transferência, ou Pix/transferência cujo nome é um dos "nomes nas transferências" do titular).
@@ -164,6 +168,7 @@
     const toksI = s => KD.norm(s).replace(/[^a-z0-9]+/g, ' ').split(' ').filter(w => w.length >= 3);
     KD.isInterna = r => {
       if (r.xfer) return true;
+      if (/^dinheiro (reservado|retirado)\b/i.test(r.e || '')) return true;   // guardar/resgatar no cofrinho é o mesmo dinheiro mudando de lugar
       if (!(r.c === 'Transferência' || r.meio === 'transferencia' || r.meio === 'pix')) return false;
       const nomes = (KD.M && KD.M.profile && KD.M.profile.nomes_titular) || []; if (!nomes.length) return false;
       const T = new Set(toksI(r.e)); return nomes.some(n => { const N = toksI(n); return N.length && N.every(w => T.has(w)); });
@@ -223,15 +228,21 @@
     M.profile = R.prof[0] || null;
     KD._mc = {};
   }
+  KD.saldoAtual = a => balAt(a, KD.today);
   KD.rebuild = () => build();
   /* pool de investimentos: tudo que está em investimento (de todos os bancos) é uma reserva só. As metas "enxergam" o total; o que o usuário
      já separou para cada meta (goals.guardado) sai do que está livre para a próxima. Investimento não entra no saldo do dia a dia. */
-  KD.pool = () => { const M = KD.M, por = {}; let total = 0; M.accs.filter(a => a.tipo === 'investimento').forEach(a => { total += a.saldo; const k = a.bank || a.inst || a.nome; por[k] = (por[k] || 0) + a.saldo; });
+  KD.pool = () => { const M = KD.M, por = {}; let total = 0; M.accs.filter(a => a.tipo === 'investimento').forEach(a => { const v = balAt(a, KD.today); total += v; const k = a.bank || a.inst || a.nome; por[k] = (por[k] || 0) + v; });
     const alocado = (M.goals || []).reduce((s, g) => s + (Number(g.guardado) || 0), 0); return { total: Math.round(total * 100) / 100, alocado: Math.round(alocado * 100) / 100, disp: Math.round((total - alocado) * 100) / 100, por }; };
 
   /* saldo de cada conta no fim do dia `d`, reconstruído a partir do saldo informado */
   function balAt(a, d) {
     let b = a.saldo;
+    if (a.of && a.of.indexOf('cofrinhos:') === 0) {   // cofrinhos (Mercado Pago): o provedor não entrega o saldo; vale o saldo informado + os movimentos da conta depois dele (reservado soma, retirado subtrai, rendimentos somam)
+      const src = KD.M.accs.find(x => x.of === a.of.slice(10)); if (!src) return b;
+      (KD.M.rowsAll || KD.M.rows).forEach(r => { if (r.accId !== src.id || r.card || !/^(dinheiro (reservado|retirado)\b|rendimentos?\b)/i.test(r.e)) return; const s = (/^dinheiro retirado/i.test(r.e) ? -1 : 1) * r.total; if (r.dt > d && r.dt <= a.em) b -= s; else if (r.dt <= d && r.dt > a.em) b += s; });
+      return b;
+    }
     KD.M.rows.forEach(r => { if (r.accId !== a.id || r.card) return; if (r.dt > d && r.dt <= a.em) b -= r.amt; else if (r.dt <= d && r.dt > a.em) b += r.amt; });
     return b;
   }

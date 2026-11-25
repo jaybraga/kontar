@@ -3701,7 +3701,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const big = (v, cents) => '<div style="margin-top:1.43cqw;font-size:11.07cqw;font-weight:700;letter-spacing:-.055em;line-height:.86;font-variant-numeric:tabular-nums;white-space:nowrap">R$ ' + Math.floor(Math.abs(v)).toLocaleString('pt-BR') + (cents ? '<span style="font-size:5cqw;letter-spacing:-.03em">,' + String(Math.round((Math.abs(v) % 1) * 100)).padStart(2, '0') + '</span>' : '') + '</div>';
     const info = (d, t) => '<div style="display:flex;align-items:center;justify-content:flex-end;gap:1.3cqw;font-size:3.04cqw;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums">' + icq(d, 3.3) + t + '</div>';
     if (view === 'inv') {
-      const tot = g.inv.reduce((a, x) => a + x.saldo, 0);
+      const tot = g.inv.reduce((a, x) => a + KD.saldoAtual(x), 0);
       corpo = '<div style="flex:1;display:flex;align-items:flex-end;padding-bottom:3.57cqw"><div>' + lab('Investido') + big(tot, true) + '</div></div>';
       base = '<div style="display:flex;justify-content:space-between;gap:2cqw;font-size:2.23cqw;font-weight:600;white-space:nowrap"><span>' + esc(g.inv.map(x => x.nome).join(' · ')) + '</span><span style="opacity:.7;font-weight:500">' + g.inv.length + (g.inv.length === 1 ? ' investimento' : ' investimentos') + '</span></div>';
     } else {
