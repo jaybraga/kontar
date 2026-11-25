@@ -485,6 +485,8 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
 .route b.cur.ring{background:transparent;border-color:transparent;color:var(--ac)}.route b.cur.ring .rg{opacity:1}
 .route b.cur.ring.full{background:var(--ac);border-color:var(--ac);color:var(--on)}.route b.cur.ring.full .rg{opacity:0}
 .route b.full .rn{opacity:0}.route b.full .rc{opacity:1}
+.U.bk{grid-template-rows:auto minmax(0,1fr) auto}.U.bk .ctl{overflow-y:auto;min-height:0}
+.pal{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 0 20px}.pal button,.pal label{width:26px;height:26px;border-radius:50%;border:0;padding:0;cursor:pointer;position:relative;display:block;flex:none}
 .tile{height:62px;border-radius:20px;border:1.5px solid #3A3A40;background:var(--btn);display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;transition:border-color .25s,background .25s;padding:0}
 .tile:hover{border-color:#4A4A52}.tile[aria-pressed=true]{border-color:var(--ac)}
 .tile .ck{position:absolute;top:7px;right:8px;width:18px;height:18px;border-radius:50%;background:var(--ac);color:var(--on);font-size:11px;font-weight:900;display:grid;place-items:center;opacity:0;transform:scale(.6);transition:opacity .25s,transform .3s var(--E)}
@@ -541,6 +543,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
       const D = { nm: nameGuess || '', nl: '', nj: '', how: null, rd: '', dia: null, bancos: [], dados: {} }; let i = 0; const LAST = ST.length - 1;
       /* ---- passo "Seus bancos": grade de logos → uma tela por banco; o passo vira anel de progresso na barra de cima ---- */
       const KD2 = window.KD, GRADE = ['Nubank', 'Itaú', 'Bradesco', 'Banco do Brasil', 'Santander', 'Mercado Pago', 'PicPay', 'Inter', 'C6', 'PagBank', 'Neon', 'XP', 'Next', 'BV', 'Amazon'];   /* popularidade aproximada no Brasil */
+      const COR_OUTRO = ['#6A4BFF', '#FF5A1F', '#00E08A', '#FFB800', '#FF3D8B', '#6AFF2A', '#B18CFF', '#FF5C5C', '#2CBFF8', '#F2F0EB'];
       const TIPOS = [['corrente', 'CORRENTE', 'pagamento'], ['poupanca', 'POUPANÇA', 'reserva'], ['investimento', 'INVESTIMENTO', 'reserva'], ['carteira', 'CARTEIRA', 'pagamento']];
       const logoDe = (b, h, w) => KD2.logo && b !== 'Outro' ? KD2.logo.slot(b, { forma: 'extensa', fundo: 'escuro', estilo: 'cor', tinta: 'pre' }, h, w, KD2.BANK[b] && KD2.BANK[b][0]) : '';
       const moeda = v => { const d = String(v).replace(/\D/g, '').slice(0, 11); return d ? (+d / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : ''; };
@@ -551,7 +554,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
       const progresso = f => { const b = rb(), p = b && b.querySelector('.rp'); if (p) p.style.strokeDashoffset = String(103.67 * (1 - f)); };
       const entraAnel = () => { const b = rb(); if (!b || ringOn) return; ringOn = true; b.innerHTML = RING; void b.offsetWidth; b.classList.remove('full'); b.classList.add('ring'); progresso(0); };
       const saiAnel = () => { ringOn = false; const b = rb(); if (b) { b.classList.remove('ring', 'full'); } };
-      const dado = b => D.dados[b] || (D.dados[b] = { nome: '', tipo: 'corrente', saldo: '', cred: false, final: '', limite: '', fecha: '', vence: '', outro: '', pulou: false });
+      const dado = b => D.dados[b] || (D.dados[b] = { nome: '', tipo: 'corrente', saldo: '', cred: false, final: '', limite: '', fecha: '', vence: '', outro: '', cor: '#6A4BFF', pulou: false });
       const nomePadrao = b => (b === 'Outro' ? (dado(b).outro || 'Outro banco').trim() : b) + ' Conta';
       const desenhaGrade = () => {
         $('#tiles').innerHTML = GRADE.concat(['Outro']).map(b => '<button class="tile" type="button" data-b="' + esc(b) + '" aria-pressed="' + D.bancos.includes(b) + '" aria-label="' + esc(b === 'Outro' ? 'Outro banco' : b) + '">' + (b === 'Outro' ? '<span class="tx">OUTRO</span>' : (KD2.logo && KD2.logo.seletor ? KD2.logo.seletor(b, 20, 84) : logoDe(b, 20, 80))) + '<span class="ck">✓</span></button>').join('');
@@ -562,7 +565,8 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
         const b = D.bancos[sub], d = dado(b), n = D.bancos.length;
         const f = (k, ph, v, pre) => '<div class="fld">' + (pre ? '<span class="pre">' + pre + '</span>' : '') + '<input data-k="' + k + '" value="' + esc(v) + '" placeholder="' + ph + '" inputmode="' + (/saldo|limite|final|fecha|vence/.test(k) ? 'numeric' : 'text') + '" autocomplete="off"></div>';
         $('#bkf').innerHTML = '<div class="bkh"><span class="lg">' + (b === 'Outro' ? '<span class="cap" style="color:#fff">Outro banco</span>' : logoDe(b, 26, 120)) + '</span><span class="cap" style="color:var(--mut)">Banco ' + (sub + 1) + ' de ' + n + '</span></div>'
-          + (b === 'Outro' ? '<label class="lab">Nome do banco</label>' + f('outro', 'Ex.: Banco Pan', d.outro) : '')
+          + (b === 'Outro' ? '<label class="lab">Nome do banco</label>' + f('outro', 'Ex.: Banco Pan', d.outro) + '<label class="lab">Cor do banco</label><div class="pal" id="pal">' + COR_OUTRO.map(c => '<button type="button" data-cor="' + c + '" aria-label="Cor ' + c + '" style="background:' + c + ';box-shadow:' + (d.cor === c ? '0 0 0 2px #111114,0 0 0 4px #fff' : 'none') + '"></button>').join('')
+          + '<label title="Escolher outra cor" style="background:' + (COR_OUTRO.includes(d.cor) ? 'conic-gradient(#FF5C5C,#FFB800,#6AFF2A,#2CBFF8,#B18CFF,#FF3D8B,#FF5C5C)' : d.cor) + ';box-shadow:' + (COR_OUTRO.includes(d.cor) ? 'none' : '0 0 0 2px #111114,0 0 0 4px #fff') + '"><input type="color" data-cp="1" value="' + d.cor + '" aria-label="Escolher a cor do banco" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0"></label></div>' : '')
           + '<label class="lab">Nome da conta</label>' + f('nome', nomePadrao(b), d.nome)
           + '<div class="pills" role="group" aria-label="Tipo">' + TIPOS.map(t => '<button type="button" data-tp="' + t[0] + '" aria-pressed="' + (d.tipo === t[0]) + '">' + t[1] + '</button>').join('') + '</div>'
           + '<label class="lab">Saldo atual</label>' + f('saldo', '0,00', d.saldo, 'R$')
@@ -594,6 +598,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
         if (i === LAST) { $('#who').textContent = (D.nm.trim().split(/\s+/)[0] || 'você') + '.'; const nb = nomesBanco(), rows = [['Nome', D.nm.trim()], ['Nomes no banco', nb.length ? nb.length + (nb.length === 1 ? ' nome' : ' nomes') : '—'], ['Contas', D.bancos.length ? D.bancos.length + (D.bancos.length === 1 ? ' conta' : ' contas') : '—'], ['Começando por', HOW[D.how]], ['Renda mensal', D.rd ? 'R$ ' + D.rd : '—'], ['Fecha a fatura', D.dia ? 'Dia ' + D.dia : '—']];
           $('#sum').innerHTML = rows.map((r, k) => '<div><i>' + (k + 1) + '</i><span>' + r[0] + '</span><b></b></div>').join(''); $$('#sum b').forEach((e, k) => { e.textContent = rows[k][1]; }); }
         $$('.step').forEach(e => e.classList.toggle('on', +e.dataset.s === i));
+        $('.U').classList.toggle('bk', i === 2 && sub >= 0);
         if (i === 2) { if (sub < 0) desenhaGrade(); $('[data-s="2"]').classList.toggle('on', sub < 0); $('#bkf').classList.toggle('on', sub >= 0); if (sub >= 0) textoBanco(); }
         $$('#route u').forEach((e, k) => e.classList.toggle('done', k < i));
         $$('#route b').forEach((e, k) => { e.classList.toggle('done', k < i); e.classList.toggle('cur', k === i);
@@ -622,13 +627,16 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
         if (k === 'saldo' || k === 'limite') v = e.target.value = moeda(v); else if (k === 'final') v = e.target.value = v.replace(/[^0-9]/g, '').slice(0, 4); else if (k === 'fecha' || k === 'vence') v = e.target.value = v.replace(/[^0-9]/g, '').slice(0, 2);
         d[k] = v; msgBk(''); if (k === 'outro') textoBanco(); });
       $('#bkf').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset && e.target.dataset.k) { e.preventDefault(); $('#nx').click(); } else if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset && e.target.dataset.sw) { e.preventDefault(); e.target.click(); } });
-      $('#bkf').addEventListener('click', e => { const t = e.target.closest('[data-tp],[data-sw],[data-later]'); if (!t || busy || sub < 0) return; const d = dado(D.bancos[sub]);
+      $('#bkf').addEventListener('input', e => { if (!(e.target.dataset && e.target.dataset.cp) || sub < 0) return; const d = dado(D.bancos[sub]); d.cor = e.target.value; const lb = e.target.parentElement; lb.style.background = d.cor; lb.style.boxShadow = '0 0 0 2px #111114,0 0 0 4px #fff'; $$('#pal button').forEach(x => { x.style.boxShadow = 'none'; }); });
+      $('#bkf').addEventListener('change', e => { if (e.target.dataset && e.target.dataset.cp && sub >= 0) desenhaBanco(); });
+      $('#bkf').addEventListener('click', e => { const t = e.target.closest('[data-tp],[data-sw],[data-later],[data-cor]'); if (!t || busy || sub < 0) return; const d = dado(D.bancos[sub]);
+        if (t.dataset.cor) { d.cor = t.dataset.cor; desenhaBanco(); return; }
         if (t.dataset.tp) { d.tipo = t.dataset.tp; $$('#bkf [data-tp]').forEach(x => x.setAttribute('aria-pressed', String(x === t))); }
         else if (t.dataset.sw) { d.cred = !d.cred; desenhaBanco(); } else if (t.dataset.later) avancaBanco(true); });
       $('#nx').onclick = () => { if (!ok() || busy) return;
         if (i === 2) { if (sub < 0) { if (D.bancos.length) { sub = 0; entraAnel(); render(); desenhaBanco(); return; } } else return avancaBanco(false); }
         if (i < LAST) { i++; render(); } else { $('#nx .t').textContent = 'Abrindo…'; $('#nx').disabled = true; $('#bk').disabled = true;
-        done({ nm: D.nm.trim(), nomes: nomesBanco(), contas: D.bancos.map(b => { const d = dado(b), p = d.pulou; return { banco: b, outro: (d.outro || '').trim(), nome: (p ? '' : d.nome).trim() || nomePadrao(b), tipo: p ? 'corrente' : d.tipo, saldo: p ? 0 : num(d.saldo), cred: !p && d.cred, final: d.final, limite: num(d.limite), fecha: +d.fecha || null, vence: +d.vence || null, pulou: p }; }), how: D.how, rd: D.rd ? parseInt(D.rd.replace(/\D/g, ''), 10) : null, dia: D.dia }); } };
+        done({ nm: D.nm.trim(), nomes: nomesBanco(), contas: D.bancos.map(b => { const d = dado(b), p = d.pulou; return { banco: b, outro: (d.outro || '').trim(), cor: d.cor, nome: (p ? '' : d.nome).trim() || nomePadrao(b), tipo: p ? 'corrente' : d.tipo, saldo: p ? 0 : num(d.saldo), cred: !p && d.cred, final: d.final, limite: num(d.limite), fecha: +d.fecha || null, vence: +d.vence || null, pulou: p }; }), how: D.how, rd: D.rd ? parseInt(D.rd.replace(/\D/g, ''), 10) : null, dia: D.dia }); } };
       render(); drawNotch();
     });
   }
@@ -658,7 +666,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
     const KD = window.KD, hoje = KD.iso ? KD.iso(KD.today) : new Date().toISOString().slice(0, 10), TF = { corrente: 'pagamento', poupanca: 'reserva', investimento: 'reserva', carteira: 'pagamento' };
     let ordC = 0;
     for (let k = 0; k < lista.length; k++) {
-      const c = lista[k], inst = c.banco === 'Outro' ? (c.outro || 'Outro banco') : c.banco, br = c.banco === 'Outro' ? ['#6A4BFF', '#FFFFFF'] : (KD.BANK[c.banco] || ['#F2F0EB', '#000000']);
+      const c = lista[k], inst = c.banco === 'Outro' ? (c.outro || 'Outro banco') : c.banco, br = c.banco === 'Outro' ? [c.cor || '#6A4BFF', ((h => { const n = parseInt(h.slice(1), 16); return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255 > 0.55 ? '#000000' : '#FFFFFF'; })(c.cor || '#6A4BFF'))] : (KD.BANK[c.banco] || ['#F2F0EB', '#000000']);
       const r = await sb.from('accounts').insert({ user_id: user.id, nome: c.nome, instituicao: inst, tipo: c.tipo, funcao: TF[c.tipo] || 'pagamento', saldo: c.saldo || 0, saldo_em: hoje, cor: br[0], ordem: k + 1, ativo: true }).select().single();
       if (r.error) { console.error('[kontar] onboarding conta', r.error); continue; }
       if (!c.cred) continue;

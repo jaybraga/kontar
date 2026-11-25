@@ -121,7 +121,8 @@
       || R.cyc.filter(c => c.card_id === cardId).sort((a, b) => pd(b.vigencia_inicio) - pd(a.vigencia_inicio))[0];
     M.cycOf = cycOf;
     const ARQ = new Set(R.accs.filter(a => a.ativo === false).map(a => a.id));   // contas arquivadas: somem da tela (e os cartões delas), o histórico fica
-    M.cards = R.cards.filter(c => !c.removido_em && !ARQ.has(c.conta_pagamento_id)).sort((a, b) => a.ordem - b.ordem).map(c => {
+    const ALF = (x, y) => String(x).localeCompare(String(y), 'pt-BR', { sensitivity: 'base' });   // listas de contas e cartões: sempre em ordem alfabética (só o que a pessoa cadastrou)
+    M.cards = R.cards.filter(c => !c.removido_em && !ARQ.has(c.conta_pagamento_id)).sort((a, b) => ALF(a.apelido || a.nome, b.apelido || b.nome) || a.ordem - b.ordem).map(c => {
       const col = colorOf(c.nome, c.instituicao, c.brand_hex), cy = cycOf(c.id, T), lim = Number(c.limite) || 0;
       const used = lim && c.disponivel_informado != null ? Math.max(0, lim - Number(c.disponivel_informado)) : 0;
       return { id: c.id, acc: c.conta_pagamento_id || null, n: c.nome, informed: lim && c.disponivel_informado != null, nick: c.apelido || '', fin: c.final4 || '····', lim, used, cor: col[0], ink: KD.tema(col[0], bankOf(c.nome, c.instituicao), c.tinta || col[1]).ink, bank: bankOf(c.nome, c.instituicao), cy,
@@ -132,7 +133,7 @@
     const cardByIdAll = Object.fromEntries(R.cards.map(c => [c.id, c]));
 
     /* contas */
-    M.accs = R.accs.filter(a => a.ativo !== false).sort((a, b) => a.ordem - b.ordem).map(a => ({ id: a.id, inst: a.instituicao || '', fin: a.final4 || '', ordem: a.ordem, nome: a.nome, saldo: Number(a.saldo) || 0, em: a.saldo_em ? pd(a.saldo_em) : T, tipo: a.tipo, funcao: a.funcao, cor: colorOf(a.nome, a.instituicao, a.cor)[0], bank: bankOf(a.nome, a.instituicao) }));
+    M.accs = R.accs.filter(a => a.ativo !== false).sort((a, b) => ALF(a.nome, b.nome) || a.ordem - b.ordem).map(a => ({ id: a.id, inst: a.instituicao || '', fin: a.final4 || '', ordem: a.ordem, nome: a.nome, saldo: Number(a.saldo) || 0, em: a.saldo_em ? pd(a.saldo_em) : T, tipo: a.tipo, funcao: a.funcao, cor: colorOf(a.nome, a.instituicao, a.cor)[0], bank: bankOf(a.nome, a.instituicao) }));
 
     M.arq = { accs: R.accs.filter(a => a.ativo === false).map(a => ({ id: a.id, nome: a.nome, inst: a.instituicao || '', cor: colorOf(a.nome, a.instituicao, a.cor)[0], n: R.cards.filter(c => c.conta_pagamento_id === a.id && !c.removido_em).length })),
       cards: R.cards.filter(c => c.removido_em && !ARQ.has(c.conta_pagamento_id)).map(c => ({ id: c.id, nome: c.nome, inst: c.instituicao || '', cor: colorOf(c.nome, c.instituicao, c.brand_hex)[0], fin: c.final4 || '' })) };
