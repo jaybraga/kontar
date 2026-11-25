@@ -415,7 +415,7 @@ button,input{font:inherit;color:inherit}
 @keyframes up{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 .cap{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase}
 .stage{min-height:100vh;display:grid;place-items:center;padding:28px 24px}
-.board{position:relative;isolation:isolate;width:min(1120px,100%);height:740px;min-height:740px;display:grid;grid-template-rows:73px 1fr;border-radius:30px 0 0 30px;overflow:hidden}
+.board{position:relative;isolation:isolate;width:min(1120px,100%);height:clamp(640px,calc(100vh - 56px),860px);min-height:0;display:grid;grid-template-rows:73px 1fr;border-radius:30px 0 0 30px;overflow:hidden}
 .board>svg{position:absolute;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
 .hdr,.ftr{display:grid;align-items:stretch}
 .hdr{grid-template-columns:auto 1fr;position:relative}.hdr::after{content:"";position:absolute;left:0;right:18px;bottom:0;height:1px;background:var(--ln)}
@@ -485,15 +485,15 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
 .route b.cur.ring{background:transparent;border-color:transparent;color:var(--ac)}.route b.cur.ring .rg{opacity:1}
 .route b.cur.ring.full{background:var(--ac);border-color:var(--ac);color:var(--on)}.route b.cur.ring.full .rg{opacity:0}
 .route b.full .rn{opacity:0}.route b.full .rc{opacity:1}
-.U.bk{grid-template-rows:auto minmax(0,1fr) auto}.U.bk .ctl{overflow-y:auto;min-height:0}
+.U{grid-template-rows:1fr minmax(0,auto) auto}.U .ctl{overflow-y:auto;min-height:0}.U.bk{grid-template-rows:auto minmax(0,1fr) auto}
 .seg{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));padding:4px;border-radius:99px;border:1.5px solid #3A3A40;background:#0B0B0D}
 .seg .th{position:absolute;top:4px;bottom:4px;left:4px;width:calc((100% - 8px) / 4);border-radius:99px;background:var(--bone);transition:transform .45s var(--E);will-change:transform;pointer-events:none}
 .seg button{position:relative;z-index:1;height:34px;border:0;background:none;border-radius:99px;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 4px;font-size:10.5px;font-weight:800;letter-spacing:.06em;color:#fff;cursor:pointer;white-space:nowrap;transition:color .35s var(--E)}
 .seg button svg{flex:none;width:14px;height:14px}
 .seg button[aria-checked=true]{color:#0A0A0A}
 .U{position:relative}
-.U.bk .ctl{scrollbar-width:thin;scrollbar-color:#3A3A40 transparent;padding-right:30px;margin-right:6px}
-.U.bk .ctl::-webkit-scrollbar{width:6px}.U.bk .ctl::-webkit-scrollbar-track{background:transparent}.U.bk .ctl::-webkit-scrollbar-thumb{background:#3A3A40;border-radius:99px}.U.bk .ctl::-webkit-scrollbar-thumb:hover{background:#55555C}
+.U .ctl{scrollbar-width:thin;scrollbar-color:#3A3A40 transparent;padding-right:30px;margin-right:6px}
+.U .ctl::-webkit-scrollbar{width:6px}.U .ctl::-webkit-scrollbar-track{background:transparent}.U .ctl::-webkit-scrollbar-thumb{background:#3A3A40;border-radius:99px}.U .ctl::-webkit-scrollbar-thumb:hover{background:#55555C}
 .cfade{position:absolute;left:0;right:0;bottom:85px;height:64px;pointer-events:none;opacity:0;transition:opacity .35s var(--E);background:linear-gradient(to top,#111114 8%,rgba(17,17,20,0))}
 .cfade.on{opacity:1}
 .pal{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 0 20px}.pal button,.pal label{width:26px;height:26px;border-radius:50%;border:0;padding:0;cursor:pointer;position:relative;display:block;flex:none}
@@ -556,7 +556,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
       const COR_OUTRO = ['#6A4BFF', '#FF5A1F', '#00E08A', '#FFB800', '#FF3D8B', '#6AFF2A', '#B18CFF', '#FF5C5C', '#2CBFF8', '#F2F0EB'];
       const ICO = { corrente: '<path d="M3 21h18"/><path d="M5 21V10"/><path d="M19 21V10"/><path d="M9 21V10"/><path d="M15 21V10"/><path d="M12 3 3 8h18z"/>',
         poupanca: '<path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z"/><path d="M2 9v1c0 1.1.9 2 2 2h1"/><path d="M16 11h.01"/>',
-        investimento: '<path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/>',
+        investimento: '<path d="M4 20V14"/><path d="M10 20V9"/><path d="M16 20V5"/><path d="M2 20h20"/><path d="M22 20V12"/>',
         carteira: '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>' };
       const icone = k => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICO[k] + '</svg>';
       const TIPOS = [['corrente', 'CORRENTE', 'pagamento'], ['poupanca', 'POUPANÇA', 'reserva'], ['investimento', 'INVESTIMENTO', 'reserva'], ['carteira', 'CARTEIRA', 'pagamento']];
@@ -590,7 +590,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
           + '<div class="bkr"><div class="bkm" id="bkm"></div><button class="later" type="button" data-later="1" style="margin:0 20px 0 0;flex:none">Preencher depois</button></div>';
         const e = $('#bkf'); e.classList.remove('on'); void e.offsetWidth; e.classList.add('on');
       };
-      const fadeCtl = () => { const c = $('.ctl'), f = $('#cfade'); if (!c || !f) return; const rola = c.scrollHeight > c.clientHeight + 2, fim = c.scrollTop + c.clientHeight >= c.scrollHeight - 3; f.classList.toggle('on', $('.U').classList.contains('bk') && rola && !fim); };
+      const fadeCtl = () => { const c = $('.ctl'), f = $('#cfade'); if (!c || !f) return; const rola = c.scrollHeight > c.clientHeight + 2, fim = c.scrollTop + c.clientHeight >= c.scrollHeight - 3; f.classList.toggle('on', rola && !fim); };
       $('.ctl').addEventListener('scroll', fadeCtl, { passive: true }); new ResizeObserver(fadeCtl).observe($('.ctl')); new MutationObserver(fadeCtl).observe($('#bkf'), { childList: true, subtree: true, attributes: true });
       const textoBanco = () => { const b = D.bancos[sub], n = D.bancos.length, nome = b === 'Outro' ? (dado(b).outro || 'outro banco') : b; $('#sb').innerHTML = 'Dados do ' + esc(nome) + '. Tudo é opcional: dá pra deixar pra depois.'; $('#tag').textContent = 'Banco ' + (sub + 1) + ' de ' + n; $('#note').textContent = 'Cada banco vira uma conta'; ['#sb'].forEach(q => { const e = $(q); e.classList.remove('anim'); void e.offsetWidth; e.classList.add('anim'); }); };
       const validaBanco = () => {
@@ -615,7 +615,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
         if (i === LAST) { $('#who').textContent = (D.nm.trim().split(/\s+/)[0] || 'você') + '.'; const nb = nomesBanco(), rows = [['Nome', D.nm.trim()], ['Nomes no banco', nb.length ? nb.length + (nb.length === 1 ? ' nome' : ' nomes') : '—'], ['Contas', D.bancos.length ? D.bancos.length + (D.bancos.length === 1 ? ' conta' : ' contas') : '—'], ['Começando por', HOW[D.how]], ['Renda mensal', D.rd ? 'R$ ' + D.rd : '—'], ['Fecha a fatura', D.dia ? 'Dia ' + D.dia : '—']];
           $('#sum').innerHTML = rows.map((r, k) => '<div><i>' + (k + 1) + '</i><span>' + r[0] + '</span><b></b></div>').join(''); $$('#sum b').forEach((e, k) => { e.textContent = rows[k][1]; }); }
         $$('.step').forEach(e => e.classList.toggle('on', +e.dataset.s === i));
-        $('.U').classList.toggle('bk', i === 2 && sub >= 0); if (!(i === 2 && sub >= 0)) $('#cfade').classList.remove('on'); else fadeCtl();
+        $('.U').classList.toggle('bk', i === 2 && sub >= 0); fadeCtl();
         if (i === 2) { if (sub < 0) desenhaGrade(); $('[data-s="2"]').classList.toggle('on', sub < 0); $('#bkf').classList.toggle('on', sub >= 0); if (sub >= 0) textoBanco(); }
         $$('#route u').forEach((e, k) => e.classList.toggle('done', k < i));
         $$('#route b').forEach((e, k) => { e.classList.toggle('done', k < i); e.classList.toggle('cur', k === i);
