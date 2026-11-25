@@ -3332,6 +3332,17 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (f.step === 'tipo') {
       texto = 'Escolha o que adicionar. O cartão de crédito fica sempre ligado a uma conta.';
       ops = flOpcao('conta', IC.conta, 'Conta', 'Corrente, poupança, investimento ou carteira') + flOpcao('cartao', IC.cartao, 'Cartão de crédito', 'Fica ligado a uma conta sua');
+    } else if (f.step === 'mp1') {
+      texto = 'O Kontar lê o seu banco pelo MeuPluggy, um serviço gratuito da Pluggy. O banco precisa estar ligado lá antes de conectar.';
+      ops = flOpcao('mp:sim', IC.conectar, 'Meu banco já está no MeuPluggy', 'Continuar: na janela que abrir, escolha o banco') + flOpcao('mp:nao', IC.manual, 'Ainda não está ligado', 'Abrir o MeuPluggy em outra aba para ligar o banco');
+    } else if (f.step === 'mp2') {
+      texto = 'Faça isso no MeuPluggy e volte para esta aba. Nada é salvo no Kontar enquanto isso.';
+      const passo = (n, t) => '<div style="display:flex;gap:16px;align-items:flex-start"><span style="width:30px;height:30px;border-radius:50%;border:1.5px solid #3A3A40;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex:none">' + n + '</span><span style="font-size:15px;line-height:1.5;padding-top:4px">' + t + '</span></div>';
+      ops = '<div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:22px;padding:10px 56px;border-top:1px solid #2A2A2F">'
+        + passo(1, 'Abra o MeuPluggy (aberto em outra aba). Se a aba não abriu, <a href="https://meu.pluggy.ai" target="_blank" rel="noopener" style="color:' + FG + ';font-weight:700;text-decoration:underline;text-underline-offset:3px">clique aqui</a>.')
+        + passo(2, 'Entre com a sua conta e adicione o banco, autorizando o acesso (Open Finance) no app do banco.')
+        + passo(3, 'Quando o banco aparecer ligado lá, volte para o Kontar e clique no botão abaixo.')
+        + '<div style="display:flex;justify-content:flex-end;gap:12px;margin-top:6px"><span data-fl-o="mp:abrir" style="border:1.5px solid #3A3A40;border-radius:99px;font-size:12px;font-weight:900;letter-spacing:.1em;padding:15px 22px;cursor:pointer;white-space:nowrap">ABRIR O MEUPLUGGY</span><span data-fl-o="mp:pronto" style="background:' + FG + ';color:' + INK + ';border-radius:99px;font-size:12px;font-weight:900;letter-spacing:.1em;padding:15px 24px;cursor:pointer;white-space:nowrap">JÁ LIGUEI, CONTINUAR</span></div></div>';
     } else if (f.step === 'conta') {
       texto = 'A fatura do cartão sai da conta que você escolher.';
       ops = M.accs.map(a => '<div data-fl-o="acc:' + esc(a.id) + '" style="flex:1;min-height:92px;display:flex;align-items:center;gap:22px;padding:0 48px;border-top:1px solid #2A2A2F;cursor:pointer;transition:background .3s ease" onmouseover="this.style.background=\'#1C1C20\'" onmouseout="this.style.background=\'transparent\'"><span style="width:60px;display:flex;justify-content:center;flex:none">' + logoDe(a.inst, a.nome, a.cor) + '</span><span style="min-width:0;text-align:left"><b style="display:block;font-size:22px;letter-spacing:-.03em;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(a.nome) + '</b><span style="display:block;font-size:13.5px;color:' + MU + ';margin-top:3px">' + (M.cards.filter(c => c.acc === a.id).length || 'nenhum') + ' cartão(ões) de crédito</span></span></div>').join('');
@@ -3364,7 +3375,13 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       return M.accs.length === 1 ? flVai('como', { kind: 'cartao', accId: M.accs[0].id }) : flVai('conta', { kind: 'cartao' });
     }
     if (f.step === 'conta') return flVai('como', { accId: k.slice(4) });
-    if (k === 'conectar') { if (!flagOF()) return; const ini = { kind: f.kind, accId: f.accId }; return flFecha(() => { if (CT.conectar) CT.conectar(ini); }); }
+    if (f.step === 'mp1' || f.step === 'mp2') {
+      const ini = { kind: f.kind, accId: f.accId };
+      if (k === 'mp:sim' || k === 'mp:pronto') return flFecha(() => { if (CT.conectar) CT.conectar(ini); });
+      if (k === 'mp:nao') { window.open('https://meu.pluggy.ai', '_blank', 'noopener'); return flVai('mp2'); }
+      if (k === 'mp:abrir') { window.open('https://meu.pluggy.ai', '_blank', 'noopener'); return; }
+    }
+    if (k === 'conectar') { if (!flagOF()) return; return flVai('mp1'); }
     const kind = f.kind, accId = f.accId; flFecha(() => { if (kind === 'cartao') CT.novoCartaoForm(accId); else CT.nova(); });
   }
   CT._u = { IC, esc, logoDe, nomeLivre, nomesUsados, brl, moedaNum, iso, TODOS, CORES, inkOn, TIPOS };
@@ -3376,7 +3393,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     fl.innerHTML = '<div data-fl-card style="width:min(780px,calc(100% - 48px));height:min(560px,calc(100vh - 64px));margin:32px 0;border-radius:30px;background:#141416;border:1px solid #2A2A2F;overflow:hidden;display:flex;flex-direction:column;transform:translateY(10px);transition:transform .45s ' + EE + '"></div>';
     document.body.appendChild(fl);
     const M = KD.M;   // atalhos: "só conta" ou "só cartão" vindos de outros lugares pulam a primeira pergunta
-    if (ini.kind === 'conta') FL.step = 'como';
+    if (ini.passo) FL.step = ini.passo;
+    else if (ini.kind === 'conta') FL.step = 'como';
     else if (ini.kind === 'cartao') { if (M.accs.length === 1 || ini.accId) { FL.step = 'como'; FL.accId = ini.accId || M.accs[0].id; } else if (M.accs.length > 1) FL.step = 'conta'; else { fl.remove(); fl = null; FL = null; return CT.nova({ credito: true }); } }
     flDesenha(false);
     fl.addEventListener('mousedown', e => { if (e.target === fl) flFecha(); });
@@ -3457,7 +3475,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   /* ---------- telas ---------- */
   function desenha(anima) {
     if (!L || !X) return; const c = L.querySelector('[data-cx-card]'); let h = '';
-    if (X.fase === 'abrindo') h = topo('Conexão segura com o seu banco') + centro(X.msg || 'Abrindo a conexão…', 'Escolha o banco na janela que abrir e autorize o acesso. O Kontar só lê, nunca movimenta dinheiro. O banco precisa estar ligado na sua conta do MeuPluggy.', LINK_MP);
+    if (X.fase === 'abrindo') h = topo('Conexão segura com o seu banco') + centro(X.msg || 'Abrindo a conexão…', 'Na janela que abriu: 1) escolha MeuPluggy, 2) entre com a sua conta do MeuPluggy, 3) marque o banco que quer trazer. O Kontar só lê, nunca movimenta dinheiro.', LINK_MP);
     else if (X.fase === 'erro') h = topo('Não deu certo') + centro('Não consegui conectar', X.msg || '', LINK_MP) + '<div style="padding:0 22px 24px;display:flex;justify-content:center"><span data-cx-x style="background:' + FG + ';color:' + INK + ';border-radius:99px;font-size:12px;font-weight:900;letter-spacing:.1em;padding:15px 24px;cursor:pointer">FECHAR</span></div>';
     else if (X.fase === 'importando') h = topo('Buscando os lançamentos do banco') + centro(X.msg || 'Importando…', 'Isso pode levar alguns segundos. Pode deixar esta janela aberta.');
     else if (X.fase === 'cartao') h = topo('Conta conectada') + centro(X.resumo || 'Pronto.', '') + '<div style="padding:0 22px 8px;text-align:center;font-size:15px;font-weight:700;letter-spacing:-.02em">Essa conta tem cartão de crédito?</div>'
@@ -3554,6 +3572,6 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       });
     } catch (e) { console.error('[kontar] conectar', e); if (X) { X.fase = 'erro'; X.msg = e.message || String(e); X.busy = false; desenha(false); } }
   };
-  document.addEventListener('click', e => { const t = e.target.closest && e.target.closest('[data-ft-conectar]'); if (t) { e.stopPropagation(); CT.conectar({}); } }, true);
+  document.addEventListener('click', e => { const t = e.target.closest && e.target.closest('[data-ft-conectar]'); if (t) { e.stopPropagation(); CT.adicionar({ passo: 'mp1' }); } }, true);
   window.addEventListener('keydown', e => { if (e.key === 'Escape' && L && X && !X.busy && X.fase !== 'abrindo') fecha(); });
 })();
