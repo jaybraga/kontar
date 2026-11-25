@@ -52,7 +52,7 @@
     'Inter': ['#FF7A00', '#FFFFFF']              // CONFIRMADO: cor dominante do site oficial inter.co, botões com texto branco (2,6:1)
   };
   const INST = { 'c6 bank': 'C6', 'c6': 'C6', 'itaú': 'Itaú', 'itau': 'Itaú', 'nubank': 'Nubank', 'mercado pago': 'Mercado Pago', 'amazon': 'Amazon',
-    'bradesco': 'Bradesco', 'banco do brasil': 'Banco do Brasil', 'bb': 'Banco do Brasil', 'santander': 'Santander', 'next': 'Next', 'xp': 'XP', 'xp investimentos': 'XP', 'neon': 'Neon', 'bv': 'BV', 'banco bv': 'BV', 'banco votorantim': 'BV', 'pagbank': 'PagBank', 'pagseguro': 'PagBank', 'picpay': 'PicPay', 'inter': 'Inter', 'banco inter': 'Inter' };
+    'caixa': 'Caixa', 'caixa econômica': 'Caixa', 'caixa economica': 'Caixa', 'caixa econômica federal': 'Caixa', 'caixa economica federal': 'Caixa', 'cef': 'Caixa', 'bradesco': 'Bradesco', 'banco do brasil': 'Banco do Brasil', 'bb': 'Banco do Brasil', 'santander': 'Santander', 'next': 'Next', 'xp': 'XP', 'xp investimentos': 'XP', 'neon': 'Neon', 'bv': 'BV', 'banco bv': 'BV', 'banco votorantim': 'BV', 'pagbank': 'PagBank', 'pagseguro': 'PagBank', 'picpay': 'PicPay', 'inter': 'Inter', 'banco inter': 'Inter' };
   const bankOf = (nome, inst) => BANK[nome] ? nome : INST[String(inst || '').toLowerCase()] || null;
   const colorOf = (nome, inst, fb) => { const b = bankOf(nome, inst); return b ? BANK[b] : [fb || '#F2F0EB', inkOn(fb || '#F2F0EB')]; };
   function inkOn(hex) { const h = String(hex).replace('#', ''), n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16), L = (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255; return L > 0.55 ? '#000000' : '#FFFFFF'; }
