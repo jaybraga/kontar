@@ -500,7 +500,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
 .sw i{width:44px;height:26px;border-radius:99px;background:#2A2A2F;position:relative;flex:none;transition:background .3s}.sw i::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .3s var(--E)}
 .sw[aria-checked=true] i{background:var(--ac)}.sw[aria-checked=true] i::after{left:21px}
 .sw b{font-size:15px;letter-spacing:-.02em}
-.cr{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.cr{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 .cr .fld{height:50px;padding:0 14px}.cr .fld input{font-size:15px}
 .bkm{min-height:16px;margin:0 0 0 20px;font-size:12.5px;color:#FF6A5C}
 .later{border:0;background:none;color:var(--dim);font-size:12.5px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;padding:0;align-self:flex-start;margin-left:20px}.later:hover{color:#fff}
