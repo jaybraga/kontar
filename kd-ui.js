@@ -993,7 +993,10 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     // pequeno e discreto no vão acima do "Dividir"; abre a confirmação, nunca apaga direto.
     const podeExcluir = !S.isNew && S.row.id && S.row.origem === 'manual';
     const delLink = podeExcluir ? '<span data-a="askdel" style="position:absolute;left:26px;top:26px;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#FF6B5A;cursor:pointer;opacity:.85;transition:opacity .25s ease" onmouseover="this.style.opacity=\'1\'" onmouseout="this.style.opacity=\'.85\'">' + svg('trash', 13, 2.2) + 'Excluir transação</span>' : '';
-    const rail = '<div style="width:331px;flex:none;background:#1C1C20;border-left:1px solid #3A3A40;border-radius:0 30px 30px 0;padding:66px 24px 24px 26px;display:flex;flex-direction:column;box-sizing:border-box;position:relative">' + delLink
+    // mesclar: junta este lançamento com outro que é o mesmo gasto (src/mescla.js); se já foi mesclado, mostra a marca e o Desfazer
+    const mesclado = S.row && S.row.mescla;
+    const mesLink = !S.isNew && S.row && S.row.id ? '<span data-a="' + (mesclado ? 'desmescla' : 'mescla') + '" title="' + (mesclado ? 'Mesclado ' + (S.row.mescla === 'auto' ? 'automaticamente' : 'por você') + '. Clique para desfazer.' : 'Juntar com outro lançamento que é o mesmo gasto') + '" style="position:absolute;right:24px;top:26px;font-size:12px;font-weight:700;color:' + (mesclado ? '#F0C24B' : '#9A9AA3') + ';cursor:pointer;white-space:nowrap;transition:opacity .25s ease" onmouseover="this.style.opacity=.8" onmouseout="this.style.opacity=1">' + (mesclado ? 'Mesclado · Desfazer' : 'Mesclar com…') + '</span>' : '';
+    const rail = '<div style="width:331px;flex:none;background:#1C1C20;border-left:1px solid #3A3A40;border-radius:0 30px 30px 0;padding:66px 24px 24px 26px;display:flex;flex-direction:column;box-sizing:border-box;position:relative">' + delLink + mesLink
       + '<div data-a="mode" data-v="dividir" style="height:54px;flex:none;display:flex;align-items:center;justify-content:center;gap:14px;padding:0 20px;white-space:nowrap;border:2px solid #2A2A2F;border-radius:28px;background:#000;cursor:pointer;transition:border-color .25s ease" onmouseover="this.style.borderColor=\'#51515C\'" onmouseout="this.style.borderColor=\'#2A2A2F\'"><span style="color:#F2F0EB;display:flex">' + svg('split', 30, 1.7) + '</span><div style="display:flex;flex-direction:column;line-height:1.15;align-items:flex-start"><span style="font-weight:900;letter-spacing:.06em;font-size:14px;text-transform:uppercase">Dividir transação</span><span style="font-size:12.5px;color:#9A9AA3">' + (S.partes.length ? S.partes.length + (S.partes.length === 1 ? ' parte' : ' partes') : 'Separe em categorias') + '</span></div></div>'
       + '<div style="height:313px;flex:none;margin-top:21px;position:relative"><svg data-tk style="position:absolute;inset:0;overflow:visible" width="280" height="313"></svg>'
       + '<div data-a="mode" data-v="ler" class="txnf" style="position:absolute;left:0;right:0;top:0;height:249px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;font-weight:900;letter-spacing:.06em;font-size:14px;text-transform:uppercase;cursor:pointer;color:#0A0A0A;transition:transform .35s ' + E + '"><span style="display:flex">' + svg('qr', 60, 1.5, '#1A1A1A') + '</span><span>Nota fiscal</span><small style="font-size:12.5px;font-weight:500;letter-spacing:0;text-transform:none;color:#6A6A72;text-align:center;line-height:1.4;margin-top:-6px">' + nf + '</small></div>'
@@ -1390,6 +1393,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       else if (a === 'keep') { if (S.busy) return; fecharModal(); }
       else if (a === 'dupother') { const md = host.querySelector('[data-modal]'), mine = S; if (md) { md.style.animation = 'none'; md.style.transition = 'opacity .2s ease'; md.style.pointerEvents = 'none'; requestAnimationFrame(() => { md.style.opacity = '0'; }); } setTimeout(() => { if (S !== mine) return; S.dup = null; render(); }, md ? 210 : 0); }
       else if (a === 'dupsame') { const D = S.dup, keep = { itens: S.itens, nota: S.nota }, md = host.querySelector('[data-modal]'); if (!D) return; const go = () => { TX.open(comp, D.m.row); if (!S) return; S.itens = keep.itens; S.nota = Object.assign({}, S.nota || {}, keep.nota); S.notaDirty = true; S.partes = []; S.partesDirty = true; S.mode = 'dividir'; render(); }; if (md) { md.style.animation = 'none'; md.style.transition = 'opacity .2s ease'; md.style.pointerEvents = 'none'; requestAnimationFrame(() => { md.style.opacity = '0'; }); setTimeout(go, 210); } else go(); }
+      else if (a === 'mescla') { if (KD.mescla) KD.mescla.abrir(S.row); }
+      else if (a === 'desmescla') { if (KD.mescla) KD.mescla.desfazer(S.row); }
       else if (a === 'askdel') { S.askDel = true; S.delErr = ''; S.askBack = false; S.askClose = false; render(); }
       else if (a === 'dodel') excluir();
       else if (a === 'pop') { ev.stopPropagation(); S.pop = S.pop === v ? null : v; render(); }
@@ -1454,6 +1459,80 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     p.itens.push(i); recalc(); S.partesDirty = true; render();
   }
   window.addEventListener('keydown', e => { if (S && e.key === 'Escape') { if (S.askClose || S.askBack || S.askDel) { if (!S.busy) fecharModal(); } else TX.requestClose(); } });
+})();
+
+/* Kontar · mescla de lançamentos (migração kontar_17).
+   Quando o mesmo gasto aparece duas vezes (ex.: um lançamento seu e o do banco), a mescla junta os dois: um sobrevive (com a sua categoria, itens
+   e nome) e o outro some das telas, sem ser apagado. O sistema mescla sozinho os casos prováveis (no sync do Open Finance); aqui fica o jeito
+   MANUAL de mesclar quando ele falha, e o DESFAZER de qualquer mescla (automática ou manual).
+   KD.mescla.abrir(row)   → painel para escolher com qual lançamento mesclar
+   KD.mescla.desfazer(row) → devolve os valores de antes e traz o absorvido de volta */
+(function () {
+  'use strict';
+  const KD = window.KD, MS = (KD.mescla = {});
+  const EE = 'cubic-bezier(.65,0,.35,1)', FG = '#F2F0EB', MU = '#7C7C85', AMB = '#F0C24B';
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const brl = n => 'R$ ' + (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const ORIGEM = { open_finance: 'Banco', import: 'Extrato', manual: 'Manual', claude: 'Nota', regra: 'Regra' };
+  const dia = iso => String(iso).slice(8, 10) + '/' + String(iso).slice(5, 7);
+  const dias = (a, b) => Math.abs(Math.round((Date.parse(a) - Date.parse(b)) / 864e5));
+  let layer = null, S = null;
+
+  const candidatos = row => {
+    const out = row.out > 0, M = KD.M;
+    return (M.rows || []).filter(r => r.id !== row.id && !r.mescla && (r.out > 0) === out && dias(r.iso, row.iso) <= 10)
+      .map(r => ({ r, igual: Math.abs(r.total - row.total) < 0.005, dd: dias(r.iso, row.iso), mesmo: (r.cardId && r.cardId === row.cardId) || (r.accId && r.accId === row.accId) }))
+      .sort((a, b) => (b.igual - a.igual) || (b.mesmo - a.mesmo) || (a.dd - b.dd)).slice(0, 14);
+  };
+  const linha = (c, k) => '<div data-ms-pick="' + k + '" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:18px;border:1.5px solid ' + (S.sel === k ? FG : '#2A2A2F') + ';background:' + (S.sel === k ? '#1C1C20' : 'transparent') + ';cursor:pointer;transition:border-color .25s ease,background .25s ease">'
+    + '<span style="flex:1;min-width:0"><b style="font-size:15px;letter-spacing:-.02em;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(c.r.e) + '</b><span style="font-size:12px;color:' + MU + '">' + dia(c.r.iso) + ' · ' + esc(c.r.k) + ' · ' + (ORIGEM[c.r.origem] || esc(c.r.origem)) + (c.igual ? '' : ' · valor diferente') + '</span></span>'
+    + '<b style="font-size:15px;white-space:nowrap;color:' + (c.igual ? FG : AMB) + '">' + brl(c.r.total) + '</b></div>';
+  function desenha() {
+    const c = layer.querySelector('[data-ms-card]'), row = S.row;
+    const ok = S.sel != null && !S.busy;
+    c.innerHTML = '<h3 style="margin:0;font-size:30px;letter-spacing:-.05em;font-weight:700">Mesclar lançamentos</h3>'
+      + '<div style="font-size:13px;color:' + MU + ';margin-top:6px;line-height:1.45">Escolha o lançamento que é o mesmo gasto de <b style="color:' + FG + '">' + esc(row.e) + '</b> (' + dia(row.iso) + ', ' + brl(row.total) + '). Fica um só, com a sua categoria, os itens e o nome. Nada é apagado e dá para desfazer.</div>'
+      + '<div style="display:flex;flex-direction:column;gap:8px;margin-top:18px;max-height:340px;overflow:auto">' + (S.lista.length ? S.lista.map((x, k) => linha(x, k)).join('') : '<div style="padding:22px;text-align:center;color:' + MU + ';font-size:13px">Não achei outro lançamento parecido nos últimos 10 dias.</div>') + '</div>'
+      + '<div data-ms-msg style="min-height:18px;margin-top:14px;font-size:12.5px;color:#FF6A5C">' + esc(S.msg || '') + '</div>'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px"><span data-ms-x style="color:#9A9AA3;font-size:12px;font-weight:700;cursor:pointer;padding:8px 4px">Cancelar</span>'
+      + '<span data-ms-ok style="background:' + FG + ';color:#0A0A0A;border-radius:99px;font-size:12px;font-weight:900;letter-spacing:.1em;padding:15px 24px;cursor:' + (ok ? 'pointer' : 'default') + ';opacity:' + (ok ? 1 : .35) + ';white-space:nowrap">' + (S.busy ? 'MESCLANDO…' : 'MESCLAR') + '</span></div>';
+  }
+  function fecha() { if (!layer) return; const l = layer; layer = null; S = null; l.style.opacity = '0'; l.firstElementChild.style.transform = 'translateY(10px)'; setTimeout(() => l.remove(), 320); }
+  const atualiza = async () => { try { await KD.refresh(KD.comp); } catch (e) { console.error(e); } };
+
+  MS.abrir = row => {
+    if (layer || !row || !row.id) return;
+    S = { row, lista: candidatos(row), sel: null, busy: false, msg: '' };
+    layer = document.createElement('div');
+    layer.style.cssText = 'position:fixed;inset:0;z-index:99990;background:rgba(0,0,0,.72);display:flex;align-items:flex-start;justify-content:center;overflow:auto;opacity:0;transition:opacity .3s ease;font-family:Helvetica,Arial,sans-serif;color:' + FG;
+    layer.innerHTML = '<div data-ms-card style="width:min(620px,calc(100% - 48px));margin:80px 0;border-radius:30px;background:#141416;border:1px solid #2A2A2F;padding:28px 30px;transform:translateY(10px);transition:transform .45s ' + EE + '"></div>';
+    document.body.appendChild(layer); desenha();
+    layer.addEventListener('mousedown', e => { if (e.target === layer && !S.busy) fecha(); });
+    layer.addEventListener('click', async e => {
+      const t = e.target.closest('[data-ms-pick],[data-ms-x],[data-ms-ok]'); if (!t || !S || S.busy) return;
+      if (t.hasAttribute('data-ms-pick')) { S.sel = +t.getAttribute('data-ms-pick'); S.msg = ''; desenha(); }
+      else if (t.hasAttribute('data-ms-x')) fecha();
+      else if (t.hasAttribute('data-ms-ok') && S.sel != null) {
+        if (KD.isDemo()) { S.msg = 'Conta de demonstração: mesclar fica travado.'; desenha(); return; }
+        const outro = S.lista[S.sel].r, aberto = S.row;
+        // o lançamento do usuário sobrevive; se o aberto veio do banco e o escolhido não, o escolhido é quem fica
+        const [manter, absorver] = aberto.origem === 'open_finance' && outro.origem !== 'open_finance' ? [outro, aberto] : [aberto, outro];
+        S.busy = true; desenha();
+        const r = await KD.sb.rpc('kontar_mesclar', { p_manter: manter.id, p_absorver: absorver.id, p_origem: 'manual' });
+        if (r.error) { S.busy = false; S.msg = 'Não consegui mesclar: ' + (r.error.message || 'erro'); desenha(); return; }
+        fecha(); if (KD.tx && KD.tx.close) KD.tx.close(true); await atualiza();
+      }
+    });
+    window.addEventListener('keydown', function esc1(e) { if (e.key === 'Escape') { window.removeEventListener('keydown', esc1); if (layer && S && !S.busy) fecha(); } });
+    requestAnimationFrame(() => { layer.style.opacity = '1'; layer.firstElementChild.style.transform = 'none'; });
+  };
+  MS.desfazer = async row => {
+    if (!row || !row.id) return;
+    if (KD.isDemo()) { alert('Conta de demonstração: desfazer mescla fica travado.'); return; }
+    const r = await KD.sb.rpc('kontar_desfazer_mescla', { p_id: row.id });
+    if (r.error) { alert('Não consegui desfazer: ' + (r.error.message || 'erro')); return; }
+    if (KD.tx && KD.tx.close) KD.tx.close(true); await atualiza();
+  };
 })();
 
 /* Kontar · detecção de duplicatas (usada pela leitura de nota e pelo importador de extrato)
