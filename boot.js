@@ -476,6 +476,33 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
 .go{position:absolute;right:0;bottom:18px;z-index:3;height:48px;padding:0 6px 0 0;border-radius:9999px;border:0;background:var(--bone);color:#000;font-size:15px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:16px;transition:filter .25s,opacity .25s}
 .go .t{flex:1;text-align:left;padding-left:22px;white-space:nowrap}.go .ar{flex:none;width:36px;height:36px;border-radius:50%;background:#000;display:grid;place-items:center;transition:transform .3s var(--E)}
 .go:hover{filter:brightness(.93)}.go:hover .ar{transform:translateX(3px)}.go:disabled{opacity:.3;cursor:default}.go:disabled .ar{transform:none}
+.route b{position:relative}
+.route b .rg{position:absolute;left:-1.5px;top:-1.5px;width:calc(100% + 3px);height:calc(100% + 3px);transform:rotate(-90deg);opacity:0;transition:opacity .45s var(--E);pointer-events:none}
+.route b .rg circle{fill:none;stroke-width:2.5}.route b .rg .rb{stroke:#3A3A40}
+.route b .rg .rp{stroke:var(--ac);stroke-linecap:round;stroke-dasharray:103.67;stroke-dashoffset:103.67;transition:stroke-dashoffset .65s var(--E)}
+.route b .rn,.route b .rc{grid-area:1/1;display:grid;place-items:center;transition:opacity .4s var(--E)}
+.route b .rc{opacity:0}
+.route b.cur.ring{background:transparent;border-color:transparent;color:var(--ac)}.route b.cur.ring .rg{opacity:1}
+.route b.cur.ring.full{background:var(--ac);border-color:var(--ac);color:var(--on)}.route b.cur.ring.full .rg{opacity:0}
+.route b.full .rn{opacity:0}.route b.full .rc{opacity:1}
+.tile{height:62px;border-radius:20px;border:1.5px solid #3A3A40;background:var(--btn);display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;transition:border-color .25s,background .25s;padding:0}
+.tile:hover{border-color:#4A4A52}.tile[aria-pressed=true]{border-color:var(--ac)}
+.tile .ck{position:absolute;top:7px;right:8px;width:18px;height:18px;border-radius:50%;background:var(--ac);color:var(--on);font-size:11px;font-weight:900;display:grid;place-items:center;opacity:0;transform:scale(.6);transition:opacity .25s,transform .3s var(--E)}
+.tile[aria-pressed=true] .ck{opacity:1;transform:none}
+.tile .tx{font-size:11px;font-weight:800;letter-spacing:.1em;color:var(--mut)}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.bkh{display:flex;align-items:center;gap:14px;margin:0 0 4px 4px}
+.bkh .lg{height:34px;display:flex;align-items:center}
+.pills{display:flex;gap:8px;flex-wrap:wrap}.pills button{height:40px;border-radius:99px;border:1.5px solid #3A3A40;background:transparent;padding:0 16px;font-size:12px;font-weight:800;letter-spacing:.08em;color:var(--mut);cursor:pointer;transition:all .25s}
+.pills button[aria-pressed=true]{background:#fff;color:#000;border-color:#fff}
+.sw{display:flex;align-items:center;gap:14px;padding:13px 18px;border-radius:24px;border:1px solid #2A2A2F;background:var(--btn);cursor:pointer;user-select:none}
+.sw i{width:44px;height:26px;border-radius:99px;background:#2A2A2F;position:relative;flex:none;transition:background .3s}.sw i::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .3s var(--E)}
+.sw[aria-checked=true] i{background:var(--ac)}.sw[aria-checked=true] i::after{left:21px}
+.sw b{font-size:15px;letter-spacing:-.02em}
+.cr{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.cr .fld{height:50px;padding:0 14px}.cr .fld input{font-size:15px}
+.bkm{min-height:16px;margin:0 0 0 20px;font-size:12.5px;color:#FF6A5C}
+.later{border:0;background:none;color:var(--dim);font-size:12.5px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;padding:0;align-self:flex-start;margin-left:20px}.later:hover{color:#fff}
 @media (max-width:820px){.board{height:auto}.body{grid-template-columns:1fr}.T{border-right:0;border-bottom:1px solid var(--ln);min-height:260px}.hdr .cap{display:none}.days{grid-template-columns:repeat(7,1fr)}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}`;
 
@@ -484,9 +511,9 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
     mount(CSS_ONB, '<main class="stage"><div class="board" id="board"><svg id="bgs" aria-hidden="true"></svg><nav class="route" id="route" aria-label="Progresso"></nav><header class="hdr"><span class="wm">' + LOGO(30) + '</span><span class="cap">Primeiro acesso</span></header>'
       + '<div class="body"><section class="T" aria-live="polite"><div class="row"><span class="num" id="num">1</span><span class="cap note" id="note"></span></div><h1 id="h"></h1></section><section class="U"><div class="desc"><span class="cap" id="tag"></span><p id="sb"></p></div><div class="ctl">'
       + '<div class="step" data-s="0"><label class="lab" for="nm">Nome</label><div class="fld"><input id="nm" type="text" placeholder="Como te chamamos?" autocomplete="given-name"></div><p class="hint">Você muda isso depois, em Minha Conta.</p></div>'
-      + '<div class="step" data-s="1"><label class="lab" for="nl">Seu nome completo, como no banco</label><div class="fld"><input id="nl" type="text" placeholder="Ex.: João da Silva" autocomplete="name"></div><label class="lab" for="nj" style="margin-top:8px">Nome da sua empresa (PJ), se tiver</label><div class="fld"><input id="nj" type="text" placeholder="Ex.: Silva Serviços LTDA" autocomplete="organization"></div><p class="hint">Pode deixar em branco. Dá pra adicionar mais nomes depois, em Minha Conta.</p></div><div class="step" data-s="2" role="radiogroup" aria-label="Como começar"><button class="opt" role="radio" aria-checked="false" data-v="import"><span class="n">A</span><span><b>Importar extrato</b><small>CSV, OFX ou PDF do seu banco ou cartão.</small></span><span class="rd"></span></button><button class="opt" role="radio" aria-checked="false" data-v="manual"><span class="n">B</span><span><b>Lançar manualmente</b><small>Começa do zero e você vai adicionando.</small></span><span class="rd"></span></button><button class="opt" role="radio" aria-checked="false" data-v="demo"><span class="n">C</span><span><b>Explorar com dados demo</b><small>Veja tudo funcionando antes de usar os seus.</small></span><span class="rd"></span></button></div>'
-      + '<div class="step" data-s="3"><label class="lab" for="rd">Renda mensal</label><div class="fld"><span class="pre">R$</span><input id="rd" inputmode="numeric" placeholder="0,00"><span class="suf cap">por mês</span></div><div class="dh"><span class="lab">Dia de fechamento da fatura</span><button class="skip" type="button" id="sk">Pular essa etapa</button></div><div class="days" id="days"></div></div>'
-      + '<div class="step" data-s="4"><div class="sum" id="sum"></div></div></div>'
+      + '<div class="step" data-s="1"><label class="lab" for="nl">Seu nome completo, como no banco</label><div class="fld"><input id="nl" type="text" placeholder="Ex.: João da Silva" autocomplete="name"></div><label class="lab" for="nj" style="margin-top:8px">Nome da sua empresa (PJ), se tiver</label><div class="fld"><input id="nj" type="text" placeholder="Ex.: Silva Serviços LTDA" autocomplete="organization"></div><p class="hint">Pode deixar em branco. Dá pra adicionar mais nomes depois, em Minha Conta.</p></div><div class="step" data-s="2"><div class="lab" style="margin-bottom:6px">Toque nos bancos em que você tem conta ou cartão</div><div class="grid4" id="tiles"></div><p class="hint" id="tcount"></p></div><div class="step" id="bkf" data-s="2b"></div><div class="step" data-s="3" role="radiogroup" aria-label="Como começar"><button class="opt" role="radio" aria-checked="false" data-v="import"><span class="n">A</span><span><b>Importar extrato</b><small>CSV, OFX ou PDF do seu banco ou cartão.</small></span><span class="rd"></span></button><button class="opt" role="radio" aria-checked="false" data-v="manual"><span class="n">B</span><span><b>Lançar manualmente</b><small>Começa do zero e você vai adicionando.</small></span><span class="rd"></span></button><button class="opt" role="radio" aria-checked="false" data-v="demo"><span class="n">C</span><span><b>Explorar com dados demo</b><small>Veja tudo funcionando antes de usar os seus.</small></span><span class="rd"></span></button></div>'
+      + '<div class="step" data-s="4"><label class="lab" for="rd">Renda mensal</label><div class="fld"><span class="pre">R$</span><input id="rd" inputmode="numeric" placeholder="0,00"><span class="suf cap">por mês</span></div><div class="dh"><span class="lab">Dia de fechamento da fatura</span><button class="skip" type="button" id="sk">Pular essa etapa</button></div><div class="days" id="days"></div></div>'
+      + '<div class="step" data-s="5"><div class="sum" id="sum"></div></div></div>'
       + '<div class="acts"><div class="lt"><button class="back" type="button" id="bk" disabled>← Voltar</button><span class="cap" id="fn"></span></div><button class="go" type="button" id="nx"><span class="t">Continuar</span><span class="ar" aria-hidden="true">' + ARROW('#fff', 2.4) + '</span></button></div></section></div></div></main>');
     return new Promise(done => {
       const drawNotch = () => { const g = $('#bgs'), b = $('#board'); if (!g || !b) return; const W = b.offsetWidth, H = b.offsetHeight, Dp = 72, gp = 18, F = 18, R = 36, D2 = 84, R2 = 42, RW = $('#route').offsetWidth, N = RW + gp + F, x = W - N; $('#nx').style.width = RW + 'px';
@@ -503,26 +530,73 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
         return 'translate(' + dxo.toFixed(2) + 'px,' + dy.toFixed(2) + 'px)'; };
       const setNum = n => { const el = $('#num'); if (!el) return; el.innerHTML = '<span class="g"></span>'; const g = el.firstChild; g.textContent = n; g.style.transform = optic(el, String(n)); };
       const ST = [
-        { n: 'Boas-vindas', h: 'Oi. Vamos<br>começar.', sb: 'Leva menos de um minuto.<br>Seus dados ficam salvos e só você vê.', note: 'Cinco paradas até o seu painel', tag: '≈ 1 min', ac: 'var(--roxo)', on: '#fff' },
+        { n: 'Boas-vindas', h: 'Oi. Vamos<br>começar.', sb: 'Leva menos de um minuto.<br>Seus dados ficam salvos e só você vê.', note: 'Seis paradas até o seu painel', tag: '≈ 1 min', ac: 'var(--roxo)', on: '#fff' },
         { n: 'Nome no banco', h: 'Seu nome<br>no banco.', sb: 'O Kontar usa isso pra reconhecer transferências entre as suas contas e não contar como gasto.', note: 'Opcional. Dá pra pular', tag: 'Opcional', ac: '#6EC1FF', on: '#000' },
+        { n: 'Seus bancos', h: 'Seus<br>bancos.', sb: 'Marque os bancos onde você tem conta ou cartão. Depois você preenche cada um, ou deixa pra mais tarde.', note: 'Opcional. Dá pra pular', tag: 'Opcional', ac: '#FF8A5B', on: '#000' },
         { n: 'Ponto de partida', h: 'Por onde<br>começar?', sb: 'Escolha um caminho pra trazer seus lançamentos. Dá pra mudar a qualquer hora.', note: 'Escolha um dos três caminhos', tag: '3 caminhos', ac: 'var(--amar)', on: '#000' },
         { n: 'Renda e fatura', h: 'Sua renda<br>e fatura.', sb: 'Com isso o Kontar já calcula<br>seus tetos e as faturas futuras.', note: 'Opcional. Dá pra pular', tag: 'Opcional', ac: 'var(--verde)', on: '#000' },
         { n: 'Tudo pronto', h: 'Pronto,<br><span id="who"></span>', sb: 'Confira o resumo.<br>O resto você ajusta<br>nos próprios cards.', note: 'Confira e abra o seu painel', tag: 'Resumo', ac: 'var(--bone)', on: '#000' }];
-      const D = { nm: nameGuess || '', nl: '', nj: '', how: null, rd: '', dia: null }; let i = 0; const LAST = ST.length - 1;
+      const D = { nm: nameGuess || '', nl: '', nj: '', how: null, rd: '', dia: null, bancos: [], dados: {} }; let i = 0; const LAST = ST.length - 1;
+      /* ---- passo "Seus bancos": grade de logos → uma tela por banco; o passo vira anel de progresso na barra de cima ---- */
+      const KD2 = window.KD, GRADE = ['Nubank', 'Itaú', 'C6', 'Mercado Pago', 'Amazon', 'Santander', 'Bradesco', 'Banco do Brasil', 'PicPay', 'Inter', 'Next', 'XP', 'Neon', 'BV', 'PagBank'];
+      const TIPOS = [['corrente', 'CORRENTE', 'pagamento'], ['poupanca', 'POUPANÇA', 'reserva'], ['investimento', 'INVESTIMENTO', 'reserva'], ['carteira', 'CARTEIRA', 'pagamento']];
+      const logoDe = (b, h, w) => KD2.logo && b !== 'Outro' ? KD2.logo.slot(b, { forma: 'extensa', fundo: 'escuro', estilo: 'cor' }, h, w, KD2.BANK[b] && KD2.BANK[b][0]) : '';
+      const moeda = v => { const d = String(v).replace(/\D/g, '').slice(0, 11); return d ? (+d / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : ''; };
+      const num = v => { const d = String(v || '').replace(/\D/g, ''); return d ? +d / 100 : 0; };
+      let sub = -1, ringOn = false, busy = false;   // sub: -1 = grade; k = k-ésimo banco marcado
+      const RING = '<svg class="rg" viewBox="0 0 36 36" aria-hidden="true"><circle class="rb" cx="18" cy="18" r="16.5"/><circle class="rp" cx="18" cy="18" r="16.5"/></svg><span class="rn">3</span><span class="rc"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>';
+      const rb = () => $$('#route b')[2];
+      const progresso = f => { const b = rb(), p = b && b.querySelector('.rp'); if (p) p.style.strokeDashoffset = String(103.67 * (1 - f)); };
+      const entraAnel = () => { const b = rb(); if (!b || ringOn) return; ringOn = true; b.innerHTML = RING; void b.offsetWidth; b.classList.remove('full'); b.classList.add('ring'); progresso(0); };
+      const saiAnel = () => { ringOn = false; const b = rb(); if (b) { b.classList.remove('ring', 'full'); } };
+      const dado = b => D.dados[b] || (D.dados[b] = { nome: '', tipo: 'corrente', saldo: '', cred: false, final: '', limite: '', fecha: '', vence: '', outro: '', pulou: false });
+      const nomePadrao = b => (b === 'Outro' ? (dado(b).outro || 'Outro banco').trim() : b) + ' Conta';
+      const desenhaGrade = () => {
+        $('#tiles').innerHTML = GRADE.concat(['Outro']).map(b => '<button class="tile" type="button" data-b="' + esc(b) + '" aria-pressed="' + D.bancos.includes(b) + '" aria-label="' + esc(b === 'Outro' ? 'Outro banco' : b) + '">' + (b === 'Outro' ? '<span class="tx">OUTRO BANCO</span>' : logoDe(b, 20, 80)) + '<span class="ck">✓</span></button>').join('');
+        const n = D.bancos.length; $('#tcount').textContent = n ? n + (n === 1 ? ' banco marcado: vira 1 conta.' : ' bancos marcados: viram ' + n + ' contas.') + ' Caixa chega em breve.' : 'Dá pra pular e criar as contas depois, na página Contas. Caixa chega em breve.';
+      };
+      const msgBk = t => { const m = $('#bkm'); if (m) m.textContent = t || ''; };
+      const desenhaBanco = () => {
+        const b = D.bancos[sub], d = dado(b), n = D.bancos.length;
+        const f = (k, ph, v, pre) => '<div class="fld">' + (pre ? '<span class="pre">' + pre + '</span>' : '') + '<input data-k="' + k + '" value="' + esc(v) + '" placeholder="' + ph + '" inputmode="' + (/saldo|limite|final|fecha|vence/.test(k) ? 'numeric' : 'text') + '" autocomplete="off"></div>';
+        $('#bkf').innerHTML = '<div class="bkh"><span class="lg">' + (b === 'Outro' ? '<span class="cap" style="color:#fff">Outro banco</span>' : logoDe(b, 26, 120)) + '</span><span class="cap" style="color:var(--mut)">Banco ' + (sub + 1) + ' de ' + n + '</span></div>'
+          + (b === 'Outro' ? '<label class="lab">Nome do banco</label>' + f('outro', 'Ex.: Banco Pan', d.outro) : '')
+          + '<label class="lab">Nome da conta</label>' + f('nome', nomePadrao(b), d.nome)
+          + '<div class="pills" role="group" aria-label="Tipo">' + TIPOS.map(t => '<button type="button" data-tp="' + t[0] + '" aria-pressed="' + (d.tipo === t[0]) + '">' + t[1] + '</button>').join('') + '</div>'
+          + '<label class="lab">Saldo atual</label>' + f('saldo', '0,00', d.saldo, 'R$')
+          + '<div class="sw" role="switch" tabindex="0" aria-checked="' + d.cred + '" data-sw="1"><i></i><b>Tem cartão de crédito</b></div>'
+          + (d.cred ? '<div class="cr">' + f('final', 'Final ····', d.final) + f('limite', 'Limite R$', d.limite) + f('fecha', 'Fecha dia', d.fecha) + f('vence', 'Vence dia', d.vence) + '</div>' : '')
+          + '<div class="bkm" id="bkm"></div><button class="later" type="button" data-later="1">Preencher depois</button>';
+        const e = $('#bkf'); e.classList.remove('on'); void e.offsetWidth; e.classList.add('on');
+      };
+      const textoBanco = () => { const b = D.bancos[sub], n = D.bancos.length, nome = b === 'Outro' ? (dado(b).outro || 'outro banco') : b; $('#sb').innerHTML = 'Dados do ' + esc(nome) + '. Tudo é opcional: se preferir, preencha depois na página Contas.'; $('#tag').textContent = 'Banco ' + (sub + 1) + ' de ' + n; $('#note').textContent = 'Cada banco vira uma conta'; ['#sb'].forEach(q => { const e = $(q); e.classList.remove('anim'); void e.offsetWidth; e.classList.add('anim'); }); };
+      const validaBanco = () => {
+        const b = D.bancos[sub], d = dado(b);
+        if (b === 'Outro' && d.outro.trim().length < 2) return 'Escreva o nome do banco.';
+        const nome = (d.nome || nomePadrao(b)).trim(); if (nome.length < 2) return 'Dê um nome para a conta.';
+        const usados = D.bancos.filter((x, k) => k !== sub).map(x => (dado(x).nome || nomePadrao(x)).trim().toLowerCase()); if (usados.includes(nome.toLowerCase())) return 'Você já tem uma conta com esse nome aqui.';
+        if (d.cred) { const fe = +d.fecha, ve = +d.vence; if (!(fe >= 1 && fe <= 31 && ve >= 1 && ve <= 31)) return 'Informe os dias de fechamento e de vencimento (1 a 31).'; }
+        return '';
+      };
       const nomesBanco = () => { const seen = new Set(), out = []; [D.nl, D.nj].forEach(v => { const t = String(v || '').trim().replace(/\s+/g, ' '); if (t.length >= 3 && !seen.has(t.toLowerCase())) { seen.add(t.toLowerCase()); out.push(t); } }); return out; };
       $('#nm').value = D.nm;
       $('#route').innerHTML = ST.map((_, k) => '<b>' + (k + 1) + '</b>' + (k < LAST ? '<u></u>' : '')).join('');
       $('#days').innerHTML = Array.from({ length: 28 }, (_, k) => '<button type="button" aria-pressed="false">' + (k + 1) + '</button>').join('');
-      const HOW = { import: 'Importar extrato', manual: 'Lançar manualmente', demo: 'Dados demo' }, ok = () => i === 0 ? D.nm.trim().length > 0 : i === 2 ? !!D.how : true;
+      const HOW = { import: 'Importar extrato', manual: 'Lançar manualmente', demo: 'Dados demo' }, ok = () => i === 0 ? D.nm.trim().length > 0 : i === 3 ? !!D.how : true;
+      let lastI = -1;
       function render() {
         const s = ST[i]; root.style.setProperty('--ac', s.ac); root.style.setProperty('--on', s.on);
-        setNum(i + 1); $('#h').innerHTML = s.h; $('#sb').innerHTML = s.sb; $('#note').textContent = s.note; $('#tag').textContent = s.tag; $('#fn').textContent = s.n;
-        ['#num', '#h', '#sb'].forEach(q => { const e = $(q); e.classList.remove('anim'); void e.offsetWidth; e.classList.add('anim'); });
-        if (i === LAST) { $('#who').textContent = (D.nm.trim().split(/\s+/)[0] || 'você') + '.'; const nb = nomesBanco(), rows = [['Nome', D.nm.trim()], ['Nomes no banco', nb.length ? nb.length + (nb.length === 1 ? ' nome' : ' nomes') : '—'], ['Começando por', HOW[D.how]], ['Renda mensal', D.rd ? 'R$ ' + D.rd : '—'], ['Fecha a fatura', D.dia ? 'Dia ' + D.dia : '—']];
+        const mudou = lastI !== i; lastI = i; if (i !== 2 && ringOn) ringOn = false;
+        if (mudou) setNum(i + 1); $('#h').innerHTML = s.h; $('#sb').innerHTML = s.sb; $('#note').textContent = s.note; $('#tag').textContent = s.tag; $('#fn').textContent = s.n;
+        (mudou ? ['#num', '#h', '#sb'] : []).forEach(q => { const e = $(q); e.classList.remove('anim'); void e.offsetWidth; e.classList.add('anim'); });
+        if (i === LAST) { $('#who').textContent = (D.nm.trim().split(/\s+/)[0] || 'você') + '.'; const nb = nomesBanco(), rows = [['Nome', D.nm.trim()], ['Nomes no banco', nb.length ? nb.length + (nb.length === 1 ? ' nome' : ' nomes') : '—'], ['Contas', D.bancos.length ? D.bancos.length + (D.bancos.length === 1 ? ' conta' : ' contas') : '—'], ['Começando por', HOW[D.how]], ['Renda mensal', D.rd ? 'R$ ' + D.rd : '—'], ['Fecha a fatura', D.dia ? 'Dia ' + D.dia : '—']];
           $('#sum').innerHTML = rows.map((r, k) => '<div><i>' + (k + 1) + '</i><span>' + r[0] + '</span><b></b></div>').join(''); $$('#sum b').forEach((e, k) => { e.textContent = rows[k][1]; }); }
         $$('.step').forEach(e => e.classList.toggle('on', +e.dataset.s === i));
+        if (i === 2) { if (sub < 0) desenhaGrade(); $('[data-s="2"]').classList.toggle('on', sub < 0); $('#bkf').classList.toggle('on', sub >= 0); if (sub >= 0) textoBanco(); }
         $$('#route u').forEach((e, k) => e.classList.toggle('done', k < i));
-        $$('#route b').forEach((e, k) => { e.classList.toggle('done', k < i); e.classList.toggle('cur', k === i); e.textContent = k < i ? '✓' : k + 1; });
+        $$('#route b').forEach((e, k) => { e.classList.toggle('done', k < i); e.classList.toggle('cur', k === i);
+          if (k === 2 && (ringOn || e.querySelector('.rg'))) { if (!ringOn && !e._tm) e._tm = setTimeout(() => { e._tm = 0; if (!ringOn) { e.classList.remove('ring', 'full'); e.textContent = i > 2 ? '✓' : '3'; } }, 520); return; }
+          e.textContent = k < i ? '✓' : k + 1; });
         $('#bk').disabled = i === 0; $('#nx .t').textContent = i === LAST ? 'Abrir meu Kontar' : 'Continuar'; $('#nx').disabled = !ok();
       }
       new ResizeObserver(drawNotch).observe($('#board')); new ResizeObserver(drawNotch).observe($('#route')); new ResizeObserver(() => setNum(i + 1)).observe($('#num'));
@@ -534,9 +608,25 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
       $('#rd').oninput = e => { const d = e.target.value.replace(/\D/g, '').slice(0, 11); e.target.value = d ? (+d / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : ''; D.rd = e.target.value; };
       $$('#days button').forEach(b => { b.onclick = () => { const on = b.getAttribute('aria-pressed') === 'true'; $$('#days button').forEach(x => x.setAttribute('aria-pressed', 'false')); b.setAttribute('aria-pressed', !on); D.dia = on ? null : +b.textContent; }; });
       $('#sk').onclick = () => { D.rd = ''; D.dia = null; $('#rd').value = ''; $$('#days button').forEach(x => x.setAttribute('aria-pressed', 'false')); i = LAST; render(); };
-      $('#bk').onclick = () => { if (i > 0) { i--; render(); } };
-      $('#nx').onclick = () => { if (!ok()) return; if (i < LAST) { i++; render(); } else { $('#nx .t').textContent = 'Abrindo…'; $('#nx').disabled = true; $('#bk').disabled = true;
-        done({ nm: D.nm.trim(), nomes: nomesBanco(), how: D.how, rd: D.rd ? parseInt(D.rd.replace(/\D/g, ''), 10) : null, dia: D.dia }); } };
+      $('#bk').onclick = () => { if (busy) return; if (i === 2 && sub >= 0) { if (sub > 0) { sub--; progresso(sub / D.bancos.length); render(); desenhaBanco(); } else { sub = -1; saiAnel(); render(); } return; } if (i > 0) { i--; render(); } };
+      const avancaBanco = pulou => {
+        const b = D.bancos[sub], n = D.bancos.length; if (!pulou) { const m = validaBanco(); if (m) return msgBk(m); } dado(b).pulou = !!pulou;
+        if (sub < n - 1) { sub++; progresso(sub / n); render(); desenhaBanco(); }
+        else { busy = true; progresso(1); $('#nx').disabled = true; $('#bk').disabled = true; setTimeout(() => { const r = rb(); if (r) r.classList.add('full'); }, 720); setTimeout(() => { busy = false; sub = -1; i++; render(); }, 1550); }
+      };
+      $('#tiles').onclick = e => { const t = e.target.closest('.tile'); if (!t) return; const b = t.dataset.b, k = D.bancos.indexOf(b); if (k >= 0) D.bancos.splice(k, 1); else { D.bancos.push(b); D.bancos.sort((x, y) => GRADE.concat(['Outro']).indexOf(x) - GRADE.concat(['Outro']).indexOf(y)); }
+        t.setAttribute('aria-pressed', String(k < 0)); const n = D.bancos.length; $('#tcount').textContent = n ? n + (n === 1 ? ' banco marcado: vira 1 conta.' : ' bancos marcados: viram ' + n + ' contas.') + ' Caixa chega em breve.' : 'Dá pra pular e criar as contas depois, na página Contas. Caixa chega em breve.'; };
+      $('#bkf').addEventListener('input', e => { const k = e.target.dataset && e.target.dataset.k; if (!k || sub < 0) return; const d = dado(D.bancos[sub]); let v = e.target.value;
+        if (k === 'saldo' || k === 'limite') v = e.target.value = moeda(v); else if (k === 'final') v = e.target.value = v.replace(/[^0-9]/g, '').slice(0, 4); else if (k === 'fecha' || k === 'vence') v = e.target.value = v.replace(/[^0-9]/g, '').slice(0, 2);
+        d[k] = v; msgBk(''); if (k === 'outro') textoBanco(); });
+      $('#bkf').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset && e.target.dataset.k) { e.preventDefault(); $('#nx').click(); } else if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset && e.target.dataset.sw) { e.preventDefault(); e.target.click(); } });
+      $('#bkf').addEventListener('click', e => { const t = e.target.closest('[data-tp],[data-sw],[data-later]'); if (!t || busy || sub < 0) return; const d = dado(D.bancos[sub]);
+        if (t.dataset.tp) { d.tipo = t.dataset.tp; $$('#bkf [data-tp]').forEach(x => x.setAttribute('aria-pressed', String(x === t))); }
+        else if (t.dataset.sw) { d.cred = !d.cred; desenhaBanco(); } else if (t.dataset.later) avancaBanco(true); });
+      $('#nx').onclick = () => { if (!ok() || busy) return;
+        if (i === 2) { if (sub < 0) { if (D.bancos.length) { sub = 0; entraAnel(); render(); desenhaBanco(); return; } } else return avancaBanco(false); }
+        if (i < LAST) { i++; render(); } else { $('#nx .t').textContent = 'Abrindo…'; $('#nx').disabled = true; $('#bk').disabled = true;
+        done({ nm: D.nm.trim(), nomes: nomesBanco(), contas: D.bancos.map(b => { const d = dado(b), p = d.pulou; return { banco: b, outro: (d.outro || '').trim(), nome: (p ? '' : d.nome).trim() || nomePadrao(b), tipo: p ? 'corrente' : d.tipo, saldo: p ? 0 : num(d.saldo), cred: !p && d.cred, final: d.final, limite: num(d.limite), fecha: +d.fecha || null, vence: +d.vence || null, pulou: p }; }), how: D.how, rd: D.rd ? parseInt(D.rd.replace(/\D/g, ''), 10) : null, dia: D.dia }); } };
       render(); drawNotch();
     });
   }
@@ -548,15 +638,34 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
     const t0 = Date.now(), iv = setInterval(() => { if (document.querySelector('[data-screen-label]') || Date.now() - t0 > 20000) { clearInterval(iv); requestAnimationFrame(() => res()); } }, 60);
   });
   /* primeiro acesso = conta nova: sem lançamentos, sem a marca "onboarded" (guardada em user_prefs.prefs) e que não seja a conta demo */
-  const needsOnboarding = () => { const KD = window.KD; if (qs('onb') === '1') return true; return !KD.isDemo() && !(KD.M.prefs && KD.M.prefs.onboarded) && !(KD.M.rows && KD.M.rows.length); };
+  const prevOnb = () => new URLSearchParams(location.search).get('onb') === '1';   /* ?onb=1 mostra o onboarding sem salvar nada (vale em qualquer endereço) */
+  const needsOnboarding = () => { const KD = window.KD; if (prevOnb()) return true; return !KD.isDemo() && !(KD.M.prefs && KD.M.prefs.onboarded) && !(KD.M.rows && KD.M.rows.length); };
   async function saveOnboarding(sb, user, a) {
     const KD = window.KD, P = Object.assign({}, KD.M.prefs, { onboarded: true, inicio: a.how });
     if (a.rd != null) P.renda = a.rd; if (a.dia) P.diaFech = a.dia;            /* renda em centavos (inteiro), como o resto do banco */
     KD.M.prefs = P; KD.M.profile = Object.assign({}, KD.M.profile, { nome_exibicao: a.nm }, a.nomes && a.nomes.length ? { nomes_titular: a.nomes } : {});
-    if (qs('onb') === '1') return;
+    if (prevOnb()) return;
     const r1 = await sb.from('profiles').upsert(Object.assign({ user_id: user.id, nome_exibicao: a.nm }, a.nomes && a.nomes.length ? { nomes_titular: a.nomes } : {}), { onConflict: 'user_id' });
     const r2 = await sb.from('user_prefs').upsert({ user_id: user.id, prefs: P, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
     if (r1.error || r2.error) console.error('[kontar] onboarding', r1.error || r2.error);
+    if (a.contas && a.contas.length) await createContas(sb, user, a.contas);
+  }
+
+  /* contas escolhidas no onboarding: cada banco vira uma conta (e um cartão de crédito, se o usuário informou) */
+  async function createContas(sb, user, lista) {
+    const KD = window.KD, hoje = KD.iso ? KD.iso(KD.today) : new Date().toISOString().slice(0, 10), TF = { corrente: 'pagamento', poupanca: 'reserva', investimento: 'reserva', carteira: 'pagamento' };
+    let ordC = 0;
+    for (let k = 0; k < lista.length; k++) {
+      const c = lista[k], inst = c.banco === 'Outro' ? (c.outro || 'Outro banco') : c.banco, br = c.banco === 'Outro' ? ['#6A4BFF', '#FFFFFF'] : (KD.BANK[c.banco] || ['#F2F0EB', '#000000']);
+      const r = await sb.from('accounts').insert({ user_id: user.id, nome: c.nome, instituicao: inst, tipo: c.tipo, funcao: TF[c.tipo] || 'pagamento', saldo: c.saldo || 0, saldo_em: hoje, cor: br[0], ordem: k + 1, ativo: true }).select().single();
+      if (r.error) { console.error('[kontar] onboarding conta', r.error); continue; }
+      if (!c.cred) continue;
+      const lim = c.limite || null, rc = await sb.from('cards').insert({ user_id: user.id, nome: inst, instituicao: inst, brand_hex: br[0], tinta: br[1], final4: c.final && c.final.length === 4 ? c.final : null, limite: lim, disponivel_informado: lim, limite_em: lim ? hoje : null, conta_pagamento_id: r.data.id, ordem: ++ordC, ativo: true }).select().single();
+      if (rc.error) { console.error('[kontar] onboarding cartão', rc.error); continue; }
+      const y = await sb.from('card_cycles').insert({ user_id: user.id, card_id: rc.data.id, vigencia_inicio: hoje, dia_fechamento: c.fecha, dia_vencimento: c.vence, regra: 'dia_fixo', origem: 'manual' });
+      if (y.error) console.error('[kontar] onboarding ciclo', y.error);
+    }
+    try { await KD.load(sb, user); } catch (e) { console.error(e); }
   }
   async function start(sb, user) {
     if (started) return; started = true;
