@@ -3139,11 +3139,13 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     }
     return n;
   }
-  /* card vazio: sempre o último da lista; é por aqui que entra conta ou cartão */
-  const vazia = sem => mk('vazia', () => {
-    const d = document.createElement('div'); d.setAttribute('data-ct-empty', '1'); d.setAttribute('data-ct-nova', '1'); d.setAttribute('role', 'button'); d.style.cssText = 'width:100%;aspect-ratio:1.586;border:1.5px dashed #34343A;border-radius:30px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;color:#8A8A92;flex:none;cursor:pointer;transition:color .3s ease,border-color .3s ease,background .3s ease';
-    d.onmouseenter = () => { d.style.color = FG; d.style.borderColor = '#6A6A72'; d.style.background = 'rgba(255,255,255,.025)'; }; d.onmouseleave = () => { d.style.color = '#8A8A92'; d.style.borderColor = '#34343A'; d.style.background = 'transparent'; };
-    d.innerHTML = '<span style="width:56px;height:56px;border-radius:50%;border:1.5px solid currentColor;display:flex;align-items:center;justify-content:center">' + IC.mais + '</span><span style="font-size:11px;font-weight:900;letter-spacing:.14em">ADICIONAR CONTA OU CARTÃO</span><span data-ct-sub style="font-size:12.5px;line-height:1.45;color:' + MU + ';max-width:300px"></span>';
+  /* card vazio: sempre o último da lista. Frente: "+ Adicionar conta ou cartão". Ao clicar ele GIRA (como os cartões) e o verso vira o painel do processo, dentro da própria página. */
+  const vazia = () => mk('vazia', () => {
+    const d = document.createElement('div'); d.setAttribute('data-ct-empty', '1'); d.style.cssText = 'position:relative;width:100%;aspect-ratio:1.586;flex:none;perspective:1800px';
+    d.innerHTML = '<div data-fl-rot style="position:absolute;inset:0;transform-style:preserve-3d;transition:transform .75s cubic-bezier(.85,0,.15,1)">'
+      + '<div data-ct-nova="1" data-fl-frente role="button" style="position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border:1.5px dashed #34343A;border-radius:30px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;color:#8A8A92;cursor:pointer;transition:color .3s ease,border-color .3s ease,background .3s ease" onmouseover="this.style.color=\'#F2F0EB\';this.style.borderColor=\'#6A6A72\';this.style.background=\'rgba(255,255,255,.025)\'" onmouseout="this.style.color=\'#8A8A92\';this.style.borderColor=\'#34343A\';this.style.background=\'transparent\'">'
+      + '<span style="width:56px;height:56px;border-radius:50%;border:1.5px solid currentColor;display:flex;align-items:center;justify-content:center">' + IC.mais + '</span><span style="font-size:11px;font-weight:900;letter-spacing:.14em">ADICIONAR CONTA OU CARTÃO</span><span data-ct-sub style="font-size:12.5px;line-height:1.45;color:' + MU + ';max-width:300px"></span></div>'
+      + '<div data-fl-verso style="position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;transform:rotateY(180deg);isolation:isolate;display:flex;flex-direction:column;color:' + FG + ';font-family:Helvetica,Arial,sans-serif;pointer-events:none"></div></div>';
     return d; });
 
   function coluna() { const sc = document.querySelector('[data-page-scroll="cartoes"]'); return sc && sc.querySelector('div[style*="clamp(520px"]'); }
@@ -3320,53 +3322,67 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (n !== col.lastElementChild) col.appendChild(n);
   }
 
-  /* ---------- fluxo de adicionar (card vazio): conta ou cartão → como → (conta do cartão) ---------- */
-  let FL = null, fl = null;   // fl = overlay; FL = estado
+  /* ---------- painel do processo (verso do card vazio) ---------- */
+  const NB = [22, 10, 18], NT = KD.notch.corner(...NB), EDGE = KD.notch.edge(...NB), MASKURL = KD.notch.mask(...NB) + ', linear-gradient(#000 0 0)';   // indent do X (HANDOFF §5.4), tamanho M
+  const TRILHA = ['TIPO', 'COMO', 'LIGAR', 'IMPORTAR'], ALTURA = 560;
+  let FL = null, P = { aberto: false, busy: false };
   const flagOF = () => !!(KD.fontes && KD.fontes.ofAtivo && KD.fontes.ofAtivo());
-  const flOpcao = (k, icone, titulo, sub, tag, off) => '<div data-fl-o="' + esc(k) + '" style="flex:1;min-height:92px;display:flex;align-items:center;gap:22px;padding:0 48px;border-top:1px solid #2A2A2F;cursor:' + (off ? 'default' : 'pointer') + ';opacity:' + (off ? .45 : 1) + ';transition:background .3s ease"' + (off ? '' : ' onmouseover="this.style.background=\'#1C1C20\'" onmouseout="this.style.background=\'transparent\'"') + '>'
-    + '<span style="width:60px;height:60px;border-radius:50%;border:1.5px solid #3A3A40;display:flex;align-items:center;justify-content:center;flex:none;overflow:hidden">' + icone + '</span>'
-    + '<span style="min-width:0;text-align:left"><b style="display:block;font-size:22px;letter-spacing:-.03em;font-weight:700">' + esc(titulo) + '</b><span style="display:block;font-size:13.5px;color:' + MU + ';margin-top:3px;line-height:1.35">' + esc(sub) + '</span></span>'
-    + (tag ? '<span style="margin-left:auto;font-size:10px;font-weight:900;letter-spacing:.12em;border:1px solid ' + (off ? '#3A3A40' : AMB) + ';color:' + (off ? '#9A9AA3' : AMB) + ';border-radius:99px;padding:6px 10px;white-space:nowrap">' + tag + '</span>' : '') + '</div>';
-  function flConteudo() {
-    const M = KD.M, f = FL; let texto = '', ops = '';
-    if (f.step === 'tipo') {
-      texto = 'Escolha o que adicionar. O cartão de crédito fica sempre ligado a uma conta.';
-      ops = flOpcao('conta', IC.conta, 'Conta', 'Corrente, poupança, investimento ou carteira') + flOpcao('cartao', IC.cartao, 'Cartão de crédito', 'Fica ligado a uma conta sua');
-    } else if (f.step === 'mp1') {
-      texto = 'O Kontar lê o seu banco pelo MeuPluggy, um serviço gratuito da Pluggy. O banco precisa estar ligado lá antes de conectar.';
-      ops = flOpcao('mp:sim', IC.conectar, 'Meu banco já está no MeuPluggy', 'Continuar: na janela que abrir, escolha o banco') + flOpcao('mp:nao', IC.manual, 'Ainda não está ligado', 'Abrir o MeuPluggy em outra aba para ligar o banco');
-    } else if (f.step === 'mp2') {
-      texto = 'Faça isso no MeuPluggy e volte para esta aba. Nada é salvo no Kontar enquanto isso.';
-      const passo = (n, t) => '<div style="display:flex;gap:16px;align-items:flex-start"><span style="width:30px;height:30px;border-radius:50%;border:1.5px solid #3A3A40;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex:none">' + n + '</span><span style="font-size:15px;line-height:1.5;padding-top:4px">' + t + '</span></div>';
-      ops = '<div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:22px;padding:10px 56px;border-top:1px solid #2A2A2F">'
-        + passo(1, 'Abra a página de conexões do MeuPluggy (aberta em outra aba). Se a aba não abriu, <a href="https://meu.pluggy.ai/connections" target="_blank" rel="noopener" style="color:' + FG + ';font-weight:700;text-decoration:underline;text-underline-offset:3px">clique aqui</a>.')
-        + passo(2, 'Entre com a sua conta e adicione o banco, autorizando o acesso (Open Finance) no app do banco.')
-        + passo(3, 'Quando o banco aparecer ligado lá, volte para o Kontar e clique no botão abaixo.')
-        + '<div style="display:flex;justify-content:flex-end;gap:12px;margin-top:6px"><span data-fl-o="mp:abrir" style="border:1.5px solid #3A3A40;border-radius:99px;font-size:12px;font-weight:900;letter-spacing:.1em;padding:15px 22px;cursor:pointer;white-space:nowrap">ABRIR O MEUPLUGGY</span><span data-fl-o="mp:pronto" style="background:' + FG + ';color:' + INK + ';border-radius:99px;font-size:12px;font-weight:900;letter-spacing:.1em;padding:15px 24px;cursor:pointer;white-space:nowrap">JÁ LIGUEI, CONTINUAR</span></div></div>';
-    } else if (f.step === 'conta') {
-      texto = 'A fatura do cartão sai da conta que você escolher.';
-      ops = M.accs.map(a => '<div data-fl-o="acc:' + esc(a.id) + '" style="flex:1;min-height:92px;display:flex;align-items:center;gap:22px;padding:0 48px;border-top:1px solid #2A2A2F;cursor:pointer;transition:background .3s ease" onmouseover="this.style.background=\'#1C1C20\'" onmouseout="this.style.background=\'transparent\'"><span style="width:60px;display:flex;justify-content:center;flex:none">' + logoDe(a.inst, a.nome, a.cor) + '</span><span style="min-width:0;text-align:left"><b style="display:block;font-size:22px;letter-spacing:-.03em;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(a.nome) + '</b><span style="display:block;font-size:13.5px;color:' + MU + ';margin-top:3px">' + (M.cards.filter(c => c.acc === a.id).length || 'nenhum') + ' cartão(ões) de crédito</span></span></div>').join('');
+  const raiz = () => document.querySelector('[data-ct-empty]');
+  const trilha = r => { if (r == null) return ''; let h = '<div style="display:flex;align-items:flex-start;padding:2px 30px 18px">';
+    TRILHA.forEach((n, i) => { const on = i === r, ok = i < r; h += '<div style="display:flex;flex-direction:column;align-items:center;gap:8px;width:84px;flex:none;font-size:10px;font-weight:800;letter-spacing:.1em;color:' + (on || ok ? FG : MU) + '"><i style="display:block;border-radius:50%;box-sizing:border-box;width:' + (on ? 26 : 16) + 'px;height:' + (on ? 26 : 16) + 'px;margin:' + (on ? 0 : 5) + 'px 0;background:' + (on || ok ? FG : '#141416') + ';border:3px solid ' + (on || ok ? FG : '#3A3A40') + ';transition:all .4s ' + EE + '"></i>' + n + '</div>'; if (i < 3) h += '<div style="flex:1;height:3px;margin-top:13px;background:' + (i < r ? FG : '#3A3A40') + ';transition:background .4s ease"></div>'; });
+    return h + '</div>'; };
+  const pill = 'width:44px;height:44px;border-radius:50%;border:1.5px solid #3A3A40;background:#1C1C20;display:flex;align-items:center;justify-content:center;color:#B4B4BA;flex:none;cursor:pointer;transition:color .25s ease,border-color .25s ease';
+  const hov = ' onmouseover="this.style.color=\'#F2F0EB\';this.style.borderColor=\'#55555C\'" onmouseout="this.style.color=\'#B4B4BA\';this.style.borderColor=\'#3A3A40\'"';
+  /* moldura do verso: fundo com recorte, X no indent, texto, trilha e conteúdo */
+  const moldura = o => {
+    const layer = '<div aria-hidden="true" style="position:absolute;inset:0;z-index:-1;box-sizing:border-box;border-radius:30px;pointer-events:none;background-color:#141416;border:1px solid #2A2A2F;-webkit-mask:' + MASKURL + ';-webkit-mask-composite:xor;mask:' + MASKURL + ';mask-composite:exclude"></div>'
+      + '<svg aria-hidden="true" width="' + NT.w + '" height="' + NT.h + '" style="position:absolute;right:0;top:0;z-index:-1;pointer-events:none;overflow:visible"><path d="' + EDGE + '" fill="none" stroke="#2A2A2F" stroke-width="1"/></svg>';
+    const x = '<span data-fl-x role="button" aria-label="Fechar" style="position:absolute;right:0;top:0;pointer-events:auto;' + pill.replace('border:1.5px solid #3A3A40', 'border:1px solid #3A3A40') + '"' + hov + '>' + IC.x + '</span>';
+    const voltar = o.voltar ? '<span data-fl-v role="button" aria-label="Voltar" style="' + pill + ';pointer-events:auto"' + hov + '>' + IC.voltar + '</span>' : '';
+    const topo = '<div style="display:flex;align-items:center;gap:16px;padding:22px ' + (NT.w + 8) + 'px 16px 22px;min-height:88px"><span style="display:contents">' + voltar + '</span><span style="flex:1;font-size:14px;line-height:1.45;color:' + (o.voltar ? '#9A9AA3' : '#C9C7C1') + ';text-align:' + (o.voltar ? 'center' : 'left') + ';text-wrap:balance">' + (o.texto || '') + '</span></div>';
+    return layer + x + topo + trilha(o.rota) + '<div data-fl-body style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto;pointer-events:auto">' + (o.corpo || '') + '</div>' + (o.rodape ? '<div style="padding:0 22px 22px;display:flex;align-items:center;gap:12px;justify-content:flex-end;pointer-events:auto">' + o.rodape + '</div>' : '');
+  };
+  /* pinta (e troca com fade) o conteúdo do verso */
+  function pinta(o, rapido) {
+    const v = raiz() && raiz().querySelector('[data-fl-verso]'); if (!v) return;
+    const antes = v.querySelector('[data-fl-body]'), troca = () => { v.innerHTML = moldura(o); const b = v.querySelector('[data-fl-body]'); if (!rapido && b && b.animate) b.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: EE }); };
+    if (antes && !rapido && antes.animate) { antes.style.transition = 'opacity .16s ease'; antes.style.opacity = '0'; setTimeout(troca, 160); } else troca();
+  }
+  const tall = (k, icone, cor, titulo, sub, off, tag) => '<div data-fl-o="' + esc(k) + '" style="border-radius:24px;background:#1C1C1E;border:1px solid #2A2A2F;padding:22px;display:flex;flex-direction:column;justify-content:space-between;cursor:' + (off ? 'default' : 'pointer') + ';opacity:' + (off ? .5 : 1) + ';min-width:0;transition:background .3s ease,border-color .3s ease"' + (off ? '' : ' onmouseover="this.style.background=\'#232326\';this.style.borderColor=\'#3A3A40\'" onmouseout="this.style.background=\'#1C1C1E\';this.style.borderColor=\'#2A2A2F\'"') + '>'
+    + '<span style="width:60px;height:60px;border-radius:50%;background:' + cor + ';color:#0A0A0A;display:flex;align-items:center;justify-content:center">' + icone + '</span>'
+    + '<span style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px"><span style="min-width:0"><b style="display:block;font-size:25px;letter-spacing:-.045em;line-height:1.05">' + esc(titulo) + '</b><span style="display:block;font-size:12.5px;color:' + MU + ';margin-top:8px;line-height:1.4">' + esc(sub) + '</span>' + (tag ? '<span style="display:inline-block;margin-top:10px;font-size:9.5px;font-weight:900;letter-spacing:.12em;border:1px solid ' + (off ? '#3A3A40' : AMB) + ';color:' + (off ? '#9A9AA3' : AMB) + ';border-radius:99px;padding:5px 9px">' + tag + '</span>' : '') + '</span><span style="flex:none;display:flex">' + ico('<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>', 26) + '</span></span></div>';
+  const dois = (a, b) => '<div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:0 22px 22px">' + a + b + '</div>';
+  const btn = (attr, txt, claro) => '<span ' + attr + ' role="button" style="' + (claro ? 'background:' + FG + ';color:' + INK + ';' : 'border:1.5px solid #3A3A40;') + 'border-radius:99px;font-size:14px;font-weight:700;padding:' + (claro ? '14px 26px' : '13px 24px') + ';cursor:pointer;white-space:nowrap">' + txt + '</span>';
+  function conteudo() {
+    const M = KD.M, f = FL;
+    if (f.step === 'tipo') return { texto: 'Escolha o que adicionar.<br>O cartão de crédito fica sempre ligado a uma conta.', voltar: false, rota: null, corpo: dois(tall('conta', IC.conta, AMB, 'Conta', 'Corrente, poupança, investimento ou carteira'), tall('cartao', IC.cartao, '#2CBFF8', 'Cartão de crédito', 'Fica ligado a uma conta sua')) };
+    if (f.step === 'conta') return { texto: 'A fatura do cartão sai da conta que você escolher.', voltar: f.pilha.length > 0, rota: 0, corpo: '<div style="flex:1;display:flex;flex-direction:column;gap:14px;padding:0 22px 22px">' + M.accs.map(a => '<div data-fl-o="acc:' + esc(a.id) + '" style="flex:1;min-height:78px;border-radius:24px;background:#1C1C1E;border:1px solid #2A2A2F;display:flex;align-items:center;gap:20px;padding:0 26px;cursor:pointer;transition:background .3s ease" onmouseover="this.style.background=\'#232326\'" onmouseout="this.style.background=\'#1C1C1E\'"><span style="width:54px;display:flex;justify-content:center;flex:none">' + logoDe(a.inst, a.nome, a.cor) + '</span><span style="flex:1;min-width:0"><b style="display:block;font-size:20px;letter-spacing:-.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(a.nome) + '</b><span style="display:block;font-size:12px;color:' + MU + ';margin-top:3px">' + (M.cards.filter(c => c.acc === a.id).length || 'nenhum') + ' cartão(ões) de crédito</span></span>' + ico('<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>', 26) + '</div>').join('') + '</div>' };
+    if (f.step === 'como') { const cartao = f.kind === 'cartao', ac = f.accId && M.accById[f.accId], of = flagOF();
+      return { texto: cartao ? 'Em ' + esc(ac ? ac.nome : 'sua conta') + '. Conectando ao banco, o cartão vem com o limite e a fatura.' : 'Conectando ao banco, a conta e o cartão de crédito (se tiver) vêm sozinhos e o extrato se atualiza todo dia.', voltar: f.pilha.length > 0, rota: 1,
+        corpo: dois(tall('conectar', IC.conectar, '#6AFF2A', 'Conectar ao banco', 'Open Finance via MeuPluggy. O banco precisa estar ligado lá.', !of, of ? '' : 'EM BREVE'), tall('manual', IC.manual, FG, 'Preencher manualmente', 'Escolha o banco e importe extratos de vez em quando.')) }; }
+    if (f.step === 'mp1') return { texto: 'O Kontar lê o seu banco pelo MeuPluggy, um serviço gratuito da Pluggy. O banco precisa estar ligado lá antes.', voltar: true, rota: 2, corpo: dois(tall('mp:sim', IC.conectar, '#6AFF2A', 'Já está no MeuPluggy', 'Continuar e escolher o banco na janela que abrir.'), tall('mp:nao', IC.manual, AMB, 'Ainda não está ligado', 'Abrir o MeuPluggy em outra aba para ligar o banco.')) };
+    if (f.step === 'mp2') { const passo = (n, t) => '<div style="position:relative;display:flex;gap:18px;align-items:center;z-index:1"><span style="width:52px;height:52px;border-radius:50%;background:' + FG + ';color:' + INK + ';display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;line-height:1;padding-top:2px;box-sizing:border-box;border:6px solid #1C1C1E;box-sizing:content-box;margin:-6px;flex:none">' + n + '</span><span style="font-size:14.5px;line-height:1.5;margin-left:6px">' + t + '</span></div>';
+      return { texto: 'Faça isso no MeuPluggy e volte para esta aba. Nada é salvo no Kontar enquanto isso.', voltar: true, rota: 2,
+        corpo: '<div style="position:relative;flex:1;margin:0 22px 14px;border-radius:24px;background:#1C1C1E;border:1px solid #2A2A2F;padding:10px 30px;display:flex;flex-direction:column;justify-content:space-evenly"><span aria-hidden="true" style="position:absolute;left:61px;top:44px;bottom:44px;width:8px;border-radius:4px;background:' + FG + '"></span>'
+          + passo(1, 'Abra <a href="https://meu.pluggy.ai/connections" target="_blank" rel="noopener" style="color:' + FG + ';font-weight:700;text-decoration:underline;text-underline-offset:3px">meu.pluggy.ai/connections</a> (abre em outra aba)') + passo(2, 'Entre e adicione o banco, autorizando o acesso (Open Finance) no app dele') + passo(3, 'Volte para o Kontar e continue') + '</div>',
+        rodape: btn('data-fl-o="mp:abrir"', 'Abrir o MeuPluggy') + btn('data-fl-o="mp:pronto"', 'Já liguei, continuar', true) }; }
+    return { texto: '', voltar: false, rota: null, corpo: '' };
+  }
+  const flDesenha = rapido => pinta(conteudo(), rapido);
+  function flVai(step, extra) { FL.pilha.push({ step: FL.step, kind: FL.kind, accId: FL.accId }); Object.assign(FL, { step }, extra || {}); flDesenha(false); }
+  function flVolta() { if (!FL || !FL.pilha.length) return; Object.assign(FL, FL.pilha.pop()); flDesenha(false); }
+  /* girar o card: abre (frente → verso, cresce de altura) e fecha */
+  function gira(abre, depois) {
+    const r = raiz(); if (!r) return; const rot = r.querySelector('[data-fl-rot]'), verso = r.querySelector('[data-fl-verso]'), w = r.getBoundingClientRect().width, h0 = w / 1.586;
+    if (abre) {
+      r.style.aspectRatio = 'auto'; r.style.height = r.getBoundingClientRect().height + 'px'; r.getBoundingClientRect(); r.style.transition = 'height .75s ' + 'cubic-bezier(.85,0,.15,1)'; r.style.height = Math.max(h0, ALTURA) + 'px';
+      rot.style.transform = 'rotateY(180deg)'; setTimeout(() => { verso.style.pointerEvents = 'auto'; r.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 120);
     } else {
-      const cartao = f.kind === 'cartao', ac = f.accId && M.accById[f.accId];
-      texto = cartao ? 'Em ' + (ac ? ac.nome : 'sua conta') + '. Conectando ao banco, o cartão vem com o limite e a fatura.' : 'Conectando ao banco, a conta e o cartão de crédito (se tiver) vêm sozinhos e o extrato se atualiza todo dia.';
-      const of = flagOF();
-      ops = flOpcao('conectar', IC.conectar, 'Conectar ao banco', 'Open Finance via MeuPluggy · o banco precisa estar ligado lá', of ? 'RECOMENDADO' : 'EM BREVE', !of) + flOpcao('manual', IC.manual, 'Preencher manualmente', 'Escolha o banco e importe o extrato de vez em quando');
+      verso.style.pointerEvents = 'none'; r.style.transition = 'height .75s cubic-bezier(.85,0,.15,1)'; r.style.height = h0 + 'px'; rot.style.transform = 'none';
+      setTimeout(() => { r.style.transition = ''; r.style.height = ''; r.style.aspectRatio = '1.586'; verso.innerHTML = ''; if (depois) depois(); }, 800);
     }
-    return { texto, ops };
   }
-  function flDesenha(anima) {
-    const c = fl.querySelector('[data-fl-card]'), { texto, ops } = flConteudo(), pode = FL.pilha.length > 0;
-    const pill = 'height:38px;border-radius:99px;border:1.5px solid #3A3A40;display:flex;align-items:center;justify-content:center;gap:6px;color:#B4B4BA;cursor:pointer;flex:none;transition:color .25s ease,border-color .25s ease';
-    c.innerHTML = '<div style="display:flex;align-items:center;gap:16px;padding:20px 22px;min-height:78px">'
-      + '<span data-fl-v style="' + pill + ';padding:0 16px 0 11px;font-size:12px;font-weight:700;visibility:' + (pode ? 'visible' : 'hidden') + '" onmouseover="this.style.color=\'#F2F0EB\';this.style.borderColor=\'#55555C\'" onmouseout="this.style.color=\'#B4B4BA\';this.style.borderColor=\'#3A3A40\'">' + IC.voltar + 'Voltar</span>'
-      + '<span style="flex:1;text-align:center;font-size:13.5px;line-height:1.45;color:' + MU + ';text-wrap:balance">' + esc(texto) + '</span>'
-      + '<span data-fl-x role="button" aria-label="Fechar" style="' + pill + ';width:38px" onmouseover="this.style.color=\'#F2F0EB\';this.style.borderColor=\'#55555C\'" onmouseout="this.style.color=\'#B4B4BA\';this.style.borderColor=\'#3A3A40\'">' + IC.x + '</span></div>'
-      + '<div data-fl-body style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto">' + ops + '</div>';
-    const b = c.querySelector('[data-fl-body]'); if (anima && b.animate) b.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: EE });
-  }
-  function flVai(step, extra) { if (!FL) return; const c = fl.querySelector('[data-fl-body]'); FL.pilha.push({ step: FL.step, kind: FL.kind, accId: FL.accId }); const go = () => { Object.assign(FL, { step }, extra || {}); flDesenha(true); }; if (c && c.animate) { c.style.transition = 'opacity .16s ease'; c.style.opacity = '0'; setTimeout(go, 160); } else go(); }
-  function flVolta() { if (!FL || !FL.pilha.length) return; const c = fl.querySelector('[data-fl-body]'), ant = FL.pilha.pop(); const go = () => { Object.assign(FL, ant); flDesenha(true); }; if (c && c.animate) { c.style.transition = 'opacity .16s ease'; c.style.opacity = '0'; setTimeout(go, 160); } else go(); }
-  function flFecha(depois) { if (!fl) { if (depois) depois(); return; } const l = fl; fl = null; FL = null; l.style.opacity = '0'; l.firstElementChild.style.transform = 'translateY(10px)'; setTimeout(() => { l.remove(); if (depois) depois(); }, 320); }
+  function flFecha(depois) { if (!P.aberto) { if (depois) depois(); return; } P.aberto = false; FL = null; gira(false, depois); }
   function flEscolhe(k) {
     const f = FL, M = KD.M;
     if (f.step === 'tipo') {
@@ -3377,33 +3393,26 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (f.step === 'conta') return flVai('como', { accId: k.slice(4) });
     if (f.step === 'mp1' || f.step === 'mp2') {
       const ini = { kind: f.kind, accId: f.accId };
-      if (k === 'mp:sim' || k === 'mp:pronto') return flFecha(() => { if (CT.conectar) CT.conectar(ini); });
+      if (k === 'mp:sim' || k === 'mp:pronto') { if (CT.conectar) CT.conectar(ini); return; }
       if (k === 'mp:nao') { window.open('https://meu.pluggy.ai/connections', '_blank', 'noopener'); return flVai('mp2'); }
       if (k === 'mp:abrir') { window.open('https://meu.pluggy.ai/connections', '_blank', 'noopener'); return; }
     }
     if (k === 'conectar') { if (!flagOF()) return; return flVai('mp1'); }
     const kind = f.kind, accId = f.accId; flFecha(() => { if (kind === 'cartao') CT.novoCartaoForm(accId); else CT.nova(); });
   }
-  CT._u = { IC, esc, logoDe, nomeLivre, nomesUsados, brl, moedaNum, iso, TODOS, CORES, inkOn, TIPOS };
   CT.adicionar = ini => {
-    if (fl || layer) return; ini = ini || {};
-    FL = { step: 'tipo', kind: ini.kind || null, accId: null, pilha: [] };
-    fl = document.createElement('div'); fl.setAttribute('data-fl-modal', '1');
-    fl.style.cssText = 'position:fixed;inset:0;z-index:99985;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;overflow:auto;opacity:0;transition:opacity .3s ease;font-family:Helvetica,Arial,sans-serif;color:' + FG;
-    fl.innerHTML = '<div data-fl-card style="width:min(780px,calc(100% - 48px));height:min(560px,calc(100vh - 64px));margin:32px 0;border-radius:30px;background:#141416;border:1px solid #2A2A2F;overflow:hidden;display:flex;flex-direction:column;transform:translateY(10px);transition:transform .45s ' + EE + '"></div>';
-    document.body.appendChild(fl);
-    const M = KD.M;   // atalhos: "só conta" ou "só cartão" vindos de outros lugares pulam a primeira pergunta
+    ini = ini || {};
+    if (!raiz()) {   // fora da página Contas (ex.: Fontes): vai pra lá e abre quando o card existir
+      if (KD.comp && KD.comp.goPage) KD.comp.goPage('cartoes'); let t = 0; const iv = setInterval(() => { if (raiz() || ++t > 40) { clearInterval(iv); if (raiz()) CT.adicionar(ini); } }, 150); return;
+    }
+    if (P.aberto || layer) return; const M = KD.M; P.aberto = true;
+    FL = { step: 'tipo', kind: ini.kind || null, accId: ini.accId || null, pilha: [] };
     if (ini.passo) FL.step = ini.passo;
     else if (ini.kind === 'conta') FL.step = 'como';
-    else if (ini.kind === 'cartao') { if (M.accs.length === 1 || ini.accId) { FL.step = 'como'; FL.accId = ini.accId || M.accs[0].id; } else if (M.accs.length > 1) FL.step = 'conta'; else { fl.remove(); fl = null; FL = null; return CT.nova({ credito: true }); } }
-    flDesenha(false);
-    fl.addEventListener('mousedown', e => { if (e.target === fl) flFecha(); });
-    fl.addEventListener('click', e => {
-      const o = e.target.closest('[data-fl-o],[data-fl-v],[data-fl-x]'); if (!o || !FL) return;
-      if (o.hasAttribute('data-fl-x')) flFecha(); else if (o.hasAttribute('data-fl-v')) flVolta(); else flEscolhe(o.getAttribute('data-fl-o'));
-    });
-    requestAnimationFrame(() => { fl.style.opacity = '1'; fl.firstElementChild.style.transform = 'none'; });
+    else if (ini.kind === 'cartao') { if (M.accs.length === 1 || ini.accId) { FL.step = 'como'; FL.accId = ini.accId || M.accs[0].id; } else if (M.accs.length > 1) FL.step = 'conta'; else { P.aberto = false; FL = null; return CT.nova({ credito: true }); } }
+    flDesenha(true); gira(true);
   };
+  CT._u = { IC, esc, logoDe, nomeLivre, nomesUsados, brl, moedaNum, iso, TODOS, CORES, inkOn, TIPOS, ico, pinta, tall, dois, btn, flFecha, raiz, painel: P, aberto: () => P.aberto, estado: () => FL };
 
   /* ---------- pontos de entrada ---------- */
   CT.nova = est => abre(Object.assign({ mode: 'conta' }, est || {}));
@@ -3415,13 +3424,14 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   };
   CT.novoCartao = accId => { if (accId) CT.novoCartaoForm(accId); else CT.adicionar({ kind: 'cartao' }); };
   document.addEventListener('click', e => {
+    const fv = e.target.closest && e.target.closest('[data-fl-o],[data-fl-v],[data-fl-x]'); if (fv && FL) { e.stopPropagation(); if (fv.hasAttribute('data-fl-x')) { if (!P.busy) flFecha(); } else if (fv.hasAttribute('data-fl-v')) flVolta(); else flEscolhe(fv.getAttribute('data-fl-o')); return; }
     const n = e.target.closest && e.target.closest('[data-ct-nova]'); if (n) { e.stopPropagation(); CT.adicionar(); return; }
     const a = e.target.closest && e.target.closest('[data-ct-add]'); if (a) { e.stopPropagation(); CT.novoCartao(a.getAttribute('data-ct-add')); return; }
     const ed = e.target.closest && e.target.closest('[data-ct-ed]'); if (ed) { e.stopPropagation(); CT.editar(ed.getAttribute('data-ct-ed')); return; }
     const ua = e.target.closest && e.target.closest('[data-ct-unarq]'); if (ua) { e.stopPropagation(); const p = ua.getAttribute('data-ct-unarq').split(':'); desarquiva(p[0], p[1]); return; }
     const at = e.target.closest && e.target.closest('[data-ct-arqt]'); if (at) { e.stopPropagation(); arqAberto = !arqAberto; passe(); }
   }, true);
-  window.addEventListener('keydown', e => { if (e.key === 'Escape') { if (fl) flFecha(); else if (layer && !(S && S.busy)) fecha(); } });
+  window.addEventListener('keydown', e => { if (e.key === 'Escape') { if (P.aberto) { if (!P.busy) flFecha(); } else if (layer && !(S && S.busy)) fecha(); } });
 })();
 
 /* Kontar · conectar ao banco (Open Finance via Pluggy) a partir de Contas ou de Fontes.
@@ -3432,7 +3442,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const KD = window.KD, CT = KD && KD.contas; if (!CT || !CT._u) return;
   const { IC, esc, logoDe, nomeLivre, nomesUsados, brl, moedaNum, iso } = CT._u;
   const EE = 'cubic-bezier(.65,0,.35,1)', FG = '#F2F0EB', INK = '#0A0A0A', MU = '#7C7C85', AMB = '#F0C24B', GRN = '#00A86B';
-  let L = null, X = null;
+  let X = null;
   const hoje = () => KD.iso ? KD.iso(KD.today) : iso(KD.today);
   const inv = async body => {
     const r = await KD.sb.functions.invoke('open-finance', { body });
@@ -3447,68 +3457,53 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const corDe = b => (b && KD.BANK && KD.BANK[b]) || ['#6A4BFF', '#FFFFFF'];
   const modoDe = (tipo, id) => { const R = KD.fontes && KD.fontes.rows && KD.fontes.rows(), r = R && R.find(x => x.k === (tipo === 'conta' ? 'a' : 'c') + id); return r ? r.modo : 'extrato'; };
 
-  /* ---------- moldura ---------- */
-  function abreMoldura() {
-    L = document.createElement('div'); L.setAttribute('data-cx-modal', '1');
-    L.style.cssText = 'position:fixed;inset:0;z-index:99984;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;overflow:auto;opacity:0;transition:opacity .3s ease;font-family:Helvetica,Arial,sans-serif;color:' + FG;
-    L.innerHTML = '<div data-cx-card style="width:min(780px,calc(100% - 48px));max-height:calc(100vh - 64px);margin:32px 0;border-radius:30px;background:#141416;border:1px solid #2A2A2F;overflow:hidden;display:flex;flex-direction:column;transform:translateY(10px);transition:transform .45s ' + EE + '"></div>';
-    document.body.appendChild(L);
-    L.addEventListener('mousedown', e => { if (e.target === L && X && !X.busy && X.fase !== 'abrindo') fecha(); });
-    L.addEventListener('click', e => {
-      const t = e.target.closest('[data-cx-x],[data-cx-t],[data-cx-ok],[data-cx-sim],[data-cx-nao]'); if (!t || !X) return;
-      if (t.hasAttribute('data-cx-x')) { if (!X.busy) fecha(); }
-      else if (t.hasAttribute('data-cx-t')) { const i = +t.getAttribute('data-cx-t'); X.itens[i].on = !X.itens[i].on; desenha(false); }
-      else if (t.hasAttribute('data-cx-ok')) importa();
-      else if (t.hasAttribute('data-cx-sim')) { const a = X.novaConta; fecha(); if (a) CT.novoCartaoForm(a); }
-      else if (t.hasAttribute('data-cx-nao')) fecha();
-    });
-    L.addEventListener('change', e => { const k = e.target.getAttribute && e.target.getAttribute('data-cx-s'); if (!k || !X) return; const [i, campo] = k.split(':'); X.itens[+i][campo] = e.target.value; desenha(false); });
-    requestAnimationFrame(() => { L.style.opacity = '1'; L.firstElementChild.style.transform = 'none'; });
-  }
-  function fecha() { if (!L) return; const l = L; L = null; X = null; l.style.opacity = '0'; l.firstElementChild.style.transform = 'translateY(10px)'; setTimeout(() => l.remove(), 320); }
-  const topo = texto => '<div style="display:flex;align-items:center;gap:16px;padding:20px 22px;min-height:78px"><span style="width:38px;flex:none"></span><span style="flex:1;text-align:center;font-size:13.5px;line-height:1.45;color:' + MU + ';text-wrap:balance">' + esc(texto) + '</span>'
-    + '<span data-cx-x role="button" aria-label="Fechar" style="height:38px;width:38px;border-radius:99px;border:1.5px solid #3A3A40;display:flex;align-items:center;justify-content:center;color:#B4B4BA;cursor:pointer;flex:none;transition:color .25s ease,border-color .25s ease" onmouseover="this.style.color=\'#F2F0EB\';this.style.borderColor=\'#55555C\'" onmouseout="this.style.color=\'#B4B4BA\';this.style.borderColor=\'#3A3A40\'">' + IC.x + '</span></div>';
+  /* ---------- telas (desenhadas no verso do card vazio, por CT._u.pinta) ---------- */
+  const U = CT._u, pinta = U.pinta, btn = U.btn;
   const LINK_MP = '<a href="https://meu.pluggy.ai/connections" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px;font-size:12.5px;font-weight:700;color:' + FG + ';text-decoration:underline;text-underline-offset:3px">Meu banco não aparece: adicionar no MeuPluggy</a>';
-  const centro = (t, sub, extra) => '<div style="flex:1;min-height:280px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px 48px;gap:8px"><b style="font-size:24px;letter-spacing:-.03em">' + esc(t) + '</b><span style="font-size:13.5px;color:' + MU + ';line-height:1.45;max-width:420px">' + esc(sub || '') + '</span>' + (extra || '') + '</div>';
-  const sel = (k, valor, ops) => '<select data-cx-s="' + k + '" style="height:42px;border-radius:99px;border:1px solid #3A3A40;background:#0B0B0D;color:' + FG + ';font:inherit;font-size:13px;padding:0 14px;max-width:260px;outline:0;cursor:pointer">' + ops.map(o => '<option value="' + esc(o[0]) + '"' + (o[0] === valor ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('') + '</select>';
-
-  /* ---------- telas ---------- */
-  function desenha(anima) {
-    if (!L || !X) return; const c = L.querySelector('[data-cx-card]'); let h = '';
-    if (X.fase === 'abrindo') h = topo('Conexão segura com o seu banco') + centro(X.msg || 'Abrindo a conexão…', 'Na janela que abriu: 1) escolha MeuPluggy, 2) entre com a sua conta do MeuPluggy, 3) marque o banco que quer trazer. O Kontar só lê, nunca movimenta dinheiro.', LINK_MP);
-    else if (X.fase === 'erro') h = topo('Não deu certo') + centro('Não consegui conectar', X.msg || '', LINK_MP) + '<div style="padding:0 22px 24px;display:flex;justify-content:center"><span data-cx-x style="background:' + FG + ';color:' + INK + ';border-radius:99px;font-size:12px;font-weight:900;letter-spacing:.1em;padding:15px 24px;cursor:pointer">FECHAR</span></div>';
-    else if (X.fase === 'importando') h = topo('Buscando os lançamentos do banco') + centro(X.msg || 'Importando…', 'Isso pode levar alguns segundos. Pode deixar esta janela aberta.');
-    else if (X.fase === 'cartao') h = topo('Conta conectada') + centro(X.resumo || 'Pronto.', '') + '<div style="padding:0 22px 8px;text-align:center;font-size:15px;font-weight:700;letter-spacing:-.02em">Essa conta tem cartão de crédito?</div>'
-      + '<div style="padding:10px 22px 26px;display:flex;gap:12px;justify-content:center"><span data-cx-nao style="border:1.5px solid #3A3A40;border-radius:99px;font-size:12px;font-weight:900;letter-spacing:.1em;padding:15px 26px;cursor:pointer">NÃO</span><span data-cx-sim style="background:' + FG + ';color:' + INK + ';border-radius:99px;font-size:12px;font-weight:900;letter-spacing:.1em;padding:15px 26px;cursor:pointer">SIM, ADICIONAR</span></div>';
-    else if (X.fase === 'fim') h = topo('Tudo certo') + centro(X.resumo || 'Pronto.', X.sub || '') + '<div style="padding:0 22px 24px;display:flex;justify-content:center"><span data-cx-x style="background:' + FG + ';color:' + INK + ';border-radius:99px;font-size:12px;font-weight:900;letter-spacing:.1em;padding:15px 24px;cursor:pointer">CONCLUIR</span></div>';
-    else {   // ligar
+  const msgCard = (t, sub, extra) => '<div style="flex:1;margin:0 22px 14px;border-radius:24px;background:#1C1C1E;border:1px solid #2A2A2F;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px 34px;gap:8px"><b style="font-size:24px;letter-spacing:-.04em">' + esc(t) + '</b><span style="font-size:13px;color:' + MU + ';line-height:1.5;max-width:380px">' + esc(sub || '') + '</span>' + (extra || '') + '</div>';
+  const sel = (k, valor, ops) => '<select data-cx-s="' + k + '" style="height:40px;border-radius:99px;border:1px solid #3A3A40;background:#0B0B0D;color:' + FG + ';font:inherit;font-size:13px;padding:0 12px;max-width:170px;outline:0;cursor:pointer;flex:none">' + ops.map(o => '<option value="' + esc(o[0]) + '"' + (o[0] === valor ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('') + '</select>';
+  const fecha = () => { if (!X || !X.busy) { X = null; U.flFecha(); } };
+  function desenha(rapido) {
+    if (!X) return; let o;
+    if (X.fase === 'abrindo') o = { texto: 'Conexão segura com o seu banco.', rota: 2, corpo: msgCard(X.msg || 'Abrindo a conexão…', 'Na janela que abriu: 1) escolha MeuPluggy, 2) entre com a sua conta do MeuPluggy, 3) marque o banco que quer trazer. O Kontar só lê, nunca movimenta dinheiro.', LINK_MP) };
+    else if (X.fase === 'erro') o = { texto: 'Algo deu errado.', rota: null, corpo: msgCard('Não consegui conectar', X.msg || '', LINK_MP), rodape: btn('data-cx-fim', 'Fechar', true) };
+    else if (X.fase === 'importando') o = { texto: 'Buscando os lançamentos do banco.', rota: 3, corpo: msgCard(X.msg || 'Importando…', 'Isso pode levar alguns segundos. Pode deixar esta tela aberta.') };
+    else if (X.fase === 'cartao') o = { texto: 'Conta conectada.', rota: 3, corpo: msgCard(X.resumo || 'Pronto.', 'Essa conta tem cartão de crédito?'), rodape: btn('data-cx-nao', 'Não') + btn('data-cx-sim', 'Sim, adicionar', true) };
+    else if (X.fase === 'fim') o = { texto: 'Tudo certo.', rota: 4, corpo: msgCard(X.resumo || 'Pronto.', X.sub || ''), rodape: btn('data-cx-fim', 'Concluir', true) };
+    else {   // ligar: lista horizontal de sub-cards
       const M = KD.M, temBanco = X.itens.some(i => i.c.tipo === 'BANK');
       const linhas = X.itens.map((it, i) => {
         const cred = it.c.tipo === 'CREDIT', k = bancoDe(it.c.nome), cor = corDe(k)[0], inst = k || it.c.nome.trim();
-        const opsC = cred ? [['new', 'Novo cartão'], ...M.cards.filter(cd => modoDe('cartao', cd.id) !== 'open_finance').map(cd => [cd.id, 'Usar: ' + cd.n])] : [['new', 'Nova conta'], ...M.accs.filter(a => modoDe('conta', a.id) !== 'open_finance').map(a => [a.id, 'Usar: ' + a.nome])];
+        const opsC = cred ? [['new', '+ Novo cartão'], ...M.cards.filter(cd => modoDe('cartao', cd.id) !== 'open_finance').map(cd => [cd.id, 'Usar: ' + cd.n])] : [['new', '+ Nova conta'], ...M.accs.filter(a => modoDe('conta', a.id) !== 'open_finance').map(a => [a.id, 'Usar: ' + a.nome])];
         if (it.ja) opsC.splice(0, opsC.length, [it.alvo, 'Já ligado a ' + (cred ? (M.cardById[it.alvo] || {}).n : (M.accById[it.alvo] || {}).nome || 'item')]);
-        const host = cred && it.alvo === 'new' && !X.accId && !temBanco ? '<div style="margin-top:8px">' + sel(i + ':host', it.host, [['', 'Conta que paga a fatura…'], ...M.accs.map(a => [a.id, a.nome])]) + '</div>' : '';
-        return '<div style="display:flex;align-items:center;gap:18px;padding:18px 28px;border-top:1px solid #2A2A2F;opacity:' + (it.on ? 1 : .45) + ';transition:opacity .3s ease">'
+        const host = cred && it.alvo === 'new' && !X.accId && !temBanco ? '<div style="margin-top:6px">' + sel(i + ':host', it.host, [['', 'Conta da fatura…'], ...M.accs.map(a => [a.id, a.nome])]) + '</div>' : '';
+        return '<div style="display:flex;align-items:center;gap:14px;border-radius:24px;background:#1C1C1E;border:1px solid #2A2A2F;padding:16px 18px;opacity:' + (it.on ? 1 : .5) + ';transition:opacity .3s ease">'
           + '<span data-cx-t="' + i + '" role="button" style="width:26px;height:26px;border-radius:8px;border:1.5px solid ' + (it.on ? FG : '#3A3A40') + ';background:' + (it.on ? FG : 'transparent') + ';color:' + INK + ';display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;transition:all .25s ease">' + (it.on ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>' : '') + '</span>'
-          + '<span style="width:54px;display:flex;justify-content:center;flex:none">' + logoDe(inst, it.c.nome, cor) + '</span>'
-          + '<span style="flex:1;min-width:0"><b style="display:block;font-size:17px;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(it.c.nome.trim()) + (it.c.final ? ' ···· ' + esc(it.c.final) : '') + '</b><span style="display:block;font-size:12.5px;color:' + MU + ';margin-top:3px">' + (it.ja ? 'Já conectado ao Kontar · ' : '') + (cred ? 'Cartão de crédito' + (it.c.limite ? ' · limite R$ ' + esc(brl(it.c.limite)) : '') : (it.c.subtipo === 'SAVINGS_ACCOUNT' ? 'Poupança' : 'Conta') + ' · saldo R$ ' + esc(brl(it.c.saldo))) + '</span></span>'
+          + '<span style="width:46px;display:flex;justify-content:center;flex:none">' + logoDe(inst, it.c.nome, cor) + '</span>'
+          + '<span style="flex:1;min-width:0"><b style="display:block;font-size:16px;letter-spacing:-.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(it.c.nome.trim()) + (it.c.final ? ' ···· ' + esc(it.c.final) : '') + '</b><span style="display:block;font-size:11.5px;color:' + MU + ';margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (it.ja ? 'Já conectado ao Kontar · ' : '') + (cred ? 'Cartão' + (it.c.limite ? ' · limite R$ ' + esc(brl(it.c.limite)) : '') : (it.c.subtipo === 'SAVINGS_ACCOUNT' ? 'Poupança' : 'Conta') + ' · saldo R$ ' + esc(brl(it.c.saldo))) + '</span></span>'
           + '<span style="flex:none">' + sel(i + ':alvo', it.alvo, opsC) + host + '</span></div>';
       }).join('');
       const n = X.itens.filter(i => i.on).length;
-      h = topo('O banco trouxe ' + X.itens.length + (X.itens.length === 1 ? ' item. ' : ' itens. ') + 'Confirme com quem cada um se liga no Kontar.')
-        + '<div style="flex:1;min-height:0;overflow:auto">' + linhas + '</div>'
-        + '<div style="padding:16px 22px 22px;border-top:1px solid #2A2A2F;display:flex;align-items:center;gap:16px"><span data-cx-msg style="flex:1;font-size:12.5px;color:#FF6A5C">' + esc(X.msg || '') + '</span><span data-cx-ok style="background:' + FG + ';color:' + INK + ';border-radius:99px;font-size:12px;font-weight:900;letter-spacing:.1em;padding:15px 24px;cursor:pointer;white-space:nowrap;opacity:' + (n ? 1 : .4) + '">IMPORTAR ' + n + '</span></div>';
+      o = { texto: 'O banco trouxe ' + X.itens.length + (X.itens.length === 1 ? ' item. ' : ' itens. ') + 'Confirme com quem cada um se liga.', rota: 3, corpo: '<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding:0 22px 14px">' + linhas + '</div>',
+        rodape: '<span data-cx-msg style="flex:1;font-size:12.5px;color:#FF6A5C;text-align:left">' + esc(X.msg || '') + '</span>' + '<span data-cx-ok role="button" style="background:' + FG + ';color:' + INK + ';border-radius:99px;font-size:14px;font-weight:700;padding:14px 26px;cursor:pointer;white-space:nowrap;opacity:' + (n ? 1 : .4) + '">Importar ' + n + '</span>' };
     }
-    c.innerHTML = h;
-    if (anima && c.animate) c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 380, easing: EE });
+    pinta(o, rapido);
   }
+  document.addEventListener('click', e => {
+    const t = e.target.closest && e.target.closest('[data-cx-t],[data-cx-ok],[data-cx-sim],[data-cx-nao],[data-cx-fim]'); if (!t || !X) return;
+    if (t.hasAttribute('data-cx-t')) { const i = +t.getAttribute('data-cx-t'); X.itens[i].on = !X.itens[i].on; desenha(true); }
+    else if (t.hasAttribute('data-cx-ok')) importa();
+    else if (t.hasAttribute('data-cx-sim')) { const a = X.novaConta; X.busy = false; X = null; U.flFecha(() => { if (a) CT.novoCartaoForm(a); }); }
+    else fecha();
+  }, true);
+  document.addEventListener('change', e => { const k = e.target.getAttribute && e.target.getAttribute('data-cx-s'); if (!k || !X) return; const [i, campo] = k.split(':'); X.itens[+i][campo] = e.target.value; desenha(true); });
 
   /* ---------- importar ---------- */
   async function importa() {
     if (!X || X.busy) return; const M = KD.M, sb = KD.sb, uid = KD.user.id, itens = X.itens.filter(i => i.on);
     if (!itens.length) { X.msg = 'Marque pelo menos um item.'; return desenha(false); }
     for (const it of itens) if (it.c.tipo === 'CREDIT' && it.alvo === 'new' && !X.accId && !itens.some(j => j.c.tipo === 'BANK') && !it.host) { X.msg = 'Escolha a conta que paga a fatura de ' + it.c.nome.trim() + '.'; return desenha(false); }
-    X.busy = true; X.fase = 'importando'; X.msg = 'Ligando as contas…'; desenha(false);
+    X.busy = true; U.painel.busy = true; X.fase = 'importando'; X.msg = 'Ligando as contas…'; desenha(false);
     const dia = hoje(), ligacao = it => ({ fonte_modo: 'open_finance', conexao_id: X.conexaoId, of_conta_id: it.c.id });
     try {
       let accDoItem = X.accId || null, novaConta = null, ordA = Math.max(0, ...M.accs.map(a => a.ordem || 0)), ordC = Math.max(0, ...M.cards.map(c => c.ordem || 0), M.cards.length);
@@ -3533,19 +3528,20 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       const sy = await inv({ acao: 'sync' }), mine = (sy.sincronizadas || []).find(s => s.conexao === X.conexaoId) || {};
       if (mine.status && mine.status !== 'ativo') throw new Error('A sincronização terminou com status "' + mine.status + '". Tente de novo em Fontes.');
       try { await KD.refresh(KD.comp); if (KD.fontes && KD.fontes.carregar) KD.fontes.carregar(); } catch (e) { console.error(e); }
-      X.busy = false;
+      X.busy = false; U.painel.busy = false;
       const resumo = (mine.novas || 0) + ' lançamentos importados' + (mine.mescladas ? ' · ' + mine.mescladas + ' mesclados com os que você já tinha' : '');
       const temCredito = X.itens.some(i => i.c.tipo === 'CREDIT');
       if (X.kind === 'conta' && !temCredito && novaConta) { X.fase = 'cartao'; X.resumo = resumo; } else { X.fase = 'fim'; X.resumo = resumo; X.sub = 'As compras do banco entram como pendentes de revisão, com a categoria sugerida. Confira no Extrato.'; }
       desenha(true);
-    } catch (e) { console.error('[kontar] conectar', e); X.busy = false; X.fase = 'ligar'; X.msg = 'Não consegui importar: ' + (e.message || e); desenha(false); try { await KD.refresh(KD.comp); } catch (_) { /* segue */ } }
+    } catch (e) { console.error('[kontar] conectar', e); X.busy = false; U.painel.busy = false; X.fase = 'ligar'; X.msg = 'Não consegui importar: ' + (e.message || e); desenha(false); try { await KD.refresh(KD.comp); } catch (_) { /* segue */ } }
   }
 
   /* ---------- entrada ---------- */
   CT.conectar = async ini => {
-    if (L) return; ini = ini || {};
-    if (KD.isDemo()) { X = { fase: 'erro', msg: 'Conta de demonstração: conectar ao banco fica travado.', itens: [] }; abreMoldura(); desenha(false); return; }
-    X = { kind: ini.kind || null, accId: ini.accId || null, fase: 'abrindo', msg: '', itens: [], busy: false }; abreMoldura(); desenha(false);
+    ini = ini || {};
+    if (!U.aberto()) return CT.adicionar({ passo: 'mp1', kind: ini.kind, accId: ini.accId });
+    if (KD.isDemo()) { X = { fase: 'erro', msg: 'Conta de demonstração: conectar ao banco fica travado.', itens: [] }; desenha(false); return; }
+    X = { kind: ini.kind || null, accId: ini.accId || null, fase: 'abrindo', msg: '', itens: [], busy: false }; desenha(false);
     try {
       const { accessToken } = await inv({ acao: 'connect-token' });
       await carregaWidget();
@@ -3567,11 +3563,10 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
             });
             X.fase = 'ligar'; X.msg = ''; desenha(true); ok(); } catch (e) { no(e); } },
           onError: e => no(new Error('A conexão foi recusada pelo banco' + (e && e.message ? ': ' + e.message : '') + '.')),
-          onClose: () => { if (X && X.fase === 'abrindo' && !X.recebido) { fecha(); ok(); } } });
+          onClose: () => { if (X && X.fase === 'abrindo' && !X.recebido) { X = null; U.flFecha(); ok(); } } });
         w.init();
       });
     } catch (e) { console.error('[kontar] conectar', e); if (X) { X.fase = 'erro'; X.msg = e.message || String(e); X.busy = false; desenha(false); } }
   };
   document.addEventListener('click', e => { const t = e.target.closest && e.target.closest('[data-ft-conectar]'); if (t) { e.stopPropagation(); CT.adicionar({ passo: 'mp1' }); } }, true);
-  window.addEventListener('keydown', e => { if (e.key === 'Escape' && L && X && !X.busy && X.fase !== 'abrindo') fecha(); });
 })();
