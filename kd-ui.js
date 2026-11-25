@@ -3125,7 +3125,22 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     poupanca: '<path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z"/><path d="M2 9v1c0 1.1.9 2 2 2h1"/><path d="M16 11h.01"/>',
     investimento: '<path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/>',
     carteira: '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>' };   // mesmos ícones do onboarding
-  const tipoIcone = t => '<span title="' + esc(TIPO_NOME[t] || 'Conta') + '" aria-label="' + esc(TIPO_NOME[t] || 'Conta') + '" style="position:relative;width:7.14cqw;height:7.14cqw;flex:none;display:flex;align-items:center;justify-content:center"><i style="position:absolute;inset:0;border-radius:50%;background:currentColor;opacity:.16"></i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:relative;width:3.7cqw;height:3.7cqw;opacity:.9">' + (TIPO_ICO[t] || TIPO_ICO.corrente) + '</svg></span>';
+  /* ícone do tipo de conta: no hover o círculo cresce para a esquerda e vira pílula com o nome do tipo (o que está à esquerda desliza junto; se não couber, o número some em fade) */
+  const tipoIcone = t => { const nome = TIPO_NOME[t] || 'Conta';
+    return '<span data-tp onmouseenter="KD.contas._tp(this,1)" onmouseleave="KD.contas._tp(this,0)" aria-label="' + esc(nome) + '" style="position:relative;height:7.14cqw;width:7.14cqw;flex:none;display:flex;align-items:center;justify-content:flex-end;overflow:hidden;border-radius:9999px;cursor:default;transition:width .38s cubic-bezier(.65,0,.35,1)"><i style="position:absolute;inset:0;border-radius:9999px;background:currentColor;opacity:.16"></i>'
+      + '<span data-tp-t style="position:relative;font-size:2.68cqw;font-weight:700;letter-spacing:-.01em;white-space:nowrap;opacity:0;padding-left:2.6cqw;transition:opacity .22s ease">' + esc(nome) + '</span>'
+      + '<span data-tp-i style="position:relative;width:7.14cqw;height:7.14cqw;flex:none;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:3.7cqw;height:3.7cqw;opacity:.9">' + (TIPO_ICO[t] || TIPO_ICO.corrente) + '</svg></span></span>'; };
+  CT._tp = (el, on) => {
+    const row = el.parentElement, ic = el.querySelector('[data-tp-i]'), tx = el.querySelector('[data-tp-t]'), fin = row.querySelector('[data-tp-fin]'), sp = row.querySelector('[data-tp-sp]');
+    if (on) {
+      const w0 = ic.getBoundingClientRect().width, need = Math.ceil(tx.scrollWidth + w0), free = sp ? sp.getBoundingClientRect().width : 0;
+      el.style.width = need + 'px'; tx.style.transitionDelay = '.12s'; tx.style.opacity = '1';
+      if (fin && need - w0 > free) { fin.style.opacity = '0'; fin.style.maxWidth = '0px'; }   // não cabe: o número da conta some em fade em vez de ficar por baixo
+    } else {
+      el.style.width = '7.14cqw'; tx.style.transitionDelay = '0s'; tx.style.opacity = '0';
+      if (fin) { fin.style.opacity = '.7'; fin.style.maxWidth = '30cqw'; }
+    }
+  };
 
   /* tile da conta: mesmo molde do cartão (proporção de cartão real, marca do banco), no lugar do antigo cabeçalho */
   function tile(a) {
@@ -3136,8 +3151,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       const tm = KD.tema(a.cor, a.bank), lt = KD.logo.cartao && KD.logo.cartao(a.bank || a.inst || a.nome, tm.ink, [5, 1, 1, a.bank || a.nome]);
       const logo = lt ? '<span title="' + esc(a.nome) + '" style="display:block;flex:none;height:' + lt.h + 'cqw;width:' + lt.w + 'cqw;' + (lt.mask ? 'background:currentColor;-webkit-mask:url(\'' + lt.url + '\') left center / contain no-repeat;mask:url(\'' + lt.url + '\') left center / contain no-repeat' : 'background:url(\'' + lt.url + '\') left center / contain no-repeat') + '"></span>' : '<span style="font-size:4.2cqw;font-weight:800;letter-spacing:-.04em;white-space:nowrap">' + esc(a.nome) + '</span>';
       n.innerHTML = '<div style="position:relative;height:100%;box-sizing:border-box;border-radius:4.29cqw;background:' + a.cor + ';color:' + tm.ink + ';padding:4.29cqw 4.64cqw 3.93cqw 5.00cqw;display:flex;flex-direction:column">'
-        + '<div style="display:flex;align-items:center;gap:2.50cqw;height:7.86cqw">' + logo + '<span style="flex:1"></span>'
-        + (a.fin ? '<span style="font-size:2.50cqw;font-weight:700;letter-spacing:.08em;white-space:nowrap;opacity:.7">···· ' + esc(a.fin) + '</span>' : '') + tipoIcone(a.tipo)
+        + '<div style="display:flex;align-items:center;gap:2.50cqw;height:7.86cqw">' + logo + '<span data-tp-sp style="flex:1"></span>'
+        + (a.fin ? '<span data-tp-fin style="font-size:2.50cqw;font-weight:700;letter-spacing:.08em;white-space:nowrap;overflow:hidden;max-width:30cqw;opacity:.7;transition:max-width .38s cubic-bezier(.65,0,.35,1),opacity .25s ease">···· ' + esc(a.fin) + '</span>' : '') + tipoIcone(a.tipo)
         + '<span data-ct-ed="' + esc(a.id) + '" role="button" aria-label="Editar conta" title="Editar conta" style="width:7.14cqw;height:7.14cqw;flex:none;border-radius:9999px;border:1.5px solid currentColor;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .25s cubic-bezier(.2,.7,.2,1)" onmouseover="this.style.background=\'rgba(0,0,0,.14)\'" onmouseout="this.style.background=\'transparent\'">' + IC.lapis + '</span></div>'
         + '<div style="flex:1;min-height:0;display:flex;align-items:flex-end;padding-bottom:3.57cqw"><div><div style="font-size:1.96cqw;font-weight:700;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap;opacity:.72">Saldo</div><div style="margin-top:1.43cqw;font-size:11.07cqw;font-weight:700;letter-spacing:-0.055em;line-height:.86;font-variant-numeric:tabular-nums;white-space:nowrap">R$ ' + esc(brl(a.saldo)) + '</div></div></div>'
         + '<div style="display:flex;justify-content:space-between;align-items:center;gap:2.14cqw;font-size:2.23cqw;font-weight:600;white-space:nowrap"><span style="display:inline-flex;align-items:center;gap:1.2cqw">' + (st ? '<i style="width:1.6cqw;height:1.6cqw;border-radius:50%;background:' + st[1] + ';display:block"></i>' + esc(st[0]) : '') + '</span><span style="opacity:.7;font-weight:500">' + (nc ? nc + (nc === 1 ? ' cartão de crédito' : ' cartões de crédito') : 'sem cartão de crédito') + '</span></div></div>';
