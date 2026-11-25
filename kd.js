@@ -125,7 +125,7 @@
     M.cards = R.cards.filter(c => !c.removido_em && !ARQ.has(c.conta_pagamento_id)).sort((a, b) => ALF(a.apelido || a.nome, b.apelido || b.nome) || a.ordem - b.ordem).map(c => {
       const col = colorOf(c.nome, c.instituicao, c.brand_hex), cy = cycOf(c.id, T), lim = Number(c.limite) || 0;
       const used = lim && c.disponivel_informado != null ? Math.max(0, lim - Number(c.disponivel_informado)) : 0;
-      return { id: c.id, acc: c.conta_pagamento_id || null, destaque: (KD.destaque && KD.destaque(bankOf(c.nome, c.instituicao), '#141416')) || col[0], n: c.nome, informed: lim && c.disponivel_informado != null, nick: c.apelido || '', fin: c.final4 || '····', lim, used, cor: col[0], ink: KD.tema(col[0], bankOf(c.nome, c.instituicao), c.tinta || col[1]).ink, bank: bankOf(c.nome, c.instituicao), cy,
+      return { criado: c.created_at || null, fatInf: c.fonte_modo === 'open_finance' && c.fatura_informada != null ? Number(c.fatura_informada) : null, fatEm: c.fatura_em || null, id: c.id, acc: c.conta_pagamento_id || null, destaque: (KD.destaque && KD.destaque(bankOf(c.nome, c.instituicao), '#141416')) || col[0], n: c.nome, informed: lim && c.disponivel_informado != null, nick: c.apelido || '', fin: c.final4 || '····', lim, used, cor: col[0], ink: KD.tema(col[0], bankOf(c.nome, c.instituicao), c.tinta || col[1]).ink, bank: bankOf(c.nome, c.instituicao), cy,
         fe: cy ? cy.dia_fechamento : null, ve: cy ? cy.dia_vencimento : null, orig: cy ? ({ fatura: 'fatura real', chute: 'chute', manual: 'cadastro manual' })[cy.origem] || 'chute' : 'chute',
         since: cy && cy.vigencia_inicio > '2025-01-01' ? cy.vigencia_inicio : null };
     });
@@ -133,7 +133,7 @@
     const cardByIdAll = Object.fromEntries(R.cards.map(c => [c.id, c]));
 
     /* contas */
-    M.accs = R.accs.filter(a => a.ativo !== false).sort((a, b) => ALF(a.nome, b.nome) || a.ordem - b.ordem).map(a => ({ destaque: (KD.destaque && KD.destaque(bankOf(a.nome, a.instituicao), '#141416')) || colorOf(a.nome, a.instituicao, a.cor)[0], id: a.id, inst: a.instituicao || '', fin: a.final4 || '', ordem: a.ordem, nome: a.nome, saldo: Number(a.saldo) || 0, em: a.saldo_em ? pd(a.saldo_em) : T, tipo: a.tipo, funcao: a.funcao, conexao: a.conexao_id || null, grupo: a.grupo || null, modo: a.fonte_modo || 'extrato', of: a.of_conta_id || null, cor: colorOf(a.nome, a.instituicao, a.cor)[0], bank: bankOf(a.nome, a.instituicao) }));
+    M.accs = R.accs.filter(a => a.ativo !== false).sort((a, b) => ALF(a.nome, b.nome) || a.ordem - b.ordem).map(a => ({ criado: a.created_at || null, destaque: (KD.destaque && KD.destaque(bankOf(a.nome, a.instituicao), '#141416')) || colorOf(a.nome, a.instituicao, a.cor)[0], id: a.id, inst: a.instituicao || '', fin: a.final4 || '', ordem: a.ordem, nome: a.nome, saldo: Number(a.saldo) || 0, em: a.saldo_em ? pd(a.saldo_em) : T, tipo: a.tipo, funcao: a.funcao, conexao: a.conexao_id || null, grupo: a.grupo || null, modo: a.fonte_modo || 'extrato', of: a.of_conta_id || null, cor: colorOf(a.nome, a.instituicao, a.cor)[0], bank: bankOf(a.nome, a.instituicao) }));
 
     M.arq = { accs: R.accs.filter(a => a.ativo === false).map(a => ({ id: a.id, nome: a.nome, inst: a.instituicao || '', cor: colorOf(a.nome, a.instituicao, a.cor)[0], n: R.cards.filter(c => c.conta_pagamento_id === a.id && !c.removido_em).length })),
       cards: R.cards.filter(c => c.removido_em && !ARQ.has(c.conta_pagamento_id)).map(c => ({ id: c.id, nome: c.nome, inst: c.instituicao || '', cor: colorOf(c.nome, c.instituicao, c.brand_hex)[0], fin: c.final4 || '' })) };
@@ -319,7 +319,9 @@
     out.lim = { tot: lt, used: lu, disp: lt - lu, pct: lt ? lu / lt * 100 : 0 };
 
     /* faturas que vencem no mês */
-    const fatOf = (c, m) => M.cash.filter(e => e.card === c.n && e.mi === m).reduce((a, e) => a + e.out, 0);
+    /* cartão do Open Finance: a fatura aberta é o valor que o banco informa (parcelas antigas, estornos e créditos já entram nela); vale pro mês do próximo vencimento */
+    const fatOf0 = (c, m) => M.cash.filter(e => e.card === c.n && e.mi === m).reduce((a, e) => a + e.out, 0);
+    const fatOf = (c, m) => (c.fatInf != null && c.ve && m === mIdx(T) + (T.getDate() < c.ve ? 0 : 1)) ? c.fatInf : fatOf0(c, m);
     const nFat = (c, m) => M.cash.filter(e => e.card === c.n && e.mi === m).length;
     out.FATS = M.cards.map(c => {
       const v = fatOf(c, mi); if (!v) return null;

@@ -2035,8 +2035,8 @@ class Component extends DCLogic {
       bd: k === cs.length - 1 ? '0' : '1px dashed rgba(0,0,0,.28)',
       on: () => this.setState({ hov: c.nome }), off: () => this.setState(s => s.hov === c.nome ? { hov: null } : null)
     }));
-    const maxC = Math.max.apply(null, C.CONTAS.map(x => x.v));
-    const contasV = contas.map(c => ({ c: c, v: C.CONTAS.find(x => x.nome === c.nome).v })).filter(o => o.v > 0).map(o => Object.assign({}, o.c, { w: (o.v / maxC * 100).toFixed(1) + '%' }));
+    const maxC = Math.max.apply(null, C.CONTAS.map(x => x.v).concat([1]));
+    const contasV = contas.map(c => ({ c: c, x: C.CONTAS.find(x => x.nome === c.nome) })).filter(o => o.x && o.x.tipo !== 'investimento').map(o => Object.assign({}, o.c, { w: (Math.max(0, o.x.v) / maxC * 100).toFixed(1) + '%' }));
 
     const mst = st.ms || this.props.metasEstilo || 'anel';
     const CIRC = 2 * Math.PI * 46;

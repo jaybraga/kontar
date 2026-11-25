@@ -2484,7 +2484,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const loaded = () => !!KD.fontes.rows();
   FM.data = () => {
     const T = KD.today, nome = KD.fontes.nomeMes(), R = KD.fontes.rows() || [];
-    const fontes = R.map(r => ({ k: r.k, id: r.id, label: r.nome, tipo: r.modo === 'manual' ? 'MANUAL' : r.modo === 'open_finance' ? 'OPEN FINANCE' : r.card ? 'FATURA' : 'EXTRATO', card: r.card, bank: r.bank, last: r.ultima, ok: r.ok, r }));
+    const fimAnt = new Date(T.getFullYear(), T.getMonth(), 1), M = KD.M, criada = r => { const o = r.card ? M.cards.find(c => c.id === r.id) : M.accs.find(a => a.id === r.id); return o && o.criado ? new Date(o.criado) : null; };
+    const fontes = R.filter(r => { const d = criada(r); return !d || d < fimAnt; }).map(r => ({ k: r.k, id: r.id, label: r.nome, tipo: r.modo === 'manual' ? 'MANUAL' : r.modo === 'open_finance' ? 'OPEN FINANCE' : r.card ? 'FATURA' : 'EXTRATO', card: r.card, bank: r.bank, last: r.ultima, ok: r.ok, r }));
     const ok = fontes.filter(f => f.ok).length, pend = fontes.length - ok;
     return { nome, fontes, ok, pend, total: fontes.length, show: loaded() && fontes.length > 0 && KD.fontes.atrasado() && pend > 0, dia: KD.fontes.dia() };
   };
@@ -3673,6 +3674,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
 
   /* fatura atual = compras no cartão desde o último fechamento; preso em parcelas = o que ainda vai vencer */
   function faturaAberta(c) {
+    if (c.fatInf != null) return c.fatInf;   // conectado: o valor que o banco informa (já com parcelas, estornos e créditos)
     const M = KD.M, T = KD.today, T0 = new Date(T.getFullYear(), T.getMonth(), T.getDate()), fe = Number(c.fe) || 1, close = new Date(T0.getFullYear(), T0.getMonth() - (T0.getDate() >= fe ? 0 : 1), fe);
     return Math.round((M.cash || []).filter(e => e.card === c.n && e.dt > close && e.dt <= T0).reduce((a, e) => a + e.out, 0) * 100) / 100;
   }
