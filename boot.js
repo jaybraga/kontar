@@ -501,7 +501,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
 .tile:hover{border-color:#4A4A52}.tile[aria-pressed=true]{border-color:var(--ac)}
 .tile .ck{position:absolute;top:7px;right:8px;width:18px;height:18px;border-radius:50%;background:var(--ac);color:var(--on);font-size:11px;font-weight:900;display:grid;place-items:center;opacity:0;transform:scale(.6);transition:opacity .25s,transform .3s var(--E)}
 .tile[aria-pressed=true] .ck{opacity:1;transform:none}
-.outro{margin:8px 0 0 4px;border:0;background:none;color:var(--mut);font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px;padding:4px 6px;border-radius:99px;transition:color .25s}.outro:hover{color:#fff}
+.outro{margin:3px 0 0 4px;border:0;background:none;color:var(--mut);font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px;padding:4px 6px;border-radius:99px;transition:color .25s}.outro:hover{color:#fff}
 .outro .ck{width:16px;height:16px;border-radius:50%;border:1.5px solid #4A4A52;font-size:10px;font-weight:900;display:grid;place-items:center;color:transparent;transition:all .25s var(--E)}
 .outro[aria-pressed=true]{color:#fff}.outro[aria-pressed=true] .ck{background:var(--ac);border-color:var(--ac);color:var(--on)}
 .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
