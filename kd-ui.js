@@ -1616,7 +1616,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   // nomes que o app usa pra mesma marca
   const ALIAS = { 'itau': 'Itaú', 'itaú azul': 'Itaú', 'itau azul': 'Itaú', 'nubank pj': 'Nubank', 'nubank pessoal': 'Nubank', 'nubank conta': 'Nubank', 'cdb mercado pago': 'Mercado Pago', 'mercadopago': 'Mercado Pago', 'mercado pago': 'Mercado Pago', 'c6 bank': 'C6', 'c6': 'C6', 'amazon': 'Amazon', 'nubank': 'Nubank' };
   LOGO.bancos = Object.keys(SPEC);
-  LOGO.chave = nome => { if (!nome) return null; if (SPEC[nome]) return nome; const n = String(nome).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim(); const a = Object.keys(ALIAS).find(k => k.normalize('NFD').replace(/[̀-ͯ]/g, '') === n); if (a) return ALIAS[a]; const b = LOGO.bancos.find(x => n.indexOf(x.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')) === 0); return b || null; };
+  LOGO.chave = nome => { if (!nome) return null; if (SPEC[nome]) return nome; const n = String(nome).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim(); if (/^nu pagamentos\b/.test(n)) return 'Nubank';   // nome oficial que o Open Finance devolve pra conta do Nubank
+    const a = Object.keys(ALIAS).find(k => k.normalize('NFD').replace(/[̀-ͯ]/g, '') === n); if (a) return ALIAS[a]; const b = LOGO.bancos.find(x => n.indexOf(x.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')) === 0); return b || null; };
 
   const fonte = (set, k) => { const C = KD.comp && KD.comp.constructor; const v = (C && C[set] && C[set][k]) || (set === 'LGC' && window.KD_LGC && window.KD_LGC[k]);   // antes do app montar (onboarding), só os compactos, embutidos pelo build.py
     return v ? decodeURIComponent(escape(atob(v))) : null; };

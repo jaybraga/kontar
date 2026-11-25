@@ -612,6 +612,10 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
       const ajustaLogos = () => { const ts = $$('#ofp .oft .tile'); if (!ts.length || !KD2.logo || !KD2.logo.seletor) return; const w = ts[0].clientWidth; if (!w) return; const comp = w < 150, chave = comp ? 'c' : 'e';
         ts.forEach(t => { const g = t.querySelector('.lgs'); if (!g || g.dataset.f === chave) return; g.dataset.f = chave; g.innerHTML = KD2.logo.seletor(t.dataset.lg, 20, comp ? Math.min(44, w - 24) : Math.min(96, w - 28), comp); }); };
       new ResizeObserver(ajustaLogos).observe($('#ofp'));
+      /* logo na lista do que veio: o mesmo do seletor (Mercado Pago com o nome claro); o Itaú vai com o nome escrito, a pedra sozinha some na linha */
+      const logoLista = b => { const L = KD2.logo; if (!L) return '';
+        if (b === 'Itaú' && L.svg) { const sv = L.svg('Itaú', { forma: 'palavra', fundo: 'escuro', estilo: 'cor' }); if (sv) return '<span aria-hidden="true" style="width:56px;height:20px;flex:none;display:block;background:url(\'data:image/svg+xml,' + encodeURIComponent(sv) + '\') left center/contain no-repeat"></span>'; }
+        return L.seletor ? L.seletor(b, 18, 76) : logoDe(b, 18, 76); };
       const msgOf = t => { ofErr = t || ''; const m = $('#ofm'); if (m) m.textContent = ofErr; };
       const desenhaOf = () => {
         const e = $('#ofp'); let h = '';
@@ -620,7 +624,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
           + '<div class="bkr"><div class="bkm" id="ofm"></div>' + (D.of.length ? '<button class="later" type="button" data-ofver="1">Ver o que já veio</button>' : '<button class="later" type="button" data-ofman="1">Preencher à mão em vez disso</button>') + '</div>';
         else if (ofx === 'achou') { const falta = LB();
           h = '<div class="lst">' + D.of.map((x, k) => { const c = x.c, b = bancoIt(x), cred = c.tipo === 'CREDIT';
-            return '<button type="button" role="checkbox" data-oft="' + k + '" aria-checked="' + x.on + '"><em>✓</em><span class="lg">' + (b ? logoDe(b, 18, 76) : '') + '</span><span><b>' + esc(String(c.nome || '').trim()) + (c.final ? ' ···· ' + esc(c.final) : '') + '</b><small>' + (cred ? 'Cartão' + (c.fecha ? ' · fecha dia ' + c.fecha : '') : (c.subtipo === 'SAVINGS_ACCOUNT' ? 'Poupança' : 'Conta corrente')) + (b ? ' · ' + esc(b) : '') + '</small></span><s>' + (cred ? (c.limite ? 'limite R$ ' + brlOf(c.limite) : '') : 'R$ ' + brlOf(c.saldo)) + '</s></button>'; }).join('') + '</div>'
+            return '<button type="button" role="checkbox" data-oft="' + k + '" aria-checked="' + x.on + '"><em>✓</em><span class="lg">' + (b ? logoLista(b) : '') + '</span><span><b>' + esc(String(c.nome || '').trim()) + (c.final ? ' ···· ' + esc(c.final) : '') + '</b><small>' + (cred ? 'Cartão' + (c.fecha ? ' · fecha dia ' + c.fecha : '') : (c.subtipo === 'SAVINGS_ACCOUNT' ? 'Poupança' : 'Conta corrente')) + (b ? ' · ' + esc(b) : '') + '</small></span><s>' + (cred ? (c.limite ? 'limite R$ ' + brlOf(c.limite) : '') : 'R$ ' + brlOf(c.saldo)) + '</s></button>'; }).join('') + '</div>'
             + '<div class="bkr"><div class="bkm" id="ofm" style="color:var(--mut)">' + (falta.length ? 'Faltou ' + esc(falta.map(b => b === 'Outro' ? (dado(b).outro || 'outro banco') : b).join(', ')) + ': conecte também ou preencha à mão em seguida.' : '') + '</div><button class="later" type="button" data-ofmais="1">Conectar outro banco</button></div>'; }
         e.innerHTML = h; ajustaLogos(); if (ofErr) msgOf(ofErr); e.classList.remove('on'); void e.offsetWidth; e.classList.add('on'); fadeCtl();
       };
