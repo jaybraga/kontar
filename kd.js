@@ -137,7 +137,7 @@
 
     M.arq = { accs: R.accs.filter(a => a.ativo === false).map(a => ({ id: a.id, nome: a.nome, inst: a.instituicao || '', cor: colorOf(a.nome, a.instituicao, a.cor)[0], n: R.cards.filter(c => c.conta_pagamento_id === a.id && !c.removido_em).length })),
       cards: R.cards.filter(c => c.removido_em && !ARQ.has(c.conta_pagamento_id)).map(c => ({ id: c.id, nome: c.nome, inst: c.instituicao || '', cor: colorOf(c.nome, c.instituicao, c.brand_hex)[0], fin: c.final4 || '' })) };
-    { const ao = Object.fromEntries(M.accs.map((a, i) => [a.id, i])); M.accById = Object.fromEntries(M.accs.map(a => [a.id, a])); M.cards.sort((x, y) => (x.acc in ao ? ao[x.acc] : 9999) - (y.acc in ao ? ao[y.acc] : 9999)); }
+    { const ao = Object.fromEntries(M.accs.map((a, i) => [a.id, i])); M.accById = Object.fromEntries(M.accs.map(a => [a.id, a])); /* os cartões ficam em ordem alfabética (a página Contas agrupa por conta sozinha, em contas.js) */ }
 
     /* estabelecimentos (por chave) */
     M.maByChave = Object.fromEntries(R.ma.map(m => [m.chave, m]));
