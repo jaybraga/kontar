@@ -541,6 +541,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
 .lst b{display:block;font-size:15px;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lst small{display:block;font-size:12.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lst s{text-decoration:none;font-size:14px;font-weight:700;white-space:nowrap}
 #ofp .bkr .later{margin:0}
+.U.bk #ofp.on{min-height:100%}#ofp .two{flex:1;min-height:200px}#ofp .tall{min-height:0}
 @media (max-width:820px){.two{grid-template-columns:1fr}.tall{min-height:0}.lst button{grid-template-columns:24px minmax(0,1fr) auto}.lst .lg{display:none}}
 @media (max-width:820px){.board{height:auto}.body{grid-template-columns:1fr}.T{border-right:0;border-bottom:1px solid var(--ln);min-height:260px}.hdr .cap{display:none}.days{grid-template-columns:repeat(7,1fr)}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}`;
