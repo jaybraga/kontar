@@ -3907,3 +3907,23 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   new MutationObserver(() => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; try { passe(); } catch (e) { console.error('[kontar] pool', e); } }); }).observe(document.documentElement, { childList: true, subtree: true });
   window.addEventListener('kd:fontes', () => { try { passe(); } catch (e) { /* segue */ } });
 })();
+
+/* Kontar · rolagem: área de card que não tem o que rolar não segura a rolagem da página.
+   As listas com .kscroll usam overscroll-behavior:contain (pra rolagem não "vazar" pra página quando chega no fim).
+   Mas o navegador aplica isso mesmo quando a lista não rola naquele eixo (ex.: fileira das Metas, que só rola na horizontal,
+   ou um card com poucos itens), e aí a roda do mouse para em cima do card. Aqui cada eixo só fica "contido" quando rola de verdade. */
+(function () {
+  'use strict';
+  const rola = (e, eixo) => { const cs = getComputedStyle(e), ov = eixo === 'y' ? cs.overflowY : cs.overflowX;
+    if (ov !== 'auto' && ov !== 'scroll') return false;
+    return eixo === 'y' ? e.scrollHeight > e.clientHeight + 1 : e.scrollWidth > e.clientWidth + 1; };
+  const ajusta = () => { document.querySelectorAll('.kscroll').forEach(e => {
+    const y = rola(e, 'y') ? 'contain' : 'auto', x = rola(e, 'x') ? 'contain' : 'auto';
+    if (e.style.overscrollBehaviorY !== y) e.style.overscrollBehaviorY = y;
+    if (e.style.overscrollBehaviorX !== x) e.style.overscrollBehaviorX = x; }); };
+  let pend = 0; const agenda = () => { if (pend) return; pend = requestAnimationFrame(() => { pend = 0; ajusta(); }); };
+  new MutationObserver(agenda).observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener('resize', agenda);
+  document.addEventListener('wheel', agenda, { passive: true, capture: true });   // segurança: confere de novo a cada giro da roda
+  agenda();
+})();
