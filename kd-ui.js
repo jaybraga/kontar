@@ -3873,3 +3873,30 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     setTimeout(() => { if (KD.comp.ceClose) KD.comp.ceClose(); const root = rootDe(key); if (root) { root.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => CT.editarGrupo(key, c.id), 500); } }, 30);
   }
 })();
+
+/* Kontar · pool de investimentos nas Metas.
+   Mostra no topo da página Metas quanto há em investimentos (todos os bancos somados), quanto já foi separado para metas e quanto está livre.
+   O número vem de KD.pool() (kd.js). Investimento não entra no saldo do dia a dia; só nas Metas. */
+(function () {
+  'use strict';
+  const KD = window.KD; if (!KD) return;
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const R0 = n => 'R$ ' + Math.round(Number(n) || 0).toLocaleString('pt-BR');
+  let raf = 0;
+  function passe() {
+    const sc = document.querySelector('[data-page-scroll="metas"]'); let n = document.querySelector('[data-pool]');
+    if (!sc || !KD.pool || !KD.M) { if (n && !sc) n.remove(); return; }
+    const P = KD.pool(); if (P.total <= 0 && P.alocado <= 0) { if (n) n.remove(); return; }
+    if (!n) { n = document.createElement('div'); n.setAttribute('data-pool', '1'); n.style.cssText = 'max-width:1080px;margin:0 auto 18px;font-family:Helvetica,Arial,sans-serif;color:#F2F0EB'; sc.insertBefore(n, sc.firstChild); }
+    else if (n.parentElement !== sc || sc.firstChild !== n) sc.insertBefore(n, sc.firstChild);
+    const sig = JSON.stringify(P); if (n.__sig === sig) return; n.__sig = sig;
+    const bancos = Object.entries(P.por).sort((a, b) => b[1] - a[1]).map(([k, v]) => '<span style="font-size:12px;color:#B4B4BA;white-space:nowrap">' + esc(k) + ' <b style="color:#F2F0EB">' + R0(v) + '</b></span>').join('<span style="color:#3A3A40">·</span>');
+    const col = (t, v, c) => '<div style="min-width:0"><div style="font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#7C7C85;white-space:nowrap">' + t + '</div><div style="margin-top:4px;font-size:26px;font-weight:700;letter-spacing:-.045em;line-height:1;white-space:nowrap;color:' + (c || '#F2F0EB') + '">' + R0(v) + '</div></div>';
+    n.innerHTML = '<div style="border:1px solid #2A2A2F;background:#111114;border-radius:24px;padding:18px 24px;display:flex;align-items:center;gap:36px;flex-wrap:wrap">'
+      + col('Em investimentos', P.total) + col('Separado para metas', P.alocado) + col('Livre para novas metas', P.disp, P.disp < 0 ? '#FF6A5C' : '#6AFF2A')
+      + '<div style="flex:1;min-width:180px;display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;align-items:center">' + bancos + '</div></div>'
+      + (P.disp < 0 ? '<div style="margin:8px 6px 0;font-size:12px;color:#FF6A5C">As metas somam mais do que há em investimentos. Ajuste o "já guardado" de alguma meta.</div>' : '');
+  }
+  new MutationObserver(() => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; try { passe(); } catch (e) { console.error('[kontar] pool', e); } }); }).observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener('kd:fontes', () => { try { passe(); } catch (e) { /* segue */ } });
+})();

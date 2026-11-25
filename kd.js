@@ -224,6 +224,10 @@
     KD._mc = {};
   }
   KD.rebuild = () => build();
+  /* pool de investimentos: tudo que está em investimento (de todos os bancos) é uma reserva só. As metas "enxergam" o total; o que o usuário
+     já separou para cada meta (goals.guardado) sai do que está livre para a próxima. Investimento não entra no saldo do dia a dia. */
+  KD.pool = () => { const M = KD.M, por = {}; let total = 0; M.accs.filter(a => a.tipo === 'investimento').forEach(a => { total += a.saldo; const k = a.bank || a.inst || a.nome; por[k] = (por[k] || 0) + a.saldo; });
+    const alocado = (M.goals || []).reduce((s, g) => s + (Number(g.guardado) || 0), 0); return { total: Math.round(total * 100) / 100, alocado: Math.round(alocado * 100) / 100, disp: Math.round((total - alocado) * 100) / 100, por }; };
 
   /* saldo de cada conta no fim do dia `d`, reconstruído a partir do saldo informado */
   function balAt(a, d) {
