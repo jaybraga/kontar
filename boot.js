@@ -540,7 +540,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
       /* ---- passo "Seus bancos": grade de logos → uma tela por banco; o passo vira anel de progresso na barra de cima ---- */
       const KD2 = window.KD, GRADE = ['Nubank', 'Itaú', 'C6', 'Mercado Pago', 'Amazon', 'Santander', 'Bradesco', 'Banco do Brasil', 'PicPay', 'Inter', 'Next', 'XP', 'Neon', 'BV', 'PagBank'];
       const TIPOS = [['corrente', 'CORRENTE', 'pagamento'], ['poupanca', 'POUPANÇA', 'reserva'], ['investimento', 'INVESTIMENTO', 'reserva'], ['carteira', 'CARTEIRA', 'pagamento']];
-      const logoDe = (b, h, w) => KD2.logo && b !== 'Outro' ? KD2.logo.slot(b, { forma: 'extensa', fundo: 'escuro', estilo: 'cor' }, h, w, KD2.BANK[b] && KD2.BANK[b][0]) : '';
+      const logoDe = (b, h, w) => KD2.logo && b !== 'Outro' ? KD2.logo.slot(b, { forma: 'extensa', fundo: 'escuro', estilo: 'cor', tinta: 'pre' }, h, w, KD2.BANK[b] && KD2.BANK[b][0]) : '';
       const moeda = v => { const d = String(v).replace(/\D/g, '').slice(0, 11); return d ? (+d / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : ''; };
       const num = v => { const d = String(v || '').replace(/\D/g, ''); return d ? +d / 100 : 0; };
       let sub = -1, ringOn = false, busy = false;   // sub: -1 = grade; k = k-ésimo banco marcado

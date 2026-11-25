@@ -1732,7 +1732,14 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     LG.chave = nome => oChave(nome) || (marcaDe(nome) ? KD.bankOf(nome, nome) : null);
     const forma = o => (o && o.forma === 'extensa') ? 'extensa' : (o && o.forma === 'palavra') ? 'palavra' : 'compacta';
     const peca = (b, f) => b.marca[f] || b.marca.extensa;
+    // antes do app montar (onboarding) as artes antigas (Nubank, C6, Mercado Pago, Amazon) ainda não existem: usa a arte do Figma, claro sobre o fundo escuro.
+    // Só com tinta:'pre', pra não ficar guardada no cache do KD.logo.url e aparecer depois no app.
+    const preApp = (br, o) => {
+      if (br.slug === 'mercado-pago' && LG.mpCor) return LG.mpCor();
+      return br.logo.svg.replace(/fill="(black|#000000|#000|#141414)"/g, 'fill="' + (o && o.fundo === 'claro' ? TINTA : OSSO) + '"');
+    };
     LG.svg = (nome, o) => {
+      if (o && o.tinta === 'pre') { const k0 = nome && KD.bankOf && KD.bankOf(nome, nome), br0 = k0 && BRAND[k0]; if (br0 && !br0.marca) { const r0 = oSvg(nome, o); return r0 || preApp(br0, o); } }
       const b = marcaDe(nome), subst = b && b.marca.compacta && b.marca.compacta.substitui;   // Itaú: só a forma compacta troca (ícone novo, a "pedra")
       if (subst && forma(o) === 'palavra') return oSvg(nome, Object.assign({}, o, { forma: 'extensa' }));   // Itaú: a arte só com o nome (typo) fica guardada aqui, fora de uso
       if (!b || (oChave(nome) && !subst)) return oSvg(nome, o);
