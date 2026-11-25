@@ -404,7 +404,7 @@
     st.pk = Object.assign({}, st.pk, { y: Math.floor(M.CUR / 12) });
     /* cores/ícones: só o que difere do padrão vira "mudança" (mantém o Restaurar) */
     const cor = {}, ico = {};
-    Object.values(M.catById).forEach(c => { const def = CAT_DEF[c.nome]; if (!def || (c.cor && c.cor.toUpperCase() !== def.toUpperCase())) cor[c.nome] = (c.cor || '#78788A').toUpperCase(); if (c.icone && ICON_KEYS.includes(c.icone) && c.icone !== c.nome) ico[c.nome] = c.icone; });
+    Object.values(M.catById).forEach(c => { const def = CAT_DEF[c.nome]; if (!def || (c.cor && c.cor.toUpperCase() !== def.toUpperCase())) cor[c.nome] = (c.cor || '#78788A').toUpperCase(); if (c.icone && (ICON_KEYS.includes(c.icone) || (window.KD_CATIC && window.KD_CATIC.svg[c.icone])) && c.icone !== c.nome) ico[c.nome] = c.icone; });
     st.cor = cor; st.ico = ico; st.custom = M.custom.slice();
     st.alt = Object.fromEntries(M.est.map(e => [e.nome, e.alterna]));
     st.pwMail = P.pwMail === true; st.sess24 = P.sess24 || false;
