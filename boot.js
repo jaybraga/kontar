@@ -497,7 +497,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
 .cfade{position:absolute;left:0;right:0;bottom:85px;height:64px;pointer-events:none;opacity:0;transition:opacity .35s var(--E);background:linear-gradient(to top,#111114 8%,rgba(17,17,20,0))}
 .cfade.on{opacity:1}
 .pal{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 0 20px}.pal button,.pal label{width:26px;height:26px;border-radius:50%;border:0;padding:0;cursor:pointer;position:relative;display:block;flex:none}
-.tile{height:62px;border-radius:20px;border:1.5px solid #3A3A40;background:var(--btn);display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;transition:border-color .25s,background .25s;padding:0}
+.tile{height:58px;border-radius:20px;border:1.5px solid #3A3A40;background:var(--btn);display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;transition:border-color .25s,background .25s;padding:0}
 .tile:hover{border-color:#4A4A52}.tile[aria-pressed=true]{border-color:var(--ac)}
 .tile .ck{position:absolute;top:7px;right:8px;width:18px;height:18px;border-radius:50%;background:var(--ac);color:var(--on);font-size:11px;font-weight:900;display:grid;place-items:center;opacity:0;transform:scale(.6);transition:opacity .25s,transform .3s var(--E)}
 .tile[aria-pressed=true] .ck{opacity:1;transform:none}
@@ -576,7 +576,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
       const desenhaGrade = () => {
         $('#tiles').innerHTML = GRADE.map(b => '<button class="tile" type="button" data-b="' + esc(b) + '" aria-pressed="' + D.bancos.includes(b) + '" aria-label="' + esc(b) + '">' + (KD2.logo && KD2.logo.seletor ? KD2.logo.seletor(b, 20, 84) : logoDe(b, 20, 80)) + '<span class="ck">✓</span></button>').join('');
         $('#outroRow').innerHTML = '<button class="outro" type="button" data-b="Outro" aria-pressed="' + D.bancos.includes('Outro') + '"><span class="ck">✓</span>Meu banco não está na lista</button>';
-        const n = D.bancos.length; $('#tcount').textContent = n ? n + (n === 1 ? ' banco marcado: vira 1 conta.' : ' bancos marcados: viram ' + n + ' contas.') + ' Caixa chega em breve.' : 'Dá pra pular e criar as contas depois, na página Contas. Caixa chega em breve.';
+        const n = D.bancos.length; $('#tcount').textContent = n ? n + (n === 1 ? ' banco marcado: vira 1 conta.' : ' bancos marcados: viram ' + n + ' contas.') + '' : 'Dá pra pular e criar as contas depois, na página Contas.';
       };
       const msgBk = t => { const m = $('#bkm'); if (m) m.textContent = t || ''; };
       const desenhaBanco = () => {
@@ -642,7 +642,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
         else { busy = true; progresso(1); $('#nx').disabled = true; $('#bk').disabled = true; setTimeout(() => { const r = rb(); if (r) r.classList.add('full'); }, 720); setTimeout(() => { busy = false; sub = -1; i++; render(); }, 1550); }
       };
       $('[data-s="2"]').onclick = e => { const t = e.target.closest('[data-b]'); if (!t) return; const b = t.dataset.b, k = D.bancos.indexOf(b); if (k >= 0) D.bancos.splice(k, 1); else { D.bancos.push(b); D.bancos.sort((x, y) => GRADE.concat(['Outro']).indexOf(x) - GRADE.concat(['Outro']).indexOf(y)); }
-        t.setAttribute('aria-pressed', String(k < 0)); const n = D.bancos.length; $('#tcount').textContent = n ? n + (n === 1 ? ' banco marcado: vira 1 conta.' : ' bancos marcados: viram ' + n + ' contas.') + ' Caixa chega em breve.' : 'Dá pra pular e criar as contas depois, na página Contas. Caixa chega em breve.'; };
+        t.setAttribute('aria-pressed', String(k < 0)); const n = D.bancos.length; $('#tcount').textContent = n ? n + (n === 1 ? ' banco marcado: vira 1 conta.' : ' bancos marcados: viram ' + n + ' contas.') + '' : 'Dá pra pular e criar as contas depois, na página Contas.'; };
       $('#bkf').addEventListener('input', e => { const k = e.target.dataset && e.target.dataset.k; if (!k || sub < 0) return; const d = dado(D.bancos[sub]); let v = e.target.value;
         if (k === 'saldo' || k === 'limite') v = e.target.value = moeda(v); else if (k === 'final') v = e.target.value = v.replace(/[^0-9]/g, '').slice(0, 4); else if (k === 'fecha' || k === 'vence') v = e.target.value = v.replace(/[^0-9]/g, '').slice(0, 2);
         d[k] = v; msgBk(''); if (k === 'outro') textoBanco(); });
