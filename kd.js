@@ -133,7 +133,7 @@
     const cardByIdAll = Object.fromEntries(R.cards.map(c => [c.id, c]));
 
     /* contas */
-    M.accs = R.accs.filter(a => a.ativo !== false).sort((a, b) => ALF(a.nome, b.nome) || a.ordem - b.ordem).map(a => ({ destaque: (KD.destaque && KD.destaque(bankOf(a.nome, a.instituicao), '#141416')) || colorOf(a.nome, a.instituicao, a.cor)[0], id: a.id, inst: a.instituicao || '', fin: a.final4 || '', ordem: a.ordem, nome: a.nome, saldo: Number(a.saldo) || 0, em: a.saldo_em ? pd(a.saldo_em) : T, tipo: a.tipo, funcao: a.funcao, cor: colorOf(a.nome, a.instituicao, a.cor)[0], bank: bankOf(a.nome, a.instituicao) }));
+    M.accs = R.accs.filter(a => a.ativo !== false).sort((a, b) => ALF(a.nome, b.nome) || a.ordem - b.ordem).map(a => ({ destaque: (KD.destaque && KD.destaque(bankOf(a.nome, a.instituicao), '#141416')) || colorOf(a.nome, a.instituicao, a.cor)[0], id: a.id, inst: a.instituicao || '', fin: a.final4 || '', ordem: a.ordem, nome: a.nome, saldo: Number(a.saldo) || 0, em: a.saldo_em ? pd(a.saldo_em) : T, tipo: a.tipo, funcao: a.funcao, conexao: a.conexao_id || null, grupo: a.grupo || null, modo: a.fonte_modo || 'extrato', cor: colorOf(a.nome, a.instituicao, a.cor)[0], bank: bankOf(a.nome, a.instituicao) }));
 
     M.arq = { accs: R.accs.filter(a => a.ativo === false).map(a => ({ id: a.id, nome: a.nome, inst: a.instituicao || '', cor: colorOf(a.nome, a.instituicao, a.cor)[0], n: R.cards.filter(c => c.conta_pagamento_id === a.id && !c.removido_em).length })),
       cards: R.cards.filter(c => c.removido_em && !ARQ.has(c.conta_pagamento_id)).map(c => ({ id: c.id, nome: c.nome, inst: c.instituicao || '', cor: colorOf(c.nome, c.instituicao, c.brand_hex)[0], fin: c.final4 || '' })) };

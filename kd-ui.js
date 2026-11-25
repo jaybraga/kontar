@@ -3131,7 +3131,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       + '<span data-tp-t style="position:relative;font-size:2.68cqw;font-weight:700;letter-spacing:-.01em;white-space:nowrap;opacity:0;padding-left:2.6cqw;transition:opacity .22s ease">' + esc(nome) + '</span>'
       + '<span data-tp-i style="position:relative;width:7.14cqw;height:7.14cqw;flex:none;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:3.7cqw;height:3.7cqw;opacity:.9">' + (TIPO_ICO[t] || TIPO_ICO.corrente) + '</svg></span></span>'; };
   CT._tp = (el, on) => {
-    const row = el.parentElement, ic = el.querySelector('[data-tp-i]'), tx = el.querySelector('[data-tp-t]'), fin = row.querySelector('[data-tp-fin]'), sp = row.querySelector('[data-tp-sp]');
+    const row = el.closest('[data-tp-row]') || el.parentElement, ic = el.querySelector('[data-tp-i]'), tx = el.querySelector('[data-tp-t]'), fin = row.querySelector('[data-tp-fin]'), sp = row.querySelector('[data-tp-sp]');
     if (on) {
       const w0 = ic.getBoundingClientRect().width, need = Math.ceil(tx.scrollWidth + w0), free = sp ? sp.getBoundingClientRect().width : 0;
       el.style.width = need + 'px'; tx.style.transitionDelay = '.12s'; tx.style.opacity = '1';
@@ -3203,11 +3203,14 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const wrap = {}; [...col.children].forEach(e => { if (e.hasAttribute('data-ct-tile') || e.hasAttribute('data-ct-empty') || e.hasAttribute('data-ct-arqs') || e.hasAttribute('data-ct-orf')) return; if (e.hasAttribute('data-ct-hdr') || e.hasAttribute('data-ct-add')) { e.remove(); return; } const p = e.querySelector('[data-ce-pen]'); if (p) wrap[p.getAttribute('data-ce-pen')] = e; else e.setAttribute('data-ct-hide', '1'); });
     const lista = [];
     const ids = new Set(M.accs.map(a => a.id));
+    if (CT.montaGrupos) { Object.values(wrap).forEach(w => w.setAttribute('data-ct-hide', '1')); CT.montaGrupos(lista); }   // card único por banco (src/grupos.js); os cartões do React ficam escondidos
+    else {
     M.accs.forEach(a => { lista.push(tile(a)); M.cards.filter(c => c.acc === a.id).forEach(c => { if (wrap[c.n]) { lista.push(wrap[c.n]); if (!c.bank) lista.push(orfa(c, true)); } }); });
-    M.cards.filter(c => !ids.has(c.acc) && wrap[c.n]).forEach(c => { lista.push(wrap[c.n]); lista.push(orfa(c, false)); });   // cartões sem conta ficam no fim do agrupamento, com o convite para ligar a uma conta
+    M.cards.filter(c => !ids.has(c.acc) && wrap[c.n]).forEach(c => { lista.push(wrap[c.n]); lista.push(orfa(c, false)); });
+    }   // cartões sem conta ficam no fim do agrupamento, com o convite para ligar a uma conta
     const v = vazia(); const sub = v.querySelector('[data-ct-sub]'), txt = !M.accs.length && !M.cards.length ? 'Nenhuma conta ainda. Comece por aqui.' : ''; if (sub && sub.textContent !== txt) sub.textContent = txt; lista.push(v);
-    let cur = col.firstElementChild, mexeu = false;
-    lista.forEach(n => { if (cur === n) cur = cur.nextElementSibling; else { col.insertBefore(n, cur); mexeu = true; } });
+    let cur = col.firstElementChild, mexeu = false; const pula = () => { while (cur && cur.hasAttribute('data-ct-hide') && !lista.includes(cur)) cur = cur.nextElementSibling; };
+    lista.forEach(n => { pula(); if (cur === n) cur = cur.nextElementSibling; else { col.insertBefore(n, cur); mexeu = true; } });
     [...col.children].forEach(e => { if (!lista.includes(e) && (e.hasAttribute('data-ct-tile') || e.hasAttribute('data-ct-orf') || e.hasAttribute('data-ct-hdr') || e.hasAttribute('data-ct-add') || e.hasAttribute('data-ct-empty'))) e.remove(); });   // contas que não existem mais
     if (mexeu) lista.forEach(n => { if (!n.__vis && n.animate && (n.hasAttribute('data-ct-tile') || n.hasAttribute('data-ct-orf') || n.hasAttribute('data-ct-empty'))) { n.__vis = 1; n.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 450, easing: EE }); } });
   }
@@ -3466,7 +3469,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     else if (ini.kind === 'cartao') { if (M.accs.length === 1 || ini.accId) { FL.step = 'como'; FL.accId = ini.accId || M.accs[0].id; } else if (M.accs.length > 1) FL.step = 'conta'; else { P.aberto = false; FL = null; return CT.nova({ credito: true }); } }
     flDesenha(true); gira(true);
   };
-  CT._u = { IC, esc, logoDe, nomeLivre, nomesUsados, brl, moedaNum, iso, TODOS, CORES, inkOn, TIPOS, ico, pinta, tall, dois, btn, flFecha, raiz, painel: P, aberto: () => P.aberto, estado: () => FL };
+  CT._u = { IC, esc, logoDe, nomeLivre, nomesUsados, brl, moedaNum, iso, TODOS, CORES, inkOn, TIPOS, ico, pinta, tall, dois, btn, flFecha, raiz, painel: P, aberto: () => P.aberto, estado: () => FL, mk, orfa, TIPO_NOME, TIPO_ICO, NB, EE, FG, INK, MU, AMB, GRN };
 
   /* ---------- pontos de entrada ---------- */
   CT.nova = est => abre(Object.assign({ mode: 'conta' }, est || {}));
@@ -3478,7 +3481,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   };
   CT.novoCartao = accId => { if (accId) CT.novoCartaoForm(accId); else CT.adicionar({ kind: 'cartao' }); };
   document.addEventListener('click', e => {
-    const fv = e.target.closest && e.target.closest('[data-fl-o],[data-fl-v],[data-fl-x]'); if (fv && FL) { e.stopPropagation(); if (fv.hasAttribute('data-fl-x')) { if (!P.busy) flFecha(); } else if (fv.hasAttribute('data-fl-v')) flVolta(); else flEscolhe(fv.getAttribute('data-fl-o')); return; }
+    const fv = e.target.closest && e.target.closest('[data-fl-o],[data-fl-v],[data-fl-x]'); if (fv && FL && !fv.closest('[data-gp]')) { e.stopPropagation(); if (fv.hasAttribute('data-fl-x')) { if (!P.busy) flFecha(); } else if (fv.hasAttribute('data-fl-v')) flVolta(); else flEscolhe(fv.getAttribute('data-fl-o')); return; }
     const n = e.target.closest && e.target.closest('[data-ct-nova]'); if (n) { e.stopPropagation(); CT.adicionar(); return; }
     const a = e.target.closest && e.target.closest('[data-ct-add]'); if (a) { e.stopPropagation(); CT.novoCartao(a.getAttribute('data-ct-add')); return; }
     const ed = e.target.closest && e.target.closest('[data-ct-ed]'); if (ed) { e.stopPropagation(); CT.editar(ed.getAttribute('data-ct-ed')); return; }
@@ -3626,4 +3629,247 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     } catch (e) { console.error('[kontar] conectar', e); if (X) { X.fase = 'erro'; X.msg = e.message || String(e); X.busy = false; desenha(false); } }
   };
   document.addEventListener('click', e => { const t = e.target.closest && e.target.closest('[data-ft-conectar]'); if (t) { e.stopPropagation(); CT.adicionar({ passo: 'mp1' }); } }, true);
+})();
+
+/* Kontar · card único por banco (página Contas).
+   Um card reúne o que é do mesmo grupo: conta(s), cartão(ões) de crédito e investimento(s). Grupo = o que veio da mesma conexão do banco
+   (accounts.conexao_id), a menos que o usuário tenha juntado/separado (accounts.grupo). Duas views, trocadas pelos ícones do topo:
+   conta + cartão (saldo, fatura atual) e investimento. O lápis vira o card e abre um painel com o que dá para editar (mesma mecânica do card "adicionar").
+   Os cartões do React ficam escondidos; este módulo desenha tudo e grava no banco como o painel antigo fazia. */
+(function () {
+  'use strict';
+  const KD = window.KD, CT = KD && KD.contas; if (!CT || !CT._u || !KD.notch) return;
+  const U = CT._u, { esc, logoDe, nomeLivre, brl, moedaNum, iso, ico, mk, orfa, TIPO_NOME, TIPO_ICO, NB, EE, FG, INK, MU, AMB } = U;
+  const NT = KD.notch.corner(...NB), MASKURL = KD.notch.mask(...NB) + ', linear-gradient(#000 0 0)';
+  const ALF = (a, b) => String(a).localeCompare(String(b), 'pt-BR');
+  const hoje = () => KD.iso ? KD.iso(KD.today) : iso(KD.today);
+  const R = n => 'R$ ' + brl(n);
+  const R0 = n => 'R$ ' + Math.round(Number(n) || 0).toLocaleString('pt-BR');
+  const icq = (d, w) => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:' + w + 'cqw;height:' + w + 'cqw;flex:none">' + d + '</svg>';
+  const D_CAL = '<rect x="3" y="4.5" width="18" height="16.5" rx="2.4"/><path d="M3 9.5h18"/><path d="M8 2.8v3.4"/><path d="M16 2.8v3.4"/>';
+  const D_PAG = '<rect x="2.5" y="6" width="19" height="12" rx="2.2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5h.01"/><path d="M18 14.5h.01"/>';
+  const D_CARTAO = '<rect x="2.5" y="5" width="19" height="14" rx="2.6"/><path d="M2.5 9.6h19"/><path d="M6.2 14.6h3.4"/><path d="M14.6 14.6h3.2"/>';
+  const D_PEN = '<path d="M4 20h4L19 9l-4-4L4 16z"/>';
+
+  /* ---------- grupos ---------- */
+  function grupos() {
+    const M = KD.M, ids = new Set(M.accs.map(a => a.id)), mapa = new Map(), chave = a => a.grupo || a.conexao || a.id;
+    const g0 = k => { if (!mapa.has(k)) mapa.set(k, { key: k, contas: [], inv: [], cartoes: [] }); return mapa.get(k); };
+    M.accs.forEach(a => (a.tipo === 'investimento' ? g0(chave(a)).inv : g0(chave(a)).contas).push(a));
+    M.cards.forEach(c => { if (ids.has(c.acc)) g0(chave(M.accById[c.acc])).cartoes.push(c); else g0('c:' + c.id).cartoes.push(c); });
+    const L = [...mapa.values()]; L.forEach(g => { g.prim = g.contas[0] || g.cartoes[0] || g.inv[0]; g.nome = g.contas[0] ? g.contas[0].nome : g.cartoes[0] ? (g.cartoes[0].nick || g.cartoes[0].n) : g.inv[0] ? g.inv[0].nome : ''; });
+    return L.sort((a, b) => ALF(a.nome, b.nome));
+  }
+  const VW = (() => { try { return JSON.parse(localStorage.getItem('kd-gview') || '{}'); } catch (e) { return {}; } })(), CI = {};
+  const salvaVW = () => { try { localStorage.setItem('kd-gview', JSON.stringify(VW)); } catch (e) { /* sem armazenamento */ } };
+  const viewDe = g => { const cc = g.contas.length || g.cartoes.length, inv = g.inv.length; const v = VW[g.key]; if (v === 'inv' && inv) return 'inv'; if (v === 'cc' && cc) return 'cc'; return cc ? 'cc' : 'inv'; };
+
+  /* fatura atual = compras no cartão desde o último fechamento; preso em parcelas = o que ainda vai vencer */
+  function faturaAberta(c) {
+    const M = KD.M, T = KD.today, T0 = new Date(T.getFullYear(), T.getMonth(), T.getDate()), fe = Number(c.fe) || 1, close = new Date(T0.getFullYear(), T0.getMonth() - (T0.getDate() >= fe ? 0 : 1), fe);
+    return Math.round((M.cash || []).filter(e => e.card === c.n && e.dt > close && e.dt <= T0).reduce((a, e) => a + e.out, 0) * 100) / 100;
+  }
+  const preso = c => { const C = KD._C; return Math.round(((C && C.PARC) || []).filter(x => x.k === c.n).reduce((a, x) => a + (Number(x.r) || 0), 0) * 100) / 100; };
+  const statusDe = (tipo, id) => { const FT = KD.fontes, rows = FT && FT.rows && FT.rows(), r = rows && rows.find(x => x.k === (tipo === 'c' ? 'c' : 'a') + id); return r ? { r, e: FT.estado(r) } : null; };
+
+  /* ---------- peças do topo: ícones de view ---------- */
+  const tp = (nome, d, cor, inv) => '<span data-tp onmouseenter="KD.contas._tp(this,1)" onmouseleave="KD.contas._tp(this,0)" aria-label="' + esc(nome) + '" style="position:relative;height:7.14cqw;width:7.14cqw;flex:none;display:flex;align-items:center;justify-content:flex-end;overflow:hidden;border-radius:9999px;transition:width .38s ' + EE + ';color:' + (inv ? cor : 'inherit') + '">'
+    + '<span data-tp-t style="position:relative;font-size:2.68cqw;font-weight:700;letter-spacing:-.01em;white-space:nowrap;opacity:0;padding-left:2.6cqw;transition:opacity .22s ease">' + esc(nome) + '</span>'
+    + '<span data-tp-i style="position:relative;width:7.14cqw;height:7.14cqw;flex:none;display:flex;align-items:center;justify-content:center">' + icq(d, 3.7).replace('<svg ', '<svg opacity=".92" ') + '</span></span>';
+  const casca = (attr, itens, ativo, clicavel) => '<span ' + attr + ' style="position:relative;display:flex;border-radius:9999px;flex:none;cursor:' + (clicavel ? 'pointer' : 'default') + '"><i style="position:absolute;inset:0;border-radius:9999px;background:currentColor;opacity:' + (ativo ? 1 : .16) + ';transition:opacity .3s ease"></i>' + itens + '</span>';
+  function icones(g, view, cor) {
+    const temCC = g.contas.length || g.cartoes.length, temInv = g.inv.length, dois = temCC && temInv, nomeConta = TIPO_NOME[(g.contas[0] || {}).tipo] || 'Conta';
+    const ccItens = (g.contas.length ? [[nomeConta, TIPO_ICO[(g.contas[0] || {}).tipo] || TIPO_ICO.corrente]] : []).concat(g.cartoes.length ? [['Cartão de crédito', D_CARTAO]] : []);
+    let h = '';
+    if (temCC) { const at = dois && view === 'cc'; h += casca('data-gp-v="cc"', ccItens.map(x => tp(x[0], x[1], cor, at)).join(''), at, dois); }
+    if (temInv) { const at = dois && view === 'inv'; h += casca('data-gp-v="inv"', tp('Investimento', TIPO_ICO.investimento, cor, at), at, dois); }
+    return h;
+  }
+
+  /* ---------- face do card ---------- */
+  function face(g, tm) {
+    const view = viewDe(g), p = g.prim, cor = p.cor, ink = tm.ink, M = KD.M;
+    const lt = KD.logo.cartao && KD.logo.cartao(p.bank || p.inst || p.nome || p.n, ink, [5, 1, 1, p.bank || p.nome || p.n]);
+    const logo = lt ? '<span title="' + esc(g.nome) + '" style="display:block;flex:none;height:' + lt.h + 'cqw;width:' + lt.w + 'cqw;max-width:46cqw;' + (lt.mask ? 'background:currentColor;-webkit-mask:url(\'' + lt.url + '\') left center / contain no-repeat;mask:url(\'' + lt.url + '\') left center / contain no-repeat' : 'background:url(\'' + lt.url + '\') left center / contain no-repeat') + '"></span>' : '<span style="font-size:4.2cqw;font-weight:800;letter-spacing:-.04em;white-space:nowrap">' + esc(g.nome) + '</span>';
+    const c = g.cartoes[(CI[g.key] || 0) % (g.cartoes.length || 1)], fin = (g.contas[0] && g.contas[0].fin) || (c && c.fin) || '';
+    const topo = '<div data-tp-row style="display:flex;align-items:center;gap:2.5cqw;height:7.86cqw">' + logo + '<span data-tp-sp style="flex:1"></span>'
+      + (fin ? '<span data-tp-fin style="font-size:2.5cqw;font-weight:700;letter-spacing:.08em;white-space:nowrap;overflow:hidden;max-width:30cqw;opacity:.7;transition:max-width .38s ' + EE + ',opacity .25s ease">···· ' + esc(fin) + '</span>' : '')
+      + icones(g, view, cor)
+      + '<span data-gp-ed="" role="button" aria-label="Editar" title="Editar" style="width:7.14cqw;height:7.14cqw;flex:none;border-radius:9999px;border:1.5px solid currentColor;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .25s cubic-bezier(.2,.7,.2,1)" onmouseover="this.style.background=\'rgba(0,0,0,.14)\'" onmouseout="this.style.background=\'transparent\'">' + icq(D_PEN, 3.4) + '</span></div>';
+    let corpo = '', base = '', aviso = '';
+    const lab = t => '<div style="font-size:1.96cqw;font-weight:700;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap;opacity:.72">' + t + '</div>';
+    const big = (v, cents) => '<div style="margin-top:1.43cqw;font-size:11.07cqw;font-weight:700;letter-spacing:-.055em;line-height:.86;font-variant-numeric:tabular-nums;white-space:nowrap">R$ ' + Math.floor(Math.abs(v)).toLocaleString('pt-BR') + (cents ? '<span style="font-size:5cqw;letter-spacing:-.03em">,' + String(Math.round((Math.abs(v) % 1) * 100)).padStart(2, '0') + '</span>' : '') + '</div>';
+    const info = (d, t) => '<div style="display:flex;align-items:center;justify-content:flex-end;gap:1.3cqw;font-size:3.04cqw;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums">' + icq(d, 3.3) + t + '</div>';
+    if (view === 'inv') {
+      const tot = g.inv.reduce((a, x) => a + x.saldo, 0);
+      corpo = '<div style="flex:1;display:flex;align-items:flex-end;padding-bottom:3.57cqw"><div>' + lab('Investido') + big(tot, true) + '</div></div>';
+      base = '<div style="display:flex;justify-content:space-between;gap:2cqw;font-size:2.23cqw;font-weight:600;white-space:nowrap"><span>' + esc(g.inv.map(x => x.nome).join(' · ')) + '</span><span style="opacity:.7;font-weight:500">' + g.inv.length + (g.inv.length === 1 ? ' investimento' : ' investimentos') + '</span></div>';
+    } else {
+      const saldo = g.contas.reduce((a, x) => a + x.saldo, 0), fat = c ? faturaAberta(c) : 0, pr = c ? preso(c) : 0;
+      const esq = c ? (g.contas.length ? '<div style="margin-bottom:2.2cqw">' + lab('Saldo em conta') + '<div style="margin-top:.9cqw;font-size:5.4cqw;font-weight:700;letter-spacing:-.045em;line-height:.9;white-space:nowrap;font-variant-numeric:tabular-nums">' + R(saldo) + '</div></div>' : '') + '<div>' + lab('Fatura atual') + big(fat, true) + '</div>'
+        : '<div>' + lab('Saldo em conta') + big(saldo, true) + '</div>';
+      const dir = c ? '<div style="display:flex;flex-direction:column;gap:1.6cqw;align-items:flex-end;padding-bottom:.4cqw">' + info(D_CAL, 'Fecha dia ' + (c.fe || '—')) + info(D_PAG, 'Vence dia ' + (c.ve || '—')) + '<div style="text-align:right;margin-top:.6cqw">' + lab('Preso em parcelas') + '<div style="margin-top:.7cqw;font-size:3.04cqw;font-weight:700;white-space:nowrap">' + R0(pr) + '</div></div></div>' : '';
+      corpo = '<div style="flex:1;min-height:0;display:flex;align-items:flex-end;justify-content:space-between;gap:3cqw;padding-bottom:3.2cqw"><div>' + esq + '</div>' + dir + '</div>';
+      if (c && c.lim > 0) { const u = c.used, pp = c.lim ? Math.min(100, pr / c.lim * 100) : 0, pc = Math.round(u / c.lim * 100);
+        base = '<div style="position:relative;height:1.79cqw;border-radius:9999px;overflow:hidden;display:flex"><span style="position:absolute;inset:0;background:currentColor;opacity:.18"></span><span style="position:relative;height:100%;width:' + Math.max(0, pc - pp).toFixed(1) + '%;background:currentColor"></span><span style="position:relative;height:100%;width:' + pp.toFixed(1) + '%;background:repeating-linear-gradient(45deg,currentColor 0 3px,transparent 3px 6px);opacity:.55"></span></div>'
+          + '<div style="margin-top:1.61cqw;display:flex;justify-content:space-between;gap:2.14cqw;font-size:2.23cqw;font-weight:600;white-space:nowrap"><span>Disponível ' + R0(c.lim - u) + ' · ' + pc + '% usados <span style="opacity:.7;font-weight:500">de ' + R0(c.lim) + '</span></span>'
+          + '<span ' + (g.cartoes.length > 1 ? 'data-gp-nx role="button" style="cursor:pointer;opacity:.9"' : 'style="opacity:.7;font-weight:500"') + '>' + esc(c.nick || c.n) + ' ···· ' + esc(c.fin) + (g.cartoes.length > 1 ? ' ›' : '') + '</span></div>';
+      } else if (c) {
+        base = '<div style="display:flex;align-items:center;gap:2cqw;border:1.5px dashed currentColor;border-radius:9999px;padding:1.2cqw 1.4cqw 1.2cqw 3cqw;font-size:2.5cqw;font-weight:700"><span style="flex:1;opacity:.9">Falta o limite deste cartão.</span><span data-gp-ed="falta" role="button" style="background:' + ink + ';color:' + cor + ';border-radius:9999px;padding:1.2cqw 3cqw;cursor:pointer;white-space:nowrap">Completar</span></div>';
+      } else {
+        const st = statusDe('a', g.contas[0] && g.contas[0].id);
+        base = '<div style="display:flex;justify-content:space-between;gap:2cqw;font-size:2.23cqw;font-weight:600;white-space:nowrap"><span>' + (st ? esc(st.e.txt) : '') + '</span><span style="opacity:.7;font-weight:500">' + esc(TIPO_NOME[g.contas[0].tipo] || 'Conta') + '</span></div>';
+      }
+    }
+    // pendência de fonte (fatura/extrato): chip + botão logo abaixo do topo
+    const alvo = view === 'cc' ? (c ? statusDe('c', c.id) : g.contas[0] ? statusDe('a', g.contas[0].id) : null) : (g.inv[0] ? statusDe('a', g.inv[0].id) : null);
+    if (alvo && alvo.e.nivel !== 'ok') aviso = '<div style="display:flex;align-items:center;gap:2cqw;margin-top:1.6cqw;font-size:2.23cqw;font-weight:700"><span style="display:inline-flex;align-items:center;gap:1.2cqw;background:' + tm.chipBg + ';color:' + tm.chipInk + ';border-radius:9999px;padding:1cqw 2.4cqw;white-space:nowrap"><i style="width:1.6cqw;height:1.6cqw;border-radius:50%;background:' + AMB + ';display:block"></i>' + esc(alvo.e.txt.length > 46 ? alvo.e.txt.slice(0, 44) + '…' : alvo.e.txt) + '</span>'
+      + (alvo.e.acao ? '<span data-gp-ac="' + esc(alvo.r.k) + '|' + alvo.e.acao + '" role="button" style="border:1.5px solid currentColor;border-radius:9999px;padding:.9cqw 2.4cqw;cursor:pointer;white-space:nowrap">' + esc((alvo.e.rotulo || '').charAt(0) + (alvo.e.rotulo || '').slice(1).toLowerCase()) + '</span>' : '') + '</div>';
+    return '<div style="position:relative;height:100%;box-sizing:border-box;border-radius:4.29cqw;background:' + cor + ';color:' + ink + ';padding:4.29cqw 4.64cqw 3.93cqw 5.00cqw;display:flex;flex-direction:column">' + topo + aviso + corpo + base + '</div>';
+  }
+
+  /* ---------- nó do card (frente = face; verso = painel de edição) ---------- */
+  function noDe(g) {
+    const n = mk('g:' + g.key, () => {
+      const d = document.createElement('div'); d.setAttribute('data-ct-tile', g.key); d.setAttribute('data-gp', g.key); d.style.cssText = 'position:relative;width:100%;aspect-ratio:1.586;flex:none;container-type:inline-size;perspective:1800px';
+      d.innerHTML = '<div data-fl-rot style="position:absolute;inset:0;transform-style:preserve-3d;transition:transform .75s cubic-bezier(.85,0,.15,1)"><div data-gp-face style="position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden"></div><div data-fl-verso style="position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;transform:rotateY(180deg);pointer-events:none"><div data-fl-esc style="position:absolute;left:0;top:0;width:529px;height:333.5px;transform-origin:0 0;isolation:isolate;display:flex;flex-direction:column;font-family:Helvetica,Arial,sans-serif"></div></div></div>';
+      const esc0 = d.querySelector('[data-fl-esc]'), aj = () => { const w = d.clientWidth; if (w) esc0.style.transform = 'scale(' + (w / 529) + ')'; }; aj(); if (window.ResizeObserver) new ResizeObserver(aj).observe(d); else window.addEventListener('resize', aj);
+      return d;
+    });
+    const tm = KD.tema(g.prim.cor, g.prim.bank, g.prim.ink), st = statusDe('c', (g.cartoes[0] || {}).id), sig = JSON.stringify([g.key, viewDe(g), CI[g.key] || 0, g.contas.map(a => [a.nome, a.saldo, a.cor, a.tipo, a.fin, a.bank]), g.inv.map(a => [a.nome, a.saldo]), g.cartoes.map(c => [c.n, c.nick, c.fin, c.lim, c.used, c.fe, c.ve, c.cor]), g.contas[0] && (statusDe('a', g.contas[0].id) || {}).e, st && st.e, KD.M.cash && KD.M.cash.length]);
+    if (n.__sig !== sig) { n.__sig = sig; n.__g = g; n.__tm = tm; const f = n.querySelector('[data-gp-face]'); f.innerHTML = face(g, tm); }
+    return n;
+  }
+  CT.montaGrupos = lista => {
+    const G = grupos(), M = KD.M, ids = new Set(M.accs.map(a => a.id));
+    G.forEach(g => { lista.push(noDe(g)); g.cartoes.forEach(c => { if (!ids.has(c.acc)) lista.push(orfa(c, false)); else if (!c.bank) lista.push(orfa(c, true)); }); });
+    vigiaCe();
+  };
+
+  /* ---------- painel de edição (verso) ---------- */
+  const tema = tm => { const ink = tm.ink, dark = ink === '#000000' || ink === '#141414' || ink === '#0A0A0A'; return { bg: tm.bg || null, ink, sc: dark ? 'rgba(0,0,0,.1)' : 'rgba(255,255,255,.14)', bd: dark ? 'rgba(0,0,0,.2)' : 'rgba(255,255,255,.24)', mut: dark ? 'rgba(0,0,0,.62)' : 'rgba(255,255,255,.7)' }; };
+  const moldura = (T, o) => {
+    const layer = '<div aria-hidden="true" style="position:absolute;inset:0;z-index:-1;box-sizing:border-box;border-radius:30px;pointer-events:none;background-color:' + T.cor + ';-webkit-mask:' + MASKURL + ';-webkit-mask-composite:xor;mask:' + MASKURL + ';mask-composite:exclude"></div>';
+    const x = '<span data-fl-x role="button" aria-label="Fechar" style="position:absolute;right:0;top:0;width:32px;height:32px;border-radius:50%;background:' + T.ink + ';color:' + T.cor + ';display:flex;align-items:center;justify-content:center;cursor:pointer;pointer-events:auto">' + ico('<path d="M18 6 6 18"/><path d="m6 6 12 12"/>', 14) + '</span>';
+    const v = o.voltar ? '<span data-fl-v role="button" aria-label="Voltar" style="width:32px;height:32px;border-radius:50%;background:' + T.sc + ';border:1px solid ' + T.bd + ';display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;pointer-events:auto">' + ico('<path d="m15 18-6-6 6-6"/>', 15) + '</span>' : '';
+    const topo = '<div style="display:flex;align-items:center;gap:12px;padding:16px ' + (NT.w + 6) + 'px 10px 18px;min-height:60px;flex:none">' + v + '<span style="flex:1;font-size:14px;line-height:1.35;font-weight:700;letter-spacing:-.01em;text-align:left">' + o.texto + '</span></div>';
+    return layer + x + topo + '<div data-fl-body style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto;pointer-events:auto">' + (o.corpo || '') + '</div>' + (o.rodape ? '<div style="padding:0 16px 16px;display:flex;align-items:center;gap:10px;pointer-events:auto;flex:none">' + o.rodape + '</div>' : '');
+  };
+  const linha = (T, k, icone, titulo, sub) => '<div data-fl-o="' + esc(k) + '" style="flex:none;min-height:58px;border-radius:20px;background:' + T.sc + ';border:1px solid ' + T.bd + ';display:flex;align-items:center;gap:14px;padding:0 16px;cursor:pointer;transition:background .3s ease" onmouseover="this.style.background=\'' + T.bd + '\'" onmouseout="this.style.background=\'' + T.sc + '\'"><span style="width:38px;height:38px;border-radius:50%;background:' + T.ink + ';color:' + T.cor + ';display:flex;align-items:center;justify-content:center;flex:none">' + icone + '</span><span style="flex:1;min-width:0"><b style="display:block;font-size:16px;letter-spacing:-.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(titulo) + '</b><span style="display:block;font-size:11.5px;color:' + T.mut + ';margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(sub || '') + '</span></span>' + ico('<path d="M5 12h14"/><path d="m13 6 6 6-6 6"/>', 20) + '</div>';
+  const campo = (T, k, rot, v, w, modo) => '<label style="display:block;' + (w ? 'width:' + w + 'px;flex:none' : 'flex:1;min-width:0') + '"><span style="display:block;font-size:9.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:' + T.mut + ';margin:0 0 5px 4px">' + rot + '</span><input data-gp-in="' + k + '" value="' + esc(v) + '" inputmode="' + (modo || 'text') + '" autocomplete="off" style="width:100%;height:38px;border-radius:9999px;border:1px solid ' + T.bd + ';background:' + T.sc + ';color:' + T.ink + ';font:inherit;font-size:14px;padding:0 16px;outline:0"></label>';
+  const botao = (T, attr, txt, cheio, perigo) => '<span ' + attr + ' role="button" style="border-radius:9999px;font-size:14px;font-weight:700;padding:10px 20px;cursor:pointer;white-space:nowrap;' + (cheio ? 'background:' + (perigo ? '#FF2424' : T.ink) + ';color:' + (perigo ? '#fff' : T.cor) + ';' : 'border:1.5px solid ' + T.bd + ';') + '">' + txt + '</span>';
+
+  function gDe(st) { return grupos().find(x => x.key === st.key); }
+  function conteudo(st) {
+    const g = gDe(st), M = KD.M; if (!g) return { texto: '', corpo: '' }; const T = st.T;
+    if (st.step === 'menu') {
+      const ops = [];
+      g.contas.forEach(a => ops.push(linha(T, 'conta:' + a.id, ico(TIPO_ICO[a.tipo] || TIPO_ICO.corrente, 18), a.nome, (TIPO_NOME[a.tipo] || 'Conta') + ' · banco, tipo, nome e saldo')));
+      g.cartoes.forEach(c => ops.push(linha(T, 'cartao:' + c.id, ico(D_CARTAO, 18), c.nick || c.n, 'Cartão ···· ' + c.fin + ' · apelido, limite e datas')));
+      g.inv.forEach(a => ops.push(linha(T, 'conta:' + a.id, ico(TIPO_ICO.investimento, 18), a.nome, 'Investimento · nome e saldo')));
+      ops.push(linha(T, 'agrup', ico('<rect x="3" y="3" width="7.5" height="7.5" rx="1.8"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.8"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.8"/><path d="M17.2 13.5v7.5M13.5 17.2H21"/>', 18), 'Agrupamento', 'Quais contas aparecem neste card'));
+      return { texto: 'O que você quer editar?', voltar: false, corpo: '<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;padding:0 16px 16px;overflow:auto">' + ops.join('') + '</div>' };
+    }
+    if (st.step === 'cartao') {
+      const c = M.cardById[st.c], d = st.d, msg = st.msg || '';
+      return { texto: 'Editar ' + esc(c ? (c.nick || c.n) : 'cartão'), voltar: true, corpo: '<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-between;padding:0 16px 12px"><div style="display:flex;gap:10px">' + campo(T, 'name', 'Apelido', d.name) + campo(T, 'fin', 'Final', d.fin, 110, 'numeric') + '</div><div style="display:flex;gap:10px;align-items:flex-end">' + campo(T, 'lim', 'Limite', d.lim, 0, 'numeric') + campo(T, 'fe', 'Fecha dia', d.fe, 96, 'numeric') + campo(T, 've', 'Vence dia', d.ve, 96, 'numeric') + '</div><div data-gp-msg style="min-height:16px;font-size:12px;font-weight:700">' + esc(msg) + '</div></div>',
+        rodape: '<span data-fl-o="rm" role="button" style="font-size:12.5px;font-weight:700;text-decoration:underline;text-underline-offset:3px;cursor:pointer;opacity:.75">Remover cartão</span><span style="flex:1"></span>' + botao(T, 'data-fl-o="cancela"', 'Cancelar') + botao(T, 'data-fl-o="salva"', st.busy ? 'Salvando…' : 'Salvar', true) };
+    }
+    if (st.step === 'rm') { const c = M.cardById[st.c]; return { texto: 'Tirar ' + esc(c ? (c.nick || c.n) : 'cartão') + '?', voltar: true, corpo: '<div style="flex:1;display:flex;align-items:center;padding:0 22px;font-size:13px;line-height:1.5;color:' + T.mut + '">O cartão some das telas e dos totais. Os lançamentos continuam no histórico.</div>', rodape: '<span style="flex:1"></span>' + botao(T, 'data-fl-o="cancela"', 'Manter') + botao(T, 'data-fl-o="remove"', st.busy ? 'Removendo…' : 'Remover', true, true) }; }
+    if (st.step === 'agrup') {
+      const outros = grupos().filter(x => x.key !== g.key), opcoes = (a, atual) => [['own', 'Card próprio'], ...outros.map(o => ['g:' + o.key, 'Juntar a ' + o.nome])];
+      const sel = (a) => '<select data-gp-s="' + esc(a.id) + '" style="height:34px;border-radius:99px;border:1px solid ' + T.bd + ';background:' + T.sc + ';color:' + T.ink + ';font:inherit;font-size:12.5px;padding:0 10px;max-width:190px;outline:0;cursor:pointer;flex:none"><option value="keep" selected>Neste card</option>' + opcoes(a).map(o => '<option value="' + esc(o[0]) + '">' + esc(o[1]) + '</option>').join('') + '</select>';
+      const linhas = [...g.contas, ...g.inv].map(a => '<div style="flex:none;min-height:54px;border-radius:20px;background:' + T.sc + ';border:1px solid ' + T.bd + ';display:flex;align-items:center;gap:12px;padding:0 14px"><span style="flex:1;min-width:0"><b style="display:block;font-size:15px;letter-spacing:-.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(a.nome) + '</b><span style="display:block;font-size:11px;color:' + T.mut + '">' + (TIPO_NOME[a.tipo] || 'Conta') + (g.cartoes.some(c => c.acc === a.id) ? ' + cartões dela' : '') + '</span></span>' + sel(a) + '</div>').join('');
+      return { texto: 'Em qual card cada conta aparece?', voltar: true, corpo: '<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;padding:0 16px 8px;overflow:auto">' + linhas + '</div><div data-gp-msg style="padding:0 20px 14px;min-height:30px;font-size:11.5px;color:' + T.mut + '">' + esc(st.msg || 'Os cartões de crédito acompanham a conta que paga a fatura. O que veio do mesmo banco já vem junto sozinho.') + '</div>' };
+    }
+    return { texto: '', corpo: '' };
+  }
+  const rootDe = key => document.querySelector('[data-gp="' + (window.CSS && CSS.escape ? CSS.escape(key) : key) + '"]');
+  function pintaP(root, rapido) {
+    const st = root.__gp, v = root.querySelector('[data-fl-esc]'); if (!st || !v) return; const o = conteudo(st), antes = v.querySelector('[data-fl-body]');
+    const troca = () => { v.innerHTML = moldura(st.T, o); const b = v.querySelector('[data-fl-body]'); if (!rapido && b && b.animate) b.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: EE }); };
+    v.style.color = st.T.ink; if (antes && !rapido && antes.animate) { antes.style.transition = 'opacity .16s ease'; antes.style.opacity = '0'; setTimeout(troca, 160); } else troca();
+  }
+  function giraP(root, abre, depois) {
+    const rot = root.querySelector('[data-fl-rot]'), verso = root.querySelector('[data-fl-verso]');
+    if (abre) { rot.style.transform = 'rotateY(180deg)'; setTimeout(() => { verso.style.pointerEvents = 'auto'; }, 400); }
+    else { verso.style.pointerEvents = 'none'; rot.style.transform = 'none'; setTimeout(() => { const e = root.querySelector('[data-fl-esc]'); if (e) e.innerHTML = ''; root.__gp = null; if (depois) depois(); }, 800); }
+  }
+  const vaiP = (root, step, extra) => { const st = root.__gp; if (!st) return; st.pilha.push({ step: st.step, c: st.c, d: st.d, msg: '' }); Object.assign(st, { step, msg: '' }, extra || {}); pintaP(root, false); };
+  const voltaP = root => { const st = root.__gp; if (!st || !st.pilha.length) return; Object.assign(st, st.pilha.pop()); pintaP(root, false); };
+  const fechaP = (root, depois) => { if (!root || !root.__gp) { if (depois) depois(); return; } giraP(root, false, depois); };
+  const maskM = v => { const d = String(v).replace(/\D/g, '').slice(0, 11); return d ? (+d / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : ''; };
+  CT.editarGrupo = (key, cartaoId) => {
+    const root = rootDe(key); if (!root || root.__gp) return; const n = root.__g || {}, tm = root.__tm || KD.tema('#141416', null);
+    root.__gp = { key, step: 'menu', pilha: [], msg: '', T: Object.assign(tema(tm), { cor: (n.prim && n.prim.cor) || '#141416' }) };
+    if (cartaoId) abreCartao(root, cartaoId, true);
+    pintaP(root, true); giraP(root, true);
+  };
+  function abreCartao(root, cid, direto) {
+    const c = KD.M.cardById[cid]; if (!c) return; const st = root.__gp;
+    const d = { name: c.nick && c.nick !== c.n ? c.nick : c.n, fin: c.fin && c.fin !== '····' ? c.fin : '', lim: c.lim ? maskM(String(Math.round(c.lim * 100))) : '', fe: c.fe ? String(c.fe) : '', ve: c.ve ? String(c.ve) : '' };
+    if (direto) { st.pilha = [{ step: 'menu', msg: '' }]; Object.assign(st, { step: 'cartao', c: cid, d }); } else vaiP(root, 'cartao', { c: cid, d });
+  }
+  const refresca = async () => { try { await KD.refresh(KD.comp); if (KD.fontes && KD.fontes.carregar) KD.fontes.carregar(); } catch (e) { console.error(e); } };
+  async function salvaCartao(root) {
+    const st = root.__gp, c = KD.M.cardById[st.c], o = st.d; if (!c || st.busy) return;
+    const erro = m => { st.msg = m; st.busy = false; const el = root.querySelector('[data-gp-msg]'); if (el) el.textContent = m; };
+    if (KD.isDemo()) return erro('Conta de demonstração: editar cartão fica travado.');
+    const lim = moedaNum(o.lim) || null, fe = +o.fe, ve = +o.ve, mexeuCiclo = (fe || ve) && (fe !== c.fe || ve !== c.ve);
+    if (mexeuCiclo && !(fe >= 1 && fe <= 31 && ve >= 1 && ve <= 31)) return erro('Informe os dias de fechamento e vencimento (1 a 31).');
+    st.busy = true; pintaP(root, true);
+    try {
+      const sb = KD.sb, nm = (o.name || '').trim();
+      let r = await sb.from('cards').update({ apelido: nm && nm !== c.n ? nm : null, final4: /^\d{4}$/.test(o.fin) ? o.fin : null, limite: lim, disponivel_informado: lim != null ? Math.max(0, lim - c.used) : null, limite_em: hoje() }).eq('id', c.id); if (r.error) throw r.error;
+      if (mexeuCiclo) { if (c.cy) { r = await sb.from('card_cycles').update({ vigencia_fim: hoje() }).eq('card_id', c.id).eq('vigencia_inicio', c.cy.vigencia_inicio); if (r.error) throw r.error; }
+        r = await sb.from('card_cycles').insert({ user_id: KD.user.id, card_id: c.id, vigencia_inicio: hoje(), dia_fechamento: fe, dia_vencimento: ve, regra: 'dia_fixo', origem: 'manual' }); if (r.error) throw r.error; }
+    } catch (e) { console.error('[kontar] cartão', e); st.busy = false; pintaP(root, true); return erro('Não consegui salvar: ' + (e.message || e)); }
+    st.busy = false; fechaP(root, null); await refresca();
+  }
+  async function removeCartao(root) {
+    const st = root.__gp; if (st.busy) return; if (KD.isDemo()) { st.msg = ''; st.step = 'cartao'; pintaP(root, true); const el = root.querySelector('[data-gp-msg]'); if (el) el.textContent = 'Conta de demonstração: remover fica travado.'; return; }
+    st.busy = true; pintaP(root, true);
+    const r = await KD.sb.from('cards').update({ removido_em: new Date().toISOString(), ativo: false }).eq('id', st.c);
+    if (r.error) { st.busy = false; st.msg = 'Não consegui remover: ' + r.error.message; return pintaP(root, true); }
+    st.busy = false; fechaP(root, null); await refresca();
+  }
+  async function movePara(root, accId, valor) {
+    const st = root.__gp, el = root.querySelector('[data-gp-msg]'); if (valor === 'keep') return;
+    if (KD.isDemo()) { if (el) el.textContent = 'Conta de demonstração: mudar o agrupamento fica travado.'; return; }
+    const g = gDe(st), alvo = valor === 'own' ? accId : valor.slice(2), a = KD.M.accById[accId];
+    const r = await KD.sb.from('accounts').update({ grupo: alvo }).eq('id', accId); if (r.error) { if (el) el.textContent = 'Não consegui mudar: ' + r.error.message; return; }
+    fechaP(root, null); await refresca();
+  }
+  /* cliques */
+  document.addEventListener('click', e => {
+    const gp = e.target.closest && e.target.closest('[data-gp]'); if (!gp) return;
+    const t = e.target.closest('[data-gp-v],[data-gp-ed],[data-gp-ac],[data-gp-nx],[data-fl-o],[data-fl-v],[data-fl-x]'); if (!t) return;
+    e.stopPropagation(); const key = gp.getAttribute('data-gp'), g = grupos().find(x => x.key === key);
+    if (t.hasAttribute('data-gp-v')) { const v = t.getAttribute('data-gp-v'); if (!g || viewDe(g) === v) return; VW[key] = v; salvaVW(); const f = gp.querySelector('[data-gp-face]'); f.style.transition = 'opacity .16s ease'; f.style.opacity = '0'; setTimeout(() => { window.dispatchEvent(new Event('kd:fontes')); f.style.opacity = '1'; }, 170); return; }
+    if (t.hasAttribute('data-gp-nx')) { CI[key] = (CI[key] || 0) + 1; window.dispatchEvent(new Event('kd:fontes')); return; }
+    if (t.hasAttribute('data-gp-ac')) { const [k, ac] = t.getAttribute('data-gp-ac').split('|'), FT = KD.fontes, r = FT && FT.rows && FT.rows().find(x => x.k === k); if (r && FT.agir) FT.agir(r, ac); return; }
+    if (t.hasAttribute('data-gp-ed')) { const c = g && g.cartoes[(CI[key] || 0) % (g.cartoes.length || 1)]; CT.editarGrupo(key, t.getAttribute('data-gp-ed') === 'falta' && c ? c.id : null); return; }
+    const st = gp.__gp; if (!st) return;
+    if (t.hasAttribute('data-fl-x')) return fechaP(gp);
+    if (t.hasAttribute('data-fl-v')) return voltaP(gp);
+    const k = t.getAttribute('data-fl-o');
+    if (k.startsWith('conta:')) { const id = k.slice(6); return fechaP(gp, () => CT.editar(id)); }
+    if (k.startsWith('cartao:')) return abreCartao(gp, k.slice(7)), pintaP(gp, false);
+    if (k === 'agrup') return vaiP(gp, 'agrup');
+    if (k === 'rm') return vaiP(gp, 'rm');
+    if (k === 'cancela') return st.pilha.length ? voltaP(gp) : fechaP(gp);
+    if (k === 'salva') return salvaCartao(gp);
+    if (k === 'remove') return removeCartao(gp);
+  }, true);
+  document.addEventListener('input', e => { const k = e.target.getAttribute && e.target.getAttribute('data-gp-in'); if (!k) return; const gp = e.target.closest('[data-gp]'), st = gp && gp.__gp; if (!st || !st.d) return;
+    if (k === 'lim') e.target.value = maskM(e.target.value); else if (k === 'fin') e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4); else if (k === 'fe' || k === 've') e.target.value = e.target.value.replace(/\D/g, '').slice(0, 2); st.d[k] = e.target.value; }, true);
+  document.addEventListener('change', e => { const a = e.target.getAttribute && e.target.getAttribute('data-gp-s'); if (!a) return; const gp = e.target.closest('[data-gp]'); if (gp && gp.__gp) movePara(gp, a, e.target.value); }, true);
+  window.addEventListener('keydown', e => { if (e.key === 'Escape') { const gp = document.querySelector('[data-gp]:has([data-fl-esc] [data-fl-x])'); if (gp && gp.__gp) fechaP(gp); } });
+  /* o "Cadastrar limite" da tabela abaixo e o "Completar" ainda abrem o editor do cartão do React (escondido): aqui ele vira o painel do card único */
+  let visto = null;
+  function vigiaCe() {
+    const ce = KD.comp && KD.comp.state && KD.comp.state.ce; if (!ce || ce.closing || !ce.n || visto === ce.n) { if (!ce) visto = null; return; }
+    const c = KD.M.cards.find(x => x.n === ce.n); if (!c) return; const ids = new Set(KD.M.accs.map(a => a.id)), a = KD.M.accById[c.acc], key = a ? (a.grupo || a.conexao || a.id) : 'c:' + c.id; visto = ce.n;
+    setTimeout(() => { if (KD.comp.ceClose) KD.comp.ceClose(); const root = rootDe(key); if (root) { root.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => CT.editarGrupo(key, c.id), 500); } }, 30);
+  }
 })();
