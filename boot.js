@@ -486,6 +486,16 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
 .route b.cur.ring.full{background:var(--ac);border-color:var(--ac);color:var(--on)}.route b.cur.ring.full .rg{opacity:0}
 .route b.full .rn{opacity:0}.route b.full .rc{opacity:1}
 .U.bk{grid-template-rows:auto minmax(0,1fr) auto}.U.bk .ctl{overflow-y:auto;min-height:0}
+.seg{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));padding:4px;border-radius:99px;border:1.5px solid #3A3A40;background:#0B0B0D}
+.seg .th{position:absolute;top:4px;bottom:4px;left:4px;width:calc((100% - 8px) / 4);border-radius:99px;background:var(--bone);transition:transform .45s var(--E);will-change:transform;pointer-events:none}
+.seg button{position:relative;z-index:1;height:34px;border:0;background:none;border-radius:99px;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 4px;font-size:10.5px;font-weight:800;letter-spacing:.06em;color:#fff;cursor:pointer;white-space:nowrap;transition:color .35s var(--E)}
+.seg button svg{flex:none;width:14px;height:14px}
+.seg button[aria-checked=true]{color:#0A0A0A}
+.U{position:relative}
+.U.bk .ctl{scrollbar-width:thin;scrollbar-color:#3A3A40 transparent;padding-right:30px;margin-right:6px}
+.U.bk .ctl::-webkit-scrollbar{width:6px}.U.bk .ctl::-webkit-scrollbar-track{background:transparent}.U.bk .ctl::-webkit-scrollbar-thumb{background:#3A3A40;border-radius:99px}.U.bk .ctl::-webkit-scrollbar-thumb:hover{background:#55555C}
+.cfade{position:absolute;left:0;right:0;bottom:85px;height:64px;pointer-events:none;opacity:0;transition:opacity .35s var(--E);background:linear-gradient(to top,#111114 8%,rgba(17,17,20,0))}
+.cfade.on{opacity:1}
 .pal{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 0 20px}.pal button,.pal label{width:26px;height:26px;border-radius:50%;border:0;padding:0;cursor:pointer;position:relative;display:block;flex:none}
 .tile{height:62px;border-radius:20px;border:1.5px solid #3A3A40;background:var(--btn);display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;transition:border-color .25s,background .25s;padding:0}
 .tile:hover{border-color:#4A4A52}.tile[aria-pressed=true]{border-color:var(--ac)}
@@ -518,7 +528,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
       + '<div class="step" data-s="1"><label class="lab" for="nl">Seu nome completo, como no banco</label><div class="fld"><input id="nl" type="text" placeholder="Ex.: João da Silva" autocomplete="name"></div><label class="lab" for="nj" style="margin-top:8px">Nome da sua empresa (PJ), se tiver</label><div class="fld"><input id="nj" type="text" placeholder="Ex.: Silva Serviços LTDA" autocomplete="organization"></div><p class="hint">Pode deixar em branco. Dá pra adicionar mais nomes depois, em Minha Conta.</p></div><div class="step" data-s="2"><div class="lab" style="margin-bottom:6px">Toque nos bancos em que você tem conta ou cartão</div><div class="grid4" id="tiles"></div><p class="hint" id="tcount"></p></div><div class="step" id="bkf" data-s="2b"></div><div class="step" data-s="3" role="radiogroup" aria-label="Como começar"><button class="opt" role="radio" aria-checked="false" data-v="import"><span class="n">A</span><span><b>Importar extrato</b><small>CSV, OFX ou PDF do seu banco ou cartão.</small></span><span class="rd"></span></button><button class="opt" role="radio" aria-checked="false" data-v="manual"><span class="n">B</span><span><b>Lançar manualmente</b><small>Começa do zero e você vai adicionando.</small></span><span class="rd"></span></button><button class="opt" role="radio" aria-checked="false" data-v="demo"><span class="n">C</span><span><b>Explorar com dados demo</b><small>Veja tudo funcionando antes de usar os seus.</small></span><span class="rd"></span></button></div>'
       + '<div class="step" data-s="4"><label class="lab" for="rd">Renda mensal</label><div class="fld"><span class="pre">R$</span><input id="rd" inputmode="numeric" placeholder="0,00"><span class="suf cap">por mês</span></div><div class="dh"><span class="lab">Dia de fechamento da fatura</span><button class="skip" type="button" id="sk">Pular essa etapa</button></div><div class="days" id="days"></div></div>'
       + '<div class="step" data-s="5"><div class="sum" id="sum"></div></div></div>'
-      + '<div class="acts"><div class="lt"><button class="back" type="button" id="bk" disabled>← Voltar</button><span class="cap" id="fn"></span></div><button class="go" type="button" id="nx"><span class="t">Continuar</span><span class="ar" aria-hidden="true">' + ARROW('#fff', 2.4) + '</span></button></div></section></div></div></main>');
+      + '<div class="cfade" id="cfade" aria-hidden="true"></div><div class="acts"><div class="lt"><button class="back" type="button" id="bk" disabled>← Voltar</button><span class="cap" id="fn"></span></div><button class="go" type="button" id="nx"><span class="t">Continuar</span><span class="ar" aria-hidden="true">' + ARROW('#fff', 2.4) + '</span></button></div></section></div></div></main>');
     return new Promise(done => {
       const drawNotch = () => { const g = $('#bgs'), b = $('#board'); if (!g || !b) return; const W = b.offsetWidth, H = b.offsetHeight, Dp = 72, gp = 18, F = 18, R = 36, D2 = 84, R2 = 42, RW = $('#route').offsetWidth, N = RW + gp + F, x = W - N; $('#nx').style.width = RW + 'px';
         const d = 'M0 30A30 30 0 0 1 30 0H' + x + 'A' + F + ' ' + F + ' 0 0 1 ' + (x + F) + ' ' + F + 'V' + (Dp - R) + 'A' + R + ' ' + R + ' 0 0 0 ' + (x + F + R) + ' ' + Dp + 'H' + (W - F) + 'A' + F + ' ' + F + ' 0 0 1 ' + W + ' ' + (Dp + F) + 'V' + (H - D2 - F) + 'A' + F + ' ' + F + ' 0 0 1 ' + (W - F) + ' ' + (H - D2) + 'H' + (x + F + R2) + 'A' + R2 + ' ' + R2 + ' 0 0 0 ' + (x + F) + ' ' + (H - D2 + R2) + 'V' + (H - F) + 'A' + F + ' ' + F + ' 0 0 1 ' + x + ' ' + H + 'H30A30 30 0 0 1 0 ' + (H - 30) + 'Z';
@@ -544,6 +554,11 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
       /* ---- passo "Seus bancos": grade de logos → uma tela por banco; o passo vira anel de progresso na barra de cima ---- */
       const KD2 = window.KD, GRADE = ['Nubank', 'Itaú', 'Bradesco', 'Banco do Brasil', 'Santander', 'Mercado Pago', 'PicPay', 'Inter', 'C6', 'PagBank', 'Neon', 'XP', 'Next', 'BV', 'Amazon'];   /* popularidade aproximada no Brasil */
       const COR_OUTRO = ['#6A4BFF', '#FF5A1F', '#00E08A', '#FFB800', '#FF3D8B', '#6AFF2A', '#B18CFF', '#FF5C5C', '#2CBFF8', '#F2F0EB'];
+      const ICO = { corrente: '<path d="M3 21h18"/><path d="M5 21V10"/><path d="M19 21V10"/><path d="M9 21V10"/><path d="M15 21V10"/><path d="M12 3 3 8h18z"/>',
+        poupanca: '<path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z"/><path d="M2 9v1c0 1.1.9 2 2 2h1"/><path d="M16 11h.01"/>',
+        investimento: '<path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/>',
+        carteira: '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>' };
+      const icone = k => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICO[k] + '</svg>';
       const TIPOS = [['corrente', 'CORRENTE', 'pagamento'], ['poupanca', 'POUPANÇA', 'reserva'], ['investimento', 'INVESTIMENTO', 'reserva'], ['carteira', 'CARTEIRA', 'pagamento']];
       const logoDe = (b, h, w) => KD2.logo && b !== 'Outro' ? KD2.logo.slot(b, { forma: 'extensa', fundo: 'escuro', estilo: 'cor', tinta: 'pre' }, h, w, KD2.BANK[b] && KD2.BANK[b][0]) : '';
       const moeda = v => { const d = String(v).replace(/\D/g, '').slice(0, 11); return d ? (+d / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : ''; };
@@ -568,13 +583,15 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
           + (b === 'Outro' ? '<label class="lab">Nome do banco</label>' + f('outro', 'Ex.: Banco Pan', d.outro) + '<label class="lab">Cor do banco</label><div class="pal" id="pal">' + COR_OUTRO.map(c => '<button type="button" data-cor="' + c + '" aria-label="Cor ' + c + '" style="background:' + c + ';box-shadow:' + (d.cor === c ? '0 0 0 2px #111114,0 0 0 4px #fff' : 'none') + '"></button>').join('')
           + '<label title="Escolher outra cor" style="background:' + (COR_OUTRO.includes(d.cor) ? 'conic-gradient(#FF5C5C,#FFB800,#6AFF2A,#2CBFF8,#B18CFF,#FF3D8B,#FF5C5C)' : d.cor) + ';box-shadow:' + (COR_OUTRO.includes(d.cor) ? 'none' : '0 0 0 2px #111114,0 0 0 4px #fff') + '"><input type="color" data-cp="1" value="' + d.cor + '" aria-label="Escolher a cor do banco" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0"></label></div>' : '')
           + '<label class="lab">Nome da conta</label>' + f('nome', nomePadrao(b), d.nome)
-          + '<div class="pills" role="group" aria-label="Tipo">' + TIPOS.map(t => '<button type="button" data-tp="' + t[0] + '" aria-pressed="' + (d.tipo === t[0]) + '">' + t[1] + '</button>').join('') + '</div>'
+          + '<div class="seg" role="radiogroup" aria-label="Tipo de conta"><i class="th" id="th" style="transform:translateX(' + TIPOS.findIndex(t => t[0] === d.tipo) * 100 + '%)"></i>' + TIPOS.map(t => '<button type="button" role="radio" data-tp="' + t[0] + '" aria-checked="' + (d.tipo === t[0]) + '">' + icone(t[0]) + '<span>' + t[1] + '</span></button>').join('') + '</div>'
           + '<label class="lab">Saldo atual</label>' + f('saldo', '0,00', d.saldo, 'R$')
           + '<div class="sw" role="switch" tabindex="0" aria-checked="' + d.cred + '" data-sw="1"><i></i><b>Tem cartão de crédito</b></div>'
           + (d.cred ? '<div class="cr">' + f('final', 'Final ····', d.final) + f('limite', 'Limite R$', d.limite) + f('fecha', 'Fecha dia', d.fecha) + f('vence', 'Vence dia', d.vence) + '</div>' : '')
           + '<div class="bkr"><div class="bkm" id="bkm"></div><button class="later" type="button" data-later="1" style="margin:0 20px 0 0;flex:none">Preencher depois</button></div>';
         const e = $('#bkf'); e.classList.remove('on'); void e.offsetWidth; e.classList.add('on');
       };
+      const fadeCtl = () => { const c = $('.ctl'), f = $('#cfade'); if (!c || !f) return; const rola = c.scrollHeight > c.clientHeight + 2, fim = c.scrollTop + c.clientHeight >= c.scrollHeight - 3; f.classList.toggle('on', $('.U').classList.contains('bk') && rola && !fim); };
+      $('.ctl').addEventListener('scroll', fadeCtl, { passive: true }); new ResizeObserver(fadeCtl).observe($('.ctl')); new MutationObserver(fadeCtl).observe($('#bkf'), { childList: true, subtree: true, attributes: true });
       const textoBanco = () => { const b = D.bancos[sub], n = D.bancos.length, nome = b === 'Outro' ? (dado(b).outro || 'outro banco') : b; $('#sb').innerHTML = 'Dados do ' + esc(nome) + '. Tudo é opcional: dá pra deixar pra depois.'; $('#tag').textContent = 'Banco ' + (sub + 1) + ' de ' + n; $('#note').textContent = 'Cada banco vira uma conta'; ['#sb'].forEach(q => { const e = $(q); e.classList.remove('anim'); void e.offsetWidth; e.classList.add('anim'); }); };
       const validaBanco = () => {
         const b = D.bancos[sub], d = dado(b);
@@ -598,7 +615,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
         if (i === LAST) { $('#who').textContent = (D.nm.trim().split(/\s+/)[0] || 'você') + '.'; const nb = nomesBanco(), rows = [['Nome', D.nm.trim()], ['Nomes no banco', nb.length ? nb.length + (nb.length === 1 ? ' nome' : ' nomes') : '—'], ['Contas', D.bancos.length ? D.bancos.length + (D.bancos.length === 1 ? ' conta' : ' contas') : '—'], ['Começando por', HOW[D.how]], ['Renda mensal', D.rd ? 'R$ ' + D.rd : '—'], ['Fecha a fatura', D.dia ? 'Dia ' + D.dia : '—']];
           $('#sum').innerHTML = rows.map((r, k) => '<div><i>' + (k + 1) + '</i><span>' + r[0] + '</span><b></b></div>').join(''); $$('#sum b').forEach((e, k) => { e.textContent = rows[k][1]; }); }
         $$('.step').forEach(e => e.classList.toggle('on', +e.dataset.s === i));
-        $('.U').classList.toggle('bk', i === 2 && sub >= 0);
+        $('.U').classList.toggle('bk', i === 2 && sub >= 0); if (!(i === 2 && sub >= 0)) $('#cfade').classList.remove('on'); else fadeCtl();
         if (i === 2) { if (sub < 0) desenhaGrade(); $('[data-s="2"]').classList.toggle('on', sub < 0); $('#bkf').classList.toggle('on', sub >= 0); if (sub >= 0) textoBanco(); }
         $$('#route u').forEach((e, k) => e.classList.toggle('done', k < i));
         $$('#route b').forEach((e, k) => { e.classList.toggle('done', k < i); e.classList.toggle('cur', k === i);
@@ -631,7 +648,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
       $('#bkf').addEventListener('change', e => { if (e.target.dataset && e.target.dataset.cp && sub >= 0) desenhaBanco(); });
       $('#bkf').addEventListener('click', e => { const t = e.target.closest('[data-tp],[data-sw],[data-later],[data-cor]'); if (!t || busy || sub < 0) return; const d = dado(D.bancos[sub]);
         if (t.dataset.cor) { d.cor = t.dataset.cor; desenhaBanco(); return; }
-        if (t.dataset.tp) { d.tipo = t.dataset.tp; $$('#bkf [data-tp]').forEach(x => x.setAttribute('aria-pressed', String(x === t))); }
+        if (t.dataset.tp) { d.tipo = t.dataset.tp; $$('#bkf [data-tp]').forEach(x => x.setAttribute('aria-checked', String(x === t))); const th = $('#th'); if (th) th.style.transform = 'translateX(' + TIPOS.findIndex(x => x[0] === d.tipo) * 100 + '%)'; }
         else if (t.dataset.sw) { d.cred = !d.cred; desenhaBanco(); } else if (t.dataset.later) avancaBanco(true); });
       $('#nx').onclick = () => { if (!ok() || busy) return;
         if (i === 2) { if (sub < 0) { if (D.bancos.length) { sub = 0; entraAnel(); render(); desenhaBanco(); return; } } else return avancaBanco(false); }
