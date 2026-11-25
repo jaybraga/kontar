@@ -540,7 +540,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
         { n: 'Tudo pronto', h: 'Pronto,<br><span id="who"></span>', sb: 'Confira o resumo.<br>O resto você ajusta<br>nos próprios cards.', note: 'Confira e abra o seu painel', tag: 'Resumo', ac: 'var(--bone)', on: '#000' }];
       const D = { nm: nameGuess || '', nl: '', nj: '', how: null, rd: '', dia: null, bancos: [], dados: {} }; let i = 0; const LAST = ST.length - 1;
       /* ---- passo "Seus bancos": grade de logos → uma tela por banco; o passo vira anel de progresso na barra de cima ---- */
-      const KD2 = window.KD, GRADE = ['Nubank', 'Itaú', 'C6', 'Mercado Pago', 'Amazon', 'Santander', 'Bradesco', 'Banco do Brasil', 'PicPay', 'Inter', 'Next', 'XP', 'Neon', 'BV', 'PagBank'];
+      const KD2 = window.KD, GRADE = ['Nubank', 'Itaú', 'Bradesco', 'Banco do Brasil', 'Santander', 'Mercado Pago', 'PicPay', 'Inter', 'C6', 'PagBank', 'Neon', 'XP', 'Next', 'BV', 'Amazon'];   /* popularidade aproximada no Brasil */
       const TIPOS = [['corrente', 'CORRENTE', 'pagamento'], ['poupanca', 'POUPANÇA', 'reserva'], ['investimento', 'INVESTIMENTO', 'reserva'], ['carteira', 'CARTEIRA', 'pagamento']];
       const logoDe = (b, h, w) => KD2.logo && b !== 'Outro' ? KD2.logo.slot(b, { forma: 'extensa', fundo: 'escuro', estilo: 'cor', tinta: 'pre' }, h, w, KD2.BANK[b] && KD2.BANK[b][0]) : '';
       const moeda = v => { const d = String(v).replace(/\D/g, '').slice(0, 11); return d ? (+d / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : ''; };
@@ -554,7 +554,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
       const dado = b => D.dados[b] || (D.dados[b] = { nome: '', tipo: 'corrente', saldo: '', cred: false, final: '', limite: '', fecha: '', vence: '', outro: '', pulou: false });
       const nomePadrao = b => (b === 'Outro' ? (dado(b).outro || 'Outro banco').trim() : b) + ' Conta';
       const desenhaGrade = () => {
-        $('#tiles').innerHTML = GRADE.concat(['Outro']).map(b => '<button class="tile" type="button" data-b="' + esc(b) + '" aria-pressed="' + D.bancos.includes(b) + '" aria-label="' + esc(b === 'Outro' ? 'Outro banco' : b) + '">' + (b === 'Outro' ? '<span class="tx">OUTRO BANCO</span>' : logoDe(b, 20, 80)) + '<span class="ck">✓</span></button>').join('');
+        $('#tiles').innerHTML = GRADE.concat(['Outro']).map(b => '<button class="tile" type="button" data-b="' + esc(b) + '" aria-pressed="' + D.bancos.includes(b) + '" aria-label="' + esc(b === 'Outro' ? 'Outro banco' : b) + '">' + (b === 'Outro' ? '<span class="tx">OUTRO</span>' : (KD2.logo && KD2.logo.seletor ? KD2.logo.seletor(b, 20, 84) : logoDe(b, 20, 80))) + '<span class="ck">✓</span></button>').join('');
         const n = D.bancos.length; $('#tcount').textContent = n ? n + (n === 1 ? ' banco marcado: vira 1 conta.' : ' bancos marcados: viram ' + n + ' contas.') + ' Caixa chega em breve.' : 'Dá pra pular e criar as contas depois, na página Contas. Caixa chega em breve.';
       };
       const msgBk = t => { const m = $('#bkm'); if (m) m.textContent = t || ''; };
