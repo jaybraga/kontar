@@ -540,7 +540,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
 .lst .lg{display:flex;align-items:center;height:22px;overflow:hidden}
 .lst b{display:block;font-size:15px;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lst small{display:block;font-size:12.5px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lst s{text-decoration:none;font-size:14px;font-weight:700;white-space:nowrap}
-#ofp .bkr .later{margin:0}
+#ofp .bkr .later{margin:0}.oft .lgs{display:flex;align-items:center;justify-content:center}
 .U.bk #ofp.on{min-height:100%}#ofp .two{flex:1;min-height:200px}#ofp .tall{min-height:0}
 @media (max-width:820px){.two{grid-template-columns:1fr}.tall{min-height:0}.lst button{grid-template-columns:24px minmax(0,1fr) auto}.lst .lg{display:none}}
 @media (max-width:820px){.board{height:auto}.body{grid-template-columns:1fr}.T{border-right:0;border-bottom:1px solid var(--ln);min-height:260px}.hdr .cap{display:none}.days{grid-template-columns:repeat(7,1fr)}}
@@ -607,7 +607,11 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
       const SVG = p => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>';
       const tall = (v, ic, cor, t, sb, tg) => '<button type="button" class="tall" role="radio" data-cm="' + v + '" aria-checked="' + (D.caminho === v) + '"><i style="background:' + cor + '">' + SVG(ic) + '</i><b>' + t + '</b><small>' + sb + '</small>' + (tg ? '<span class="tg">' + tg + '</span>' : '') + '</button>';
       const tilesOf = () => { const n = D.bancos.length, linhas = Math.ceil(n / 6), por = Math.ceil(n / linhas);   // até 6 numa linha; acima disso, linhas equilibradas e sempre de ponta a ponta
-        return '<div class="oft">' + D.bancos.map(b => '<span class="tile" aria-pressed="' + coberto(b) + '" style="flex:1 1 calc((100% - ' + (por - 1) * 8 + 'px) / ' + por + ')">' + (b === 'Outro' ? '<span class="nm">' + esc((dado(b).outro || 'Outro banco')) + '</span>' : (KD2.logo && KD2.logo.seletor ? KD2.logo.seletor(b, 20, 84) : logoDe(b, 20, 80))) + '<span class="ck">✓</span></span>').join('') + '</div>'; };
+        return '<div class="oft">' + D.bancos.map(b => '<span class="tile" data-lg="' + esc(b) + '" aria-pressed="' + coberto(b) + '" style="flex:1 1 calc((100% - ' + (por - 1) * 8 + 'px) / ' + por + ')">' + (b === 'Outro' ? '<span class="nm">' + esc((dado(b).outro || 'Outro banco')) + '</span>' : '<span class="lgs"></span>') + '<span class="ck">✓</span></span>').join('') + '</div>'; };
+      /* logo completo ou so o simbolo, conforme a largura real do tile (com muitos bancos por linha o completo fica espremido) */
+      const ajustaLogos = () => { const ts = $$('#ofp .oft .tile'); if (!ts.length || !KD2.logo || !KD2.logo.seletor) return; const w = ts[0].clientWidth; if (!w) return; const comp = w < 150, chave = comp ? 'c' : 'e';
+        ts.forEach(t => { const g = t.querySelector('.lgs'); if (!g || g.dataset.f === chave) return; g.dataset.f = chave; g.innerHTML = KD2.logo.seletor(t.dataset.lg, 20, comp ? Math.min(44, w - 24) : Math.min(96, w - 28), comp); }); };
+      new ResizeObserver(ajustaLogos).observe($('#ofp'));
       const msgOf = t => { ofErr = t || ''; const m = $('#ofm'); if (m) m.textContent = ofErr; };
       const desenhaOf = () => {
         const e = $('#ofp'); let h = '';
@@ -618,7 +622,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
           h = '<div class="lst">' + D.of.map((x, k) => { const c = x.c, b = bancoIt(x), cred = c.tipo === 'CREDIT';
             return '<button type="button" role="checkbox" data-oft="' + k + '" aria-checked="' + x.on + '"><em>✓</em><span class="lg">' + (b ? logoDe(b, 18, 76) : '') + '</span><span><b>' + esc(String(c.nome || '').trim()) + (c.final ? ' ···· ' + esc(c.final) : '') + '</b><small>' + (cred ? 'Cartão' + (c.fecha ? ' · fecha dia ' + c.fecha : '') : (c.subtipo === 'SAVINGS_ACCOUNT' ? 'Poupança' : 'Conta corrente')) + (b ? ' · ' + esc(b) : '') + '</small></span><s>' + (cred ? (c.limite ? 'limite R$ ' + brlOf(c.limite) : '') : 'R$ ' + brlOf(c.saldo)) + '</s></button>'; }).join('') + '</div>'
             + '<div class="bkr"><div class="bkm" id="ofm" style="color:var(--mut)">' + (falta.length ? 'Faltou ' + esc(falta.map(b => b === 'Outro' ? (dado(b).outro || 'outro banco') : b).join(', ')) + ': conecte também ou preencha à mão em seguida.' : '') + '</div><button class="later" type="button" data-ofmais="1">Conectar outro banco</button></div>'; }
-        e.innerHTML = h; if (ofErr) msgOf(ofErr); e.classList.remove('on'); void e.offsetWidth; e.classList.add('on'); fadeCtl();
+        e.innerHTML = h; ajustaLogos(); if (ofErr) msgOf(ofErr); e.classList.remove('on'); void e.offsetWidth; e.classList.add('on'); fadeCtl();
       };
       const textoOf = () => { const n = D.bancos.length; $('#sb').innerHTML = ofx === 'como' ? 'Escolha como ' + (n === 1 ? 'o banco marcado entra' : 'os ' + n + ' bancos marcados entram') + ' no Kontar.' : ofx === 'mp' ? 'O Kontar lê seus bancos pelo MeuPluggy. Eles precisam estar ligados lá antes.' : 'Achamos ' + D.of.length + (D.of.length === 1 ? ' item' : ' itens') + '. Desmarque o que não quer trazer. Os lançamentos chegam quando o painel abrir.'; $('#tag').textContent = ofx === 'como' ? 'Dois caminhos' : 'Open Finance'; };
       const ofInv = async body => { const r = await window.KD_SB.functions.invoke('open-finance', { body }); if (r.error) { let d = ''; try { const j = await r.error.context.json(); d = j.detalhe || j.erro || j.motivo || ''; } catch (e) { /* sem corpo */ } throw new Error(d || r.error.message || 'erro'); } return r.data; };

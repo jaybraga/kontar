@@ -1849,9 +1849,10 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     /* logo de cada banco nas telas de ESCOLHA (painel Nova conta e onboarding), onde a largura é pequena:
        Mercado Pago = símbolo colorido + nome claro · Banco do Brasil = só o ícone · Next = lockup horizontal · Amazon = colorido (texto claro, seta laranja) */
     const slotSvg = (svg, h, w) => '<span aria-hidden="true" style="width:' + w + 'px;height:' + h + 'px;flex:none;display:block;background:url(\'data:image/svg+xml,' + encodeURIComponent(svg) + '\') center/contain no-repeat"></span>';
-    LG.seletor = (nome, h, w) => {
+    LG.seletor = (nome, h, w, compacto) => {
       h = h || 20; w = w || 70;
       if (nome === 'Outro') return '';
+      if (compacto) { const oc = { forma: 'compacta', fundo: 'escuro', estilo: 'cor', tinta: 'pre' }; if (LG.url(nome, oc)) return LG.slot(nome, oc, h + 8, w, KD.BANK[nome] && KD.BANK[nome][0]); }   // tile estreito: só o símbolo
       if (nome === 'Mercado Pago' && LG.mpCor) return slotSvg(LG.mpCor(OSSO), h + 4, w);
       const o = { forma: nome === 'Banco do Brasil' ? 'compacta' : 'extensa', fundo: 'escuro', estilo: 'cor', tinta: 'pre' };
       return LG.url(nome, o) ? LG.slot(nome, o, nome === 'Banco do Brasil' ? h + 4 : nome === 'Next' ? h + 2 : h, w, KD.BANK[nome] && KD.BANK[nome][0]) : '';
