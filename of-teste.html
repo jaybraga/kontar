@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>Kontar · teste Open Finance</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#000;color:#F2F0EB;font:15px/1.5 Helvetica,Arial,sans-serif;padding:40px 24px}
+main{max-width:760px;margin:0 auto}h1{font-size:34px;letter-spacing:-.04em;margin:0 0 6px}p{color:#9A9AA3;margin:0 0 22px}
+button{height:46px;border-radius:99px;border:0;background:#F2F0EB;color:#000;font:800 13px Helvetica;letter-spacing:.08em;padding:0 22px;cursor:pointer}button:disabled{opacity:.4;cursor:default}
+button.g{background:transparent;color:#F2F0EB;border:1.5px solid #3A3A40}
+input{height:46px;border-radius:99px;border:1px solid #3A3A40;background:#111114;color:#F2F0EB;padding:0 20px;font:15px Helvetica;min-width:340px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:14px 0}
+pre{background:#111114;border:1px solid #2A2A2F;border-radius:20px;padding:18px;overflow:auto;font-size:12.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word;min-height:80px}
+.s{font-size:12px;letter-spacing:.14em;font-weight:800;color:#7C7C85;margin:26px 0 8px}
+</style></head><body><main>
+<h1>Teste do Open Finance</h1>
+<p>Página de teste, sem link no app. Só lê: nada é gravado no Kontar. Você precisa estar logado no Kontar neste navegador.</p>
+<div class="s">1 · CONECTAR UM BANCO (opcional, se você ainda não tem o itemId)</div>
+<div class="row"><button id="cx">CONECTAR BANCO</button><span id="st" style="color:#9A9AA3"></span></div>
+<div class="s">2 · LER UMA AMOSTRA</div>
+<div class="row"><input id="item" placeholder="itemId (aparece sozinho depois de conectar)" autocomplete="off"><button id="am">LER AMOSTRA</button></div>
+<pre id="out">Aguardando.</pre>
+</main>
+<script src="./config.js"></script>
+<script src="./vendor/supabase.js"></script>
+<script>
+(function(){
+  const CFG = window.KONTAR_CONFIG || {}, $ = q => document.querySelector(q), out = t => { $('#out').textContent = typeof t === 'string' ? t : JSON.stringify(t, null, 2); };
+  const sb = window.supabase.createClient(CFG.url, CFG.key, { auth: { persistSession: true, autoRefreshToken: true } });
+  const chama = async corpo => { const r = await sb.functions.invoke('open-finance', { body: corpo }); if (r.error) { let d = ''; try { d = JSON.stringify(await r.error.context.json()); } catch (e) {} throw new Error((r.error.message || 'erro') + ' ' + d); } return r.data; };
+  sb.auth.getSession().then(r => { if (!r.data.session) { $('#st').textContent = 'Você não está logado: abra o Kontar, entre e volte aqui.'; $('#cx').disabled = true; $('#am').disabled = true; } });
+  $('#am').onclick = async () => {
+    const id = $('#item').value.trim(); if (!id) return out('Informe o itemId.');
+    out('Lendo…'); $('#am').disabled = true;
+    try { out(await chama({ acao: 'amostra', itemId: id })); } catch (e) { out('Falhou: ' + e.message); }
+    $('#am').disabled = false;
+  };
+  $('#cx').onclick = async () => {
+    $('#cx').disabled = true; out('Pedindo o token de conexão…');
+    try {
+      const { accessToken } = await chama({ acao: 'connect-token' });
+      await new Promise((ok, no) => { if (window.PluggyConnect) return ok(); const s = document.createElement('script'); s.src = 'https://cdn.pluggy.ai/pluggy-connect/v2.8.0/pluggy-connect.js'; s.onload = ok; s.onerror = () => no(new Error('não carregou o widget da Pluggy')); document.head.appendChild(s); });
+      const w = new window.PluggyConnect({ connectToken: accessToken, includeSandbox: false,
+        onSuccess: d => { const id = d && d.item && d.item.id; $('#item').value = id || ''; $('#st').textContent = id ? 'Conectado. itemId preenchido abaixo.' : 'Conectou, mas não veio itemId.'; out({ conectado: true, itemId: id, conector: d && d.item && d.item.connector && d.item.connector.name }); $('#cx').disabled = false; },
+        onError: e => { out('Erro no widget: ' + JSON.stringify(e)); $('#cx').disabled = false; },
+        onClose: () => { $('#cx').disabled = false; } });
+      w.init(); out('Widget aberto. Escolha o banco (ou o conector MeuPluggy) e conclua o login.');
+    } catch (e) { out('Falhou: ' + e.message); $('#cx').disabled = false; }
+  };
+})();
+</script></body></html>
