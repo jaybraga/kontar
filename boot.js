@@ -496,6 +496,15 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
 .U .ctl::-webkit-scrollbar{width:6px}.U .ctl::-webkit-scrollbar-track{background:transparent}.U .ctl::-webkit-scrollbar-thumb{background:#3A3A40;border-radius:99px}.U .ctl::-webkit-scrollbar-thumb:hover{background:#55555C}
 .cfade{position:absolute;left:0;right:0;bottom:85px;height:64px;pointer-events:none;opacity:0;transition:opacity .35s var(--E);background:linear-gradient(to top,#111114 8%,rgba(17,17,20,0))}
 .cfade.on{opacity:1}
+.fld.big{height:auto;padding:0 6px 14px 20px;border:0;border-radius:0;background:none;border-bottom:2px solid #3A3A40;align-items:baseline;gap:16px}
+.fld.big:focus-within{border-color:var(--ac)}
+.fld.big .pre{font-size:clamp(24px,2.6vw,34px);font-weight:700;letter-spacing:-.03em;color:var(--dim)}
+.fld.big input{font-size:clamp(56px,7vw,96px);font-weight:700;letter-spacing:-.06em;line-height:1;font-variant-numeric:tabular-nums;padding:0}
+.bigs{color:var(--dim);margin:2px 0 6px 20px}
+.cfade.tp{bottom:auto;top:0;height:40px;background:linear-gradient(to bottom,#111114 10%,rgba(17,17,20,0))}
+.sbk{display:flex;flex-direction:column;gap:8px}.sbk .oft .tile{height:54px}
+.sbk .tile .ck{background:var(--verde);color:#000}.sbk .tile[aria-pressed=false]{border-color:#2A2A2F}
+.sbk .lgd{display:flex;align-items:center;gap:8px;margin:0 0 0 20px;font-size:12.5px;color:var(--dim)}.sbk .lgd i{width:14px;height:14px;border-radius:50%;background:var(--verde);color:#000;font-style:normal;font-size:9px;font-weight:900;display:grid;place-items:center}
 .pal{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 0 20px}.pal button,.pal label{width:26px;height:26px;border-radius:50%;border:0;padding:0;cursor:pointer;position:relative;display:block;flex:none}
 .tile{height:58px;border-radius:20px;border:1.5px solid #3A3A40;background:var(--btn);display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;transition:border-color .25s,background .25s;padding:0}
 .tile:hover{border-color:#4A4A52}.tile[aria-pressed=true]{border-color:var(--ac)}
@@ -552,9 +561,9 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
       + '<div class="body"><section class="T" aria-live="polite"><div class="row"><span class="num" id="num">1</span><span class="cap note" id="note"></span></div><h1 id="h"></h1></section><section class="U"><div class="desc"><span class="cap" id="tag"></span><p id="sb"></p></div><div class="ctl">'
       + '<div class="step" data-s="0"><label class="lab" for="nm">Nome</label><div class="fld"><input id="nm" type="text" placeholder="Como te chamamos?" autocomplete="given-name"></div><p class="hint">Você muda isso depois, em Minha Conta.</p></div>'
       + '<div class="step" data-s="1"><label class="lab" for="nl">Seu nome completo, como no banco</label><div class="fld"><input id="nl" type="text" placeholder="Ex.: João da Silva" autocomplete="name"></div><label class="lab" for="nj" style="margin-top:8px">Nome da sua empresa (PJ), se tiver</label><div class="fld"><input id="nj" type="text" placeholder="Ex.: Silva Serviços LTDA" autocomplete="organization"></div><p class="hint">Pode deixar em branco. Dá pra adicionar mais nomes depois, em Minha Conta.</p></div><div class="step" data-s="2"><div class="lab" style="margin-bottom:6px">Toque nos bancos em que você tem conta ou cartão</div><div class="grid4" id="tiles"></div><div id="outroRow"></div><p class="hint" id="tcount"></p></div><div class="step" id="bkf" data-s="2b"></div><div class="step ofw" id="ofp" data-s="2c"></div><div class="step" data-s="3" role="radiogroup" aria-label="Como começar"><button class="opt" role="radio" aria-checked="false" data-v="import"><span class="n">A</span><span><b>Importar extrato</b><small>CSV, OFX ou PDF do seu banco ou cartão.</small></span><span class="rd"></span></button><button class="opt" role="radio" aria-checked="false" data-v="manual"><span class="n">B</span><span><b>Lançar manualmente</b><small>Começa do zero e você vai adicionando.</small></span><span class="rd"></span></button><button class="opt" role="radio" aria-checked="false" data-v="demo"><span class="n">C</span><span><b>Explorar com dados demo</b><small>Veja tudo funcionando antes de usar os seus.</small></span><span class="rd"></span></button></div>'
-      + '<div class="step" data-s="4"><label class="lab" for="rd">Renda mensal</label><div class="fld"><span class="pre">R$</span><input id="rd" inputmode="numeric" placeholder="0,00"><span class="suf cap">por mês</span></div><p class="hint">Pode deixar em branco. O fechamento de cada cartão vem do banco ou do que você preencheu.</p></div>'
-      + '<div class="step" data-s="5"><div class="sum" id="sum"></div></div></div>'
-      + '<div class="cfade" id="cfade" aria-hidden="true"></div><div class="acts"><div class="lt"><button class="back" type="button" id="bk" disabled>← Voltar</button><span class="cap" id="fn"></span></div><button class="go" type="button" id="nx"><span class="t">Continuar</span><span class="ar" aria-hidden="true">' + ARROW('#fff', 2.4) + '</span></button></div></section></div></div></main>');
+      + '<div class="step" data-s="4"><label class="lab" for="rd">Renda mensal</label><div class="fld big"><span class="pre">R$</span><input id="rd" inputmode="numeric" placeholder="0,00" autocomplete="off"></div><span class="cap bigs">por mês</span><p class="hint">Pode deixar em branco. O fechamento de cada cartão vem do banco ou do que você preencheu.</p></div>'
+      + '<div class="step" data-s="5"><div class="sbk" id="sbk"></div><div class="sum" id="sum"></div></div></div>'
+      + '<div class="cfade" id="cfade" aria-hidden="true"></div><div class="cfade tp" id="cfadeT" aria-hidden="true"></div><div class="acts"><div class="lt"><button class="back" type="button" id="bk" disabled>← Voltar</button><span class="cap" id="fn"></span></div><button class="go" type="button" id="nx"><span class="t">Continuar</span><span class="ar" aria-hidden="true">' + ARROW('#fff', 2.4) + '</span></button></div></section></div></div></main>');
     return new Promise(done => {
       const drawNotch = () => { const g = $('#bgs'), b = $('#board'); if (!g || !b) return; const W = b.offsetWidth, H = b.offsetHeight, Dp = 72, gp = 18, F = 18, R = 36, D2 = 84, R2 = 42, RW = $('#route').offsetWidth, N = RW + gp + F, x = W - N; $('#nx').style.width = RW + 'px';
         const d = 'M0 30A30 30 0 0 1 30 0H' + x + 'A' + F + ' ' + F + ' 0 0 1 ' + (x + F) + ' ' + F + 'V' + (Dp - R) + 'A' + R + ' ' + R + ' 0 0 0 ' + (x + F + R) + ' ' + Dp + 'H' + (W - F) + 'A' + F + ' ' + F + ' 0 0 1 ' + W + ' ' + (Dp + F) + 'V' + (H - D2 - F) + 'A' + F + ' ' + F + ' 0 0 1 ' + (W - F) + ' ' + (H - D2) + 'H' + (x + F + R2) + 'A' + R2 + ' ' + R2 + ' 0 0 0 ' + (x + F) + ' ' + (H - D2 + R2) + 'V' + (H - F) + 'A' + F + ' ' + F + ' 0 0 1 ' + x + ' ' + H + 'H30A30 30 0 0 1 0 ' + (H - 30) + 'Z';
@@ -609,13 +618,24 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
       const tilesOf = () => { const n = D.bancos.length, linhas = Math.ceil(n / 6), por = Math.ceil(n / linhas);   // até 6 numa linha; acima disso, linhas equilibradas e sempre de ponta a ponta
         return '<div class="oft">' + D.bancos.map(b => '<span class="tile" data-lg="' + esc(b) + '" aria-pressed="' + coberto(b) + '" style="flex:1 1 calc((100% - ' + (por - 1) * 8 + 'px) / ' + por + ')">' + (b === 'Outro' ? '<span class="nm">' + esc((dado(b).outro || 'Outro banco')) + '</span>' : '<span class="lgs"></span>') + '<span class="ck">✓</span></span>').join('') + '</div>'; };
       /* logo completo ou so o simbolo, conforme a largura real do tile (com muitos bancos por linha o completo fica espremido) */
-      const ajustaLogos = () => { const ts = $$('#ofp .oft .tile'); if (!ts.length || !KD2.logo || !KD2.logo.seletor) return; const w = ts[0].clientWidth; if (!w) return; const comp = w < 150, chave = comp ? 'c' : 'e';
+      const ajustaLogos = () => { ['#ofp', '#sbk'].forEach(q => ajustaEm(q)); };
+      const ajustaEm = q => { const ts = $$(q + ' .oft .tile'); if (!ts.length || !KD2.logo || !KD2.logo.seletor) return; const w = ts[0].clientWidth; if (!w) return; const comp = w < 150, chave = comp ? 'c' : 'e';
         ts.forEach(t => { const g = t.querySelector('.lgs'); if (!g || g.dataset.f === chave) return; g.dataset.f = chave; g.innerHTML = KD2.logo.seletor(t.dataset.lg, 20, comp ? Math.min(44, w - 24) : Math.min(96, w - 28), comp); }); };
-      new ResizeObserver(ajustaLogos).observe($('#ofp'));
+      new ResizeObserver(ajustaLogos).observe($('#ofp')); new ResizeObserver(() => { if (i === LAST) desenhaResumo(); }).observe($('#sbk'));
       /* logo na lista do que veio: o mesmo do seletor (Mercado Pago com o nome claro); o Itaú vai com o nome escrito, a pedra sozinha some na linha */
       const logoLista = b => { const L = KD2.logo; if (!L) return '';
         if (b === 'Itaú' && L.svg) { const sv = L.svg('Itaú', { forma: 'palavra', fundo: 'escuro', estilo: 'cor' }); if (sv) return '<span aria-hidden="true" style="width:76px;height:20px;flex:none;display:block;background:url(\'data:image/svg+xml,' + encodeURIComponent(sv) + '\') center/contain no-repeat"></span>'; }
         return L.seletor ? L.seletor(b, 18, 76) : logoDe(b, 18, 76); };
+      const bancosResumo = () => { const of = D.caminho === 'of' ? D.of.filter(x => x.on).map(bancoIt).filter(Boolean) : [], ordem = GRADE.concat(['Outro']);
+        const todos = [...new Set([...D.bancos, ...of])].sort((x, y) => (ordem.indexOf(x) + 1 || 99) - (ordem.indexOf(y) + 1 || 99));
+        return todos.map(b => ({ b, ok: of.includes(b) })); };
+      let resumoW = -1;
+      const desenhaResumo = () => { const e = $('#sbk'); if (!e) return; const L = bancosResumo(); if (!L.length) { e.innerHTML = ''; resumoW = -1; return; }
+        const W = e.clientWidth || 600; if (Math.abs(W - resumoW) < 4 && e.innerHTML) return ajustaLogos(); resumoW = W;
+        const cabe = Math.max(1, Math.min(8, Math.floor((W + 8) / (92 + 8)))), linhas = Math.ceil(L.length / cabe), por = Math.ceil(L.length / linhas);
+        e.innerHTML = '<div class="oft">' + L.map(x => '<span class="tile" data-lg="' + esc(x.b) + '" aria-pressed="' + x.ok + '" title="' + esc(x.b === 'Outro' ? (dado(x.b).outro || 'Outro banco') : x.b) + (x.ok ? ' · conectado' : ' · preenchido à mão') + '" style="flex:1 1 calc((100% - ' + (por - 1) * 8 + 'px) / ' + por + ')">' + (x.b === 'Outro' ? '<span class="nm">' + esc(dado(x.b).outro || 'Outro banco') + '</span>' : '<span class="lgs"></span>') + '<span class="ck">✓</span></span>').join('') + '</div>'
+          + (L.some(x => x.ok) ? '<div class="lgd"><i>✓</i>Conectado pelo Open Finance' + (L.some(x => !x.ok) ? '. Os outros você preencheu à mão.' : '') + '</div>' : '');
+        ajustaLogos(); };
       const msgOf = t => { ofErr = t || ''; const m = $('#ofm'); if (m) m.textContent = ofErr; };
       const desenhaOf = () => {
         const e = $('#ofp'); let h = '';
@@ -676,7 +696,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
           + '<div class="bkr"><div class="bkm" id="bkm"></div><button class="later" type="button" data-later="1" style="margin:0 20px 0 0;flex:none">Preencher depois</button></div>';
         const e = $('#bkf'); e.classList.remove('on'); void e.offsetWidth; e.classList.add('on');
       };
-      const fadeCtl = () => { const c = $('.ctl'), f = $('#cfade'); if (!c || !f) return; const rola = c.scrollHeight > c.clientHeight + 2, fim = c.scrollTop + c.clientHeight >= c.scrollHeight - 3; f.classList.toggle('on', rola && !fim); };
+      const fadeCtl = () => { const c = $('.ctl'), f = $('#cfade'), t = $('#cfadeT'); if (!c || !f) return; const rola = c.scrollHeight > c.clientHeight + 2, fim = c.scrollTop + c.clientHeight >= c.scrollHeight - 3; f.classList.toggle('on', rola && !fim); if (t) { t.style.top = c.offsetTop + 'px'; t.classList.toggle('on', rola && c.scrollTop > 2); } };
       $('.ctl').addEventListener('scroll', fadeCtl, { passive: true }); new ResizeObserver(fadeCtl).observe($('.ctl')); new MutationObserver(fadeCtl).observe($('#bkf'), { childList: true, subtree: true, attributes: true });
       const textoBanco = () => { const b = LB()[sub], n = LB().length, nome = b === 'Outro' ? (dado(b).outro || 'outro banco') : b; $('#sb').innerHTML = 'Dados do ' + esc(nome) + '. Tudo é opcional: dá pra deixar pra depois.'; $('#tag').textContent = 'Banco ' + (sub + 1) + ' de ' + n; $('#note').textContent = 'Cada banco vira uma conta'; ['#sb'].forEach(q => { const e = $(q); e.classList.remove('anim'); void e.offsetWidth; e.classList.add('anim'); }); };
       const validaBanco = () => {
@@ -703,6 +723,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
         $$('.step').forEach(e => e.classList.toggle('on', +e.dataset.s === i));
         $('.U').classList.toggle('bk', i === 2 && (sub >= 0 || !!ofx));
         if (i === 2) { if (sub < 0 && !ofx) desenhaGrade(); $('[data-s="2"]').classList.toggle('on', sub < 0 && !ofx); $('#bkf').classList.toggle('on', sub >= 0); $('#ofp').classList.toggle('on', sub < 0 && !!ofx); if (sub >= 0) textoBanco(); else if (ofx) { textoOf(); desenhaOf(); } } else $('#ofp').classList.remove('on');
+        if (i === LAST) { resumoW = -1; desenhaResumo(); }
         fadeCtl();
         $$('#route u').forEach((e, k) => e.classList.toggle('done', k < i));
         $$('#route b').forEach((e, k) => { e.classList.toggle('done', k < i); e.classList.toggle('cur', k === i);
