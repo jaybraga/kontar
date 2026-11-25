@@ -556,7 +556,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
       const COR_OUTRO = ['#6A4BFF', '#FF5A1F', '#00E08A', '#FFB800', '#FF3D8B', '#6AFF2A', '#B18CFF', '#FF5C5C', '#2CBFF8', '#F2F0EB'];
       const ICO = { corrente: '<path d="M3 21h18"/><path d="M5 21V10"/><path d="M19 21V10"/><path d="M9 21V10"/><path d="M15 21V10"/><path d="M12 3 3 8h18z"/>',
         poupanca: '<path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z"/><path d="M2 9v1c0 1.1.9 2 2 2h1"/><path d="M16 11h.01"/>',
-        investimento: '<path d="M4 20V14"/><path d="M10 20V9"/><path d="M16 20V5"/><path d="M2 20h20"/><path d="M22 20V12"/>',
+        investimento: '<path d="M5 20v-5"/><path d="M12 20v-9"/><path d="M19 20V5"/>',
         carteira: '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>' };
       const icone = k => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICO[k] + '</svg>';
       const TIPOS = [['corrente', 'CORRENTE', 'pagamento'], ['poupanca', 'POUPANÇA', 'reserva'], ['investimento', 'INVESTIMENTO', 'reserva'], ['carteira', 'CARTEIRA', 'pagamento']];
