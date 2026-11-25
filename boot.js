@@ -491,8 +491,10 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
 .tile[aria-pressed=true] .ck{opacity:1;transform:none}
 .tile .tx{font-size:11px;font-weight:800;letter-spacing:.1em;color:var(--mut)}
 .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.bkh{display:flex;align-items:center;gap:14px;margin:0 0 4px 4px}
-.bkh .lg{height:34px;display:flex;align-items:center}
+.bkh{display:flex;align-items:center;gap:14px;margin:0 0 2px 4px}
+.bkh .lg{height:28px;display:flex;align-items:center}
+#bkf{gap:8px}#bkf .fld{height:50px}#bkf .lab{margin-bottom:0}
+.bkr{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .pills{display:flex;gap:8px;flex-wrap:wrap}.pills button{height:40px;border-radius:99px;border:1.5px solid #3A3A40;background:transparent;padding:0 16px;font-size:12px;font-weight:800;letter-spacing:.08em;color:var(--mut);cursor:pointer;transition:all .25s}
 .pills button[aria-pressed=true]{background:#fff;color:#000;border-color:#fff}
 .sw{display:flex;align-items:center;gap:14px;padding:13px 18px;border-radius:24px;border:1px solid #2A2A2F;background:var(--btn);cursor:pointer;user-select:none}
@@ -566,7 +568,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
           + '<label class="lab">Saldo atual</label>' + f('saldo', '0,00', d.saldo, 'R$')
           + '<div class="sw" role="switch" tabindex="0" aria-checked="' + d.cred + '" data-sw="1"><i></i><b>Tem cartão de crédito</b></div>'
           + (d.cred ? '<div class="cr">' + f('final', 'Final ····', d.final) + f('limite', 'Limite R$', d.limite) + f('fecha', 'Fecha dia', d.fecha) + f('vence', 'Vence dia', d.vence) + '</div>' : '')
-          + '<div class="bkm" id="bkm"></div><button class="later" type="button" data-later="1">Preencher depois</button>';
+          + '<div class="bkr"><div class="bkm" id="bkm"></div><button class="later" type="button" data-later="1" style="margin:0 20px 0 0;flex:none">Preencher depois</button></div>';
         const e = $('#bkf'); e.classList.remove('on'); void e.offsetWidth; e.classList.add('on');
       };
       const textoBanco = () => { const b = D.bancos[sub], n = D.bancos.length, nome = b === 'Outro' ? (dado(b).outro || 'outro banco') : b; $('#sb').innerHTML = 'Dados do ' + esc(nome) + '. Tudo é opcional: dá pra deixar pra depois.'; $('#tag').textContent = 'Banco ' + (sub + 1) + ' de ' + n; $('#note').textContent = 'Cada banco vira uma conta'; ['#sb'].forEach(q => { const e = $(q); e.classList.remove('anim'); void e.offsetWidth; e.classList.add('anim'); }); };
