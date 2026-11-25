@@ -2966,8 +2966,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
 
   /* ---------- ações ---------- */
   const importar = () => { const b = document.querySelector('[data-kd-imp]'); if (b) b.click(); };
-  const addCartao = () => { if (KD.contas) KD.contas.novoCartao(); };
-  const addConta = () => { if (KD.contas) KD.contas.nova(); };
+  const addCartao = () => { if (KD.contas) KD.contas.adicionar({ kind: 'cartao' }); };
+  const addConta = () => { if (KD.contas) KD.contas.adicionar({ kind: 'conta' }); };
   const verCats = () => { try { localStorage.setItem('kd-vz-cat', '1'); } catch (e) {} KD.comp.goPage('categorias'); };
   const ACOES = { importar, cartao: addCartao, conta: addConta, cats: verCats, manual: () => { if (KD.tx) KD.tx.openNew(KD.comp); } };
 
@@ -3107,47 +3107,62 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   /* ---------- peças da página ---------- */
   const nodos = new Map();   // chave → elemento (reaproveitados entre passes)
   const mk = (key, build) => { let n = nodos.get(key); if (!n || !n.__ok) { n = build(); n.__ok = true; nodos.set(key, n); } return n; };
-  function cabecalho(a, primeiro) {
-    const n = mk('h:' + a.id, () => { const d = document.createElement('div'); d.setAttribute('data-ct-hdr', a.id); return d; });
-    const st = statusDe(a), sig = [a.nome, a.saldo, a.cor, a.inst, st && st[0], primeiro].join('|');
+  /* ícones (traço de 1,7, mesma família dos outros do app) */
+  const ico = (d, t) => '<svg width="' + (t || 26) + '" height="' + (t || 26) + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>';
+  const IC = {
+    conta: ico('<path d="M3 21h18"/><path d="M5 21V10"/><path d="M9.5 21V10"/><path d="M14.5 21V10"/><path d="M19 21V10"/><path d="M12 3 3 8.2V10h18V8.2Z"/>'),
+    cartao: ico('<rect x="2.5" y="5" width="19" height="14" rx="2.6"/><path d="M2.5 9.6h19"/><path d="M6.2 14.6h3.4"/><path d="M14.6 14.6h3.2"/>'),
+    conectar: ico('<path d="M9.5 15.5 7.8 17.2a3.4 3.4 0 0 1-4.8-4.8L6.2 9.2a3.4 3.4 0 0 1 4.8 0"/><path d="m14.5 8.5 1.7-1.7a3.4 3.4 0 0 1 4.8 4.8l-3.2 3.2a3.4 3.4 0 0 1-4.8 0"/><path d="m9.2 14.8 5.6-5.6"/>'),
+    manual: ico('<path d="M12 20h9"/><path d="M16.4 3.9a2.1 2.1 0 0 1 3 3L7.6 18.7 3 20l1.3-4.6Z"/>'),
+    voltar: ico('<path d="m15 18-6-6 6-6"/>', 16),
+    x: ico('<path d="M18 6 6 18"/><path d="m6 6 12 12"/>', 16),
+    mais: ico('<path d="M12 5v14"/><path d="M5 12h14"/>', 26),
+    lapis: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:3.4cqw;height:3.4cqw"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>',
+  };
+  const TIPO_NOME = { corrente: 'Conta corrente', poupanca: 'Poupança', investimento: 'Investimento', carteira: 'Carteira' };
+
+  /* tile da conta: mesmo molde do cartão (proporção de cartão real, marca do banco), no lugar do antigo cabeçalho */
+  function tile(a) {
+    const n = mk('t:' + a.id, () => { const d = document.createElement('div'); d.setAttribute('data-ct-tile', a.id); d.style.cssText = 'width:100%;aspect-ratio:1.586;container-type:inline-size;flex:none'; return d; });
+    const st = statusDe(a), nc = KD.M.cards.filter(c => c.acc === a.id).length, sig = [a.nome, a.saldo, a.cor, a.inst, a.bank, a.tipo, a.fin, st && st[0], nc].join('|');
     if (n.__sig !== sig) {
-      n.__sig = sig; n.style.cssText = 'display:flex;align-items:center;gap:12px;padding:0 6px;margin-bottom:-8px;' + (primeiro ? '' : 'margin-top:20px');
-      n.innerHTML = '<span style="display:flex;min-width:46px">' + logoDe(a.inst, a.nome, a.cor) + '</span><span style="font-size:18px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">' + esc(a.nome) + '</span>'
-        + (st ? '<span style="display:inline-flex;align-items:center;gap:7px;font-size:9.5px;font-weight:800;letter-spacing:.1em;padding:6px 11px;border-radius:99px;background:#1C1C20;white-space:nowrap;flex:none"><i style="width:8px;height:8px;border-radius:50%;background:' + st[1] + ';display:block"></i>' + st[0] + '</span>' : '')
-        + '<span style="margin-left:auto;font-size:13px;color:#B4B4BA;white-space:nowrap;flex:none">saldo <b style="color:' + FG + ';font-size:16px">' + esc(brl0(a.saldo)) + '</b></span>'
-        + '<span data-ct-ed="' + esc(a.id) + '" role="button" aria-label="Editar conta" title="Editar conta" style="width:30px;height:30px;border-radius:50%;border:1.5px solid #3A3A40;display:flex;align-items:center;justify-content:center;flex:none;cursor:pointer;color:#B4B4BA;transition:color .25s ease,border-color .25s ease" onmouseover="this.style.color=\'#F2F0EB\';this.style.borderColor=\'#55555C\'" onmouseout="this.style.color=\'#B4B4BA\';this.style.borderColor=\'#3A3A40\'"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg></span>';
+      n.__sig = sig;
+      const tm = KD.tema(a.cor, a.bank), lt = KD.logo.cartao && KD.logo.cartao(a.bank || a.inst || a.nome, tm.ink, [5, 1, 1, a.bank || a.nome]);
+      const logo = lt ? '<span title="' + esc(a.nome) + '" style="display:block;flex:none;height:' + lt.h + 'cqw;width:' + lt.w + 'cqw;' + (lt.mask ? 'background:currentColor;-webkit-mask:url(\'' + lt.url + '\') left center / contain no-repeat;mask:url(\'' + lt.url + '\') left center / contain no-repeat' : 'background:url(\'' + lt.url + '\') left center / contain no-repeat') + '"></span>' : '<span style="font-size:4.2cqw;font-weight:800;letter-spacing:-.04em;white-space:nowrap">' + esc(a.nome) + '</span>';
+      n.innerHTML = '<div style="position:relative;height:100%;box-sizing:border-box;border-radius:4.29cqw;background:' + a.cor + ';color:' + tm.ink + ';padding:4.29cqw 4.64cqw 3.93cqw 5.00cqw;display:flex;flex-direction:column">'
+        + '<div style="display:flex;align-items:center;gap:2.50cqw;height:7.86cqw">' + logo + '<span style="font-size:2.68cqw;font-weight:700;letter-spacing:-.01em;white-space:nowrap;opacity:.85">' + esc(TIPO_NOME[a.tipo] || 'Conta') + '</span><span style="flex:1"></span>'
+        + (a.fin ? '<span style="font-size:2.50cqw;font-weight:700;letter-spacing:.08em;white-space:nowrap;opacity:.7">···· ' + esc(a.fin) + '</span>' : '')
+        + '<span data-ct-ed="' + esc(a.id) + '" role="button" aria-label="Editar conta" title="Editar conta" style="width:7.14cqw;height:7.14cqw;flex:none;border-radius:9999px;border:1.5px solid currentColor;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .25s cubic-bezier(.2,.7,.2,1)" onmouseover="this.style.background=\'rgba(0,0,0,.14)\'" onmouseout="this.style.background=\'transparent\'">' + IC.lapis + '</span></div>'
+        + '<div style="flex:1;min-height:0;display:flex;align-items:flex-end;padding-bottom:3.57cqw"><div><div style="font-size:1.96cqw;font-weight:700;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap;opacity:.72">Saldo</div><div style="margin-top:1.43cqw;font-size:11.07cqw;font-weight:700;letter-spacing:-0.055em;line-height:.86;font-variant-numeric:tabular-nums;white-space:nowrap">R$ ' + esc(brl(a.saldo)) + '</div></div></div>'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;gap:2.14cqw;font-size:2.23cqw;font-weight:600;white-space:nowrap"><span style="display:inline-flex;align-items:center;gap:1.2cqw">' + (st ? '<i style="width:1.6cqw;height:1.6cqw;border-radius:50%;background:' + st[1] + ';display:block"></i>' + esc(st[0]) : '') + '</span><span style="opacity:.7;font-weight:500">' + (nc ? nc + (nc === 1 ? ' cartão de crédito' : ' cartões de crédito') : 'sem cartão de crédito') + '</span></div></div>';
     }
     return n;
   }
-  const slim = a => mk('s:' + a.id, () => { const d = document.createElement('div'); d.setAttribute('data-ct-add', a.id); d.style.cssText = 'border:1.5px dashed #3A3A40;border-radius:99px;padding:14px;text-align:center;color:#9A9AA3;font-size:11px;font-weight:800;letter-spacing:.12em;cursor:pointer;transition:color .25s ease,border-color .25s ease;flex:none'; d.textContent = '+ CARTÃO DE CRÉDITO NESTA CONTA'; d.onmouseenter = () => { d.style.color = FG; d.style.borderColor = '#55555C'; }; d.onmouseleave = () => { d.style.color = '#9A9AA3'; d.style.borderColor = '#3A3A40'; }; return d; });
-  const vazia = () => mk('vazia', () => {
-    const d = document.createElement('div'); d.setAttribute('data-ct-empty', '1'); d.style.cssText = 'border:1.5px dashed #34343A;border-radius:30px;min-height:340px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;color:#8A8A92;flex:none';
-    d.innerHTML = '<div style="width:56px;height:56px;border-radius:50%;border:1.5px solid #3A3A40;display:flex;align-items:center;justify-content:center;color:#9A9AA3;margin-bottom:14px"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><path d="M4 7.5V17a2 2 0 0 0 2 2h13a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1H6.5A2.5 2.5 0 0 1 4 7.5Z"/><circle cx="16.5" cy="13.5" r="1.2"/></svg></div>'
-      + '<div style="font-size:17px;font-weight:700;letter-spacing:-.02em;color:#D8D6D0">Nenhuma conta ainda</div><div style="font-size:12.5px;line-height:1.45;color:' + MU + ';margin-top:6px;max-width:300px">Cadastre uma conta para começar. O cartão de crédito é opcional e dá para adicionar depois.</div>'
-      + '<span data-ct-nova="1" style="display:inline-block;margin-top:16px;border:1.5px solid #55555C;border-radius:99px;padding:10px 18px;font-size:10.5px;font-weight:900;letter-spacing:.12em;color:' + FG + ';cursor:pointer">+ ADICIONAR CONTA</span>';
+  /* card vazio: sempre o último da lista; é por aqui que entra conta ou cartão */
+  const vazia = sem => mk('vazia', () => {
+    const d = document.createElement('div'); d.setAttribute('data-ct-empty', '1'); d.setAttribute('data-ct-nova', '1'); d.setAttribute('role', 'button'); d.style.cssText = 'width:100%;aspect-ratio:1.586;border:1.5px dashed #34343A;border-radius:4.29cqw;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;color:#8A8A92;flex:none;cursor:pointer;transition:color .3s ease,border-color .3s ease,background .3s ease';
+    d.onmouseenter = () => { d.style.color = FG; d.style.borderColor = '#6A6A72'; d.style.background = 'rgba(255,255,255,.025)'; }; d.onmouseleave = () => { d.style.color = '#8A8A92'; d.style.borderColor = '#34343A'; d.style.background = 'transparent'; };
+    d.innerHTML = '<span style="width:56px;height:56px;border-radius:50%;border:1.5px solid currentColor;display:flex;align-items:center;justify-content:center">' + IC.mais + '</span><span style="font-size:11px;font-weight:900;letter-spacing:.14em">ADICIONAR CONTA OU CARTÃO</span><span data-ct-sub style="font-size:12.5px;line-height:1.45;color:' + MU + ';max-width:300px"></span>';
     return d; });
 
   function coluna() { const sc = document.querySelector('[data-page-scroll="cartoes"]'); return sc && sc.querySelector('div[style*="clamp(520px"]'); }
   function organiza(col) {
     const M = KD.M; if (!M) return;
-    const wrap = {}; [...col.children].forEach(e => { if (e.hasAttribute('data-ct-hdr') || e.hasAttribute('data-ct-add') || e.hasAttribute('data-ct-empty') || e.hasAttribute('data-ct-arqs')) return; const p = e.querySelector('[data-ce-pen]'); if (p) wrap[p.getAttribute('data-ce-pen')] = e; else e.setAttribute('data-ct-hide', '1'); });
+    const wrap = {}; [...col.children].forEach(e => { if (e.hasAttribute('data-ct-tile') || e.hasAttribute('data-ct-empty') || e.hasAttribute('data-ct-arqs')) return; if (e.hasAttribute('data-ct-hdr') || e.hasAttribute('data-ct-add')) { e.remove(); return; } const p = e.querySelector('[data-ce-pen]'); if (p) wrap[p.getAttribute('data-ce-pen')] = e; else e.setAttribute('data-ct-hide', '1'); });
     const lista = [];
-    if (!M.accs.length && !M.cards.length) lista.push(vazia());
-    else {
-      const ids = new Set(M.accs.map(a => a.id));
-      M.accs.forEach((a, i) => { lista.push(cabecalho(a, i === 0)); M.cards.filter(c => c.acc === a.id).forEach(c => { if (wrap[c.n]) lista.push(wrap[c.n]); }); lista.push(slim(a)); });
-      const orf = M.cards.filter(c => !ids.has(c.acc) && wrap[c.n]);
-      if (orf.length) { const h = mk('h:sem', () => { const d = document.createElement('div'); d.setAttribute('data-ct-hdr', 'sem'); d.style.cssText = 'padding:0 6px;margin:20px 0 -8px;font-size:11px;font-weight:800;letter-spacing:.14em;color:' + MU; d.textContent = 'CARTÕES SEM CONTA'; return d; }); lista.push(h); orf.forEach(c => lista.push(wrap[c.n])); }
-    }
+    const ids = new Set(M.accs.map(a => a.id));
+    M.accs.forEach(a => { lista.push(tile(a)); M.cards.filter(c => c.acc === a.id).forEach(c => { if (wrap[c.n]) lista.push(wrap[c.n]); }); });
+    M.cards.filter(c => !ids.has(c.acc) && wrap[c.n]).forEach(c => lista.push(wrap[c.n]));   // cartões sem conta ficam no fim do agrupamento, sem cabeçalho
+    const v = vazia(); const sub = v.querySelector('[data-ct-sub]'), txt = !M.accs.length && !M.cards.length ? 'Nenhuma conta ainda. Comece por aqui.' : ''; if (sub && sub.textContent !== txt) sub.textContent = txt; lista.push(v);
     let cur = col.firstElementChild, mexeu = false;
     lista.forEach(n => { if (cur === n) cur = cur.nextElementSibling; else { col.insertBefore(n, cur); mexeu = true; } });
-    [...col.children].forEach(e => { if (!lista.includes(e) && (e.hasAttribute('data-ct-hdr') || e.hasAttribute('data-ct-add') || e.hasAttribute('data-ct-empty'))) e.remove(); });   // grupos que não existem mais
-    if (mexeu) lista.forEach(n => { if (!n.__vis && n.animate && (n.hasAttribute('data-ct-hdr') || n.hasAttribute('data-ct-add') || n.hasAttribute('data-ct-empty'))) { n.__vis = 1; n.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 450, easing: EE }); } });
+    [...col.children].forEach(e => { if (!lista.includes(e) && (e.hasAttribute('data-ct-tile') || e.hasAttribute('data-ct-hdr') || e.hasAttribute('data-ct-add') || e.hasAttribute('data-ct-empty'))) e.remove(); });   // contas que não existem mais
+    if (mexeu) lista.forEach(n => { if (!n.__vis && n.animate && (n.hasAttribute('data-ct-tile') || n.hasAttribute('data-ct-empty'))) { n.__vis = 1; n.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 450, easing: EE }); } });
   }
   function esquerda() {
     const h = document.querySelector('[data-kd-hist]'); if (!h || h.parentElement.querySelector('[data-ct-nova-wrap]')) return;
     const w = document.createElement('div'); w.setAttribute('data-ct-nova-wrap', '1'); w.style.cssText = 'margin-top:12px;align-self:flex-start';
-    w.innerHTML = '<span data-ct-nova="1" style="display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 16px;border:1.5px dashed #3A3A40;border-radius:99px;font-size:11px;font-weight:800;letter-spacing:.1em;color:#9A9AA3;cursor:pointer;white-space:nowrap;transition:color .25s ease,border-color .25s ease" onmouseover="this.style.color=\'#F2F0EB\';this.style.borderColor=\'#55555C\'" onmouseout="this.style.color=\'#9A9AA3\';this.style.borderColor=\'#3A3A40\'">+ ADICIONAR CONTA</span>';
+    w.innerHTML = '<span data-ct-nova="1" style="display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 16px;border:1.5px dashed #3A3A40;border-radius:99px;font-size:11px;font-weight:800;letter-spacing:.1em;color:#9A9AA3;cursor:pointer;white-space:nowrap;transition:color .25s ease,border-color .25s ease" onmouseover="this.style.color=\'#F2F0EB\';this.style.borderColor=\'#55555C\'" onmouseout="this.style.color=\'#9A9AA3\';this.style.borderColor=\'#3A3A40\'">+ CONTA OU CARTÃO</span>';
     h.after(w);
   }
   function css() {
@@ -3304,20 +3319,87 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (n !== col.lastElementChild) col.appendChild(n);
   }
 
+  /* ---------- fluxo de adicionar (card vazio): conta ou cartão → como → (conta do cartão) ---------- */
+  let FL = null, fl = null;   // fl = overlay; FL = estado
+  const flagOF = () => !!(KD.fontes && KD.fontes.ofAtivo && KD.fontes.ofAtivo());
+  const flOpcao = (k, icone, titulo, sub, tag, off) => '<div data-fl-o="' + esc(k) + '" style="flex:1;min-height:92px;display:flex;align-items:center;gap:22px;padding:0 48px;border-top:1px solid #2A2A2F;cursor:' + (off ? 'default' : 'pointer') + ';opacity:' + (off ? .45 : 1) + ';transition:background .3s ease"' + (off ? '' : ' onmouseover="this.style.background=\'#1C1C20\'" onmouseout="this.style.background=\'transparent\'"') + '>'
+    + '<span style="width:60px;height:60px;border-radius:50%;border:1.5px solid #3A3A40;display:flex;align-items:center;justify-content:center;flex:none;overflow:hidden">' + icone + '</span>'
+    + '<span style="min-width:0;text-align:left"><b style="display:block;font-size:22px;letter-spacing:-.03em;font-weight:700">' + esc(titulo) + '</b><span style="display:block;font-size:13.5px;color:' + MU + ';margin-top:3px;line-height:1.35">' + esc(sub) + '</span></span>'
+    + (tag ? '<span style="margin-left:auto;font-size:10px;font-weight:900;letter-spacing:.12em;border:1px solid ' + (off ? '#3A3A40' : AMB) + ';color:' + (off ? '#9A9AA3' : AMB) + ';border-radius:99px;padding:6px 10px;white-space:nowrap">' + tag + '</span>' : '') + '</div>';
+  function flConteudo() {
+    const M = KD.M, f = FL; let texto = '', ops = '';
+    if (f.step === 'tipo') {
+      texto = 'Escolha o que adicionar. O cartão de crédito fica sempre ligado a uma conta.';
+      ops = flOpcao('conta', IC.conta, 'Conta', 'Corrente, poupança, investimento ou carteira') + flOpcao('cartao', IC.cartao, 'Cartão de crédito', 'Fica ligado a uma conta sua');
+    } else if (f.step === 'conta') {
+      texto = 'A fatura do cartão sai da conta que você escolher.';
+      ops = M.accs.map(a => '<div data-fl-o="acc:' + esc(a.id) + '" style="flex:1;min-height:92px;display:flex;align-items:center;gap:22px;padding:0 48px;border-top:1px solid #2A2A2F;cursor:pointer;transition:background .3s ease" onmouseover="this.style.background=\'#1C1C20\'" onmouseout="this.style.background=\'transparent\'"><span style="width:60px;display:flex;justify-content:center;flex:none">' + logoDe(a.inst, a.nome, a.cor) + '</span><span style="min-width:0;text-align:left"><b style="display:block;font-size:22px;letter-spacing:-.03em;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(a.nome) + '</b><span style="display:block;font-size:13.5px;color:' + MU + ';margin-top:3px">' + (M.cards.filter(c => c.acc === a.id).length || 'nenhum') + ' cartão(ões) de crédito</span></span></div>').join('');
+    } else {
+      const cartao = f.kind === 'cartao', ac = f.accId && M.accById[f.accId];
+      texto = cartao ? 'Em ' + (ac ? ac.nome : 'sua conta') + '. Conectando ao banco, o cartão vem com o limite e a fatura.' : 'Conectando ao banco, a conta e o cartão de crédito (se tiver) vêm sozinhos e o extrato se atualiza todo dia.';
+      const of = flagOF();
+      ops = flOpcao('conectar', IC.conectar, 'Conectar ao banco', 'Open Finance · você autoriza no app do banco', of ? 'RECOMENDADO' : 'EM BREVE', !of) + flOpcao('manual', IC.manual, 'Preencher manualmente', 'Escolha o banco e importe o extrato de vez em quando');
+    }
+    return { texto, ops };
+  }
+  function flDesenha(anima) {
+    const c = fl.querySelector('[data-fl-card]'), { texto, ops } = flConteudo(), pode = FL.pilha.length > 0;
+    const pill = 'height:38px;border-radius:99px;border:1.5px solid #3A3A40;display:flex;align-items:center;justify-content:center;gap:6px;color:#B4B4BA;cursor:pointer;flex:none;transition:color .25s ease,border-color .25s ease';
+    c.innerHTML = '<div style="display:flex;align-items:center;gap:16px;padding:20px 22px;min-height:78px">'
+      + '<span data-fl-v style="' + pill + ';padding:0 16px 0 11px;font-size:12px;font-weight:700;visibility:' + (pode ? 'visible' : 'hidden') + '" onmouseover="this.style.color=\'#F2F0EB\';this.style.borderColor=\'#55555C\'" onmouseout="this.style.color=\'#B4B4BA\';this.style.borderColor=\'#3A3A40\'">' + IC.voltar + 'Voltar</span>'
+      + '<span style="flex:1;text-align:center;font-size:13.5px;line-height:1.45;color:' + MU + ';text-wrap:balance">' + esc(texto) + '</span>'
+      + '<span data-fl-x role="button" aria-label="Fechar" style="' + pill + ';width:38px" onmouseover="this.style.color=\'#F2F0EB\';this.style.borderColor=\'#55555C\'" onmouseout="this.style.color=\'#B4B4BA\';this.style.borderColor=\'#3A3A40\'">' + IC.x + '</span></div>'
+      + '<div data-fl-body style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto">' + ops + '</div>';
+    const b = c.querySelector('[data-fl-body]'); if (anima && b.animate) b.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: EE });
+  }
+  function flVai(step, extra) { if (!FL) return; const c = fl.querySelector('[data-fl-body]'); FL.pilha.push({ step: FL.step, kind: FL.kind, accId: FL.accId }); const go = () => { Object.assign(FL, { step }, extra || {}); flDesenha(true); }; if (c && c.animate) { c.style.transition = 'opacity .16s ease'; c.style.opacity = '0'; setTimeout(go, 160); } else go(); }
+  function flVolta() { if (!FL || !FL.pilha.length) return; const c = fl.querySelector('[data-fl-body]'), ant = FL.pilha.pop(); const go = () => { Object.assign(FL, ant); flDesenha(true); }; if (c && c.animate) { c.style.transition = 'opacity .16s ease'; c.style.opacity = '0'; setTimeout(go, 160); } else go(); }
+  function flFecha(depois) { if (!fl) { if (depois) depois(); return; } const l = fl; fl = null; FL = null; l.style.opacity = '0'; l.firstElementChild.style.transform = 'translateY(10px)'; setTimeout(() => { l.remove(); if (depois) depois(); }, 320); }
+  function flEscolhe(k) {
+    const f = FL, M = KD.M;
+    if (f.step === 'tipo') {
+      if (k === 'conta') return flVai('como', { kind: 'conta' });
+      if (!M.accs.length) return flFecha(() => CT.nova({ credito: true }));   // cartão precisa de conta: cria a conta primeiro, já com o cartão
+      return M.accs.length === 1 ? flVai('como', { kind: 'cartao', accId: M.accs[0].id }) : flVai('conta', { kind: 'cartao' });
+    }
+    if (f.step === 'conta') return flVai('como', { accId: k.slice(4) });
+    if (k === 'conectar') { if (!flagOF()) return; const ini = { kind: f.kind, accId: f.accId }; return flFecha(() => { if (CT.conectar) CT.conectar(ini); }); }
+    const kind = f.kind, accId = f.accId; flFecha(() => { if (kind === 'cartao') CT.novoCartaoForm(accId); else CT.nova(); });
+  }
+  CT.adicionar = ini => {
+    if (fl || layer) return; ini = ini || {};
+    FL = { step: 'tipo', kind: ini.kind || null, accId: null, pilha: [] };
+    fl = document.createElement('div'); fl.setAttribute('data-fl-modal', '1');
+    fl.style.cssText = 'position:fixed;inset:0;z-index:99985;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;overflow:auto;opacity:0;transition:opacity .3s ease;font-family:Helvetica,Arial,sans-serif;color:' + FG;
+    fl.innerHTML = '<div data-fl-card style="width:min(780px,calc(100% - 48px));height:min(560px,calc(100vh - 64px));margin:32px 0;border-radius:30px;background:#141416;border:1px solid #2A2A2F;overflow:hidden;display:flex;flex-direction:column;transform:translateY(10px);transition:transform .45s ' + EE + '"></div>';
+    document.body.appendChild(fl);
+    const M = KD.M;   // atalhos: "só conta" ou "só cartão" vindos de outros lugares pulam a primeira pergunta
+    if (ini.kind === 'conta') FL.step = 'como';
+    else if (ini.kind === 'cartao') { if (M.accs.length === 1 || ini.accId) { FL.step = 'como'; FL.accId = ini.accId || M.accs[0].id; } else if (M.accs.length > 1) FL.step = 'conta'; else { fl.remove(); fl = null; FL = null; return CT.nova({ credito: true }); } }
+    flDesenha(false);
+    fl.addEventListener('mousedown', e => { if (e.target === fl) flFecha(); });
+    fl.addEventListener('click', e => {
+      const o = e.target.closest('[data-fl-o],[data-fl-v],[data-fl-x]'); if (!o || !FL) return;
+      if (o.hasAttribute('data-fl-x')) flFecha(); else if (o.hasAttribute('data-fl-v')) flVolta(); else flEscolhe(o.getAttribute('data-fl-o'));
+    });
+    requestAnimationFrame(() => { fl.style.opacity = '1'; fl.firstElementChild.style.transform = 'none'; });
+  };
+
   /* ---------- pontos de entrada ---------- */
   CT.nova = est => abre(Object.assign({ mode: 'conta' }, est || {}));
-  CT.novoCartao = accId => {
+  CT.novoCartaoForm = accId => {
     const M = KD.M, a = accId ? M.accById[accId] : (M.accs.length === 1 ? M.accs[0] : null);
-    if (!a) { if (!M.accs.length) return CT.nova({ credito: true }); KD.comp.goPage('cartoes'); return; }
+    if (!a) return CT.nova({ credito: true });
     const k = a.bank && TODOS.includes(a.bank) ? a.bank : (KD.logo.chave(a.inst) || KD.logo.chave(a.nome));
     abre({ mode: 'cartao', accId: a.id, contaNome: a.nome, banco: k && TODOS.includes(k) ? k : (a.inst ? 'Outro' : null), outro: k && TODOS.includes(k) ? '' : a.inst, cor: a.cor || CORES[0] });
   };
+  CT.novoCartao = accId => { if (accId) CT.novoCartaoForm(accId); else CT.adicionar({ kind: 'cartao' }); };
   document.addEventListener('click', e => {
-    const n = e.target.closest && e.target.closest('[data-ct-nova]'); if (n) { e.stopPropagation(); CT.nova(); return; }
+    const n = e.target.closest && e.target.closest('[data-ct-nova]'); if (n) { e.stopPropagation(); CT.adicionar(); return; }
     const a = e.target.closest && e.target.closest('[data-ct-add]'); if (a) { e.stopPropagation(); CT.novoCartao(a.getAttribute('data-ct-add')); return; }
     const ed = e.target.closest && e.target.closest('[data-ct-ed]'); if (ed) { e.stopPropagation(); CT.editar(ed.getAttribute('data-ct-ed')); return; }
     const ua = e.target.closest && e.target.closest('[data-ct-unarq]'); if (ua) { e.stopPropagation(); const p = ua.getAttribute('data-ct-unarq').split(':'); desarquiva(p[0], p[1]); return; }
     const at = e.target.closest && e.target.closest('[data-ct-arqt]'); if (at) { e.stopPropagation(); arqAberto = !arqAberto; passe(); }
   }, true);
-  window.addEventListener('keydown', e => { if (e.key === 'Escape' && layer && !(S && S.busy)) fecha(); });
+  window.addEventListener('keydown', e => { if (e.key === 'Escape') { if (fl) flFecha(); else if (layer && !(S && S.busy)) fecha(); } });
 })();
