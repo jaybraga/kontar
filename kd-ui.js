@@ -3339,7 +3339,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       texto = 'Faça isso no MeuPluggy e volte para esta aba. Nada é salvo no Kontar enquanto isso.';
       const passo = (n, t) => '<div style="display:flex;gap:16px;align-items:flex-start"><span style="width:30px;height:30px;border-radius:50%;border:1.5px solid #3A3A40;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex:none">' + n + '</span><span style="font-size:15px;line-height:1.5;padding-top:4px">' + t + '</span></div>';
       ops = '<div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:22px;padding:10px 56px;border-top:1px solid #2A2A2F">'
-        + passo(1, 'Abra o MeuPluggy (aberto em outra aba). Se a aba não abriu, <a href="https://meu.pluggy.ai" target="_blank" rel="noopener" style="color:' + FG + ';font-weight:700;text-decoration:underline;text-underline-offset:3px">clique aqui</a>.')
+        + passo(1, 'Abra a página de conexões do MeuPluggy (aberta em outra aba). Se a aba não abriu, <a href="https://meu.pluggy.ai/connections" target="_blank" rel="noopener" style="color:' + FG + ';font-weight:700;text-decoration:underline;text-underline-offset:3px">clique aqui</a>.')
         + passo(2, 'Entre com a sua conta e adicione o banco, autorizando o acesso (Open Finance) no app do banco.')
         + passo(3, 'Quando o banco aparecer ligado lá, volte para o Kontar e clique no botão abaixo.')
         + '<div style="display:flex;justify-content:flex-end;gap:12px;margin-top:6px"><span data-fl-o="mp:abrir" style="border:1.5px solid #3A3A40;border-radius:99px;font-size:12px;font-weight:900;letter-spacing:.1em;padding:15px 22px;cursor:pointer;white-space:nowrap">ABRIR O MEUPLUGGY</span><span data-fl-o="mp:pronto" style="background:' + FG + ';color:' + INK + ';border-radius:99px;font-size:12px;font-weight:900;letter-spacing:.1em;padding:15px 24px;cursor:pointer;white-space:nowrap">JÁ LIGUEI, CONTINUAR</span></div></div>';
@@ -3378,8 +3378,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (f.step === 'mp1' || f.step === 'mp2') {
       const ini = { kind: f.kind, accId: f.accId };
       if (k === 'mp:sim' || k === 'mp:pronto') return flFecha(() => { if (CT.conectar) CT.conectar(ini); });
-      if (k === 'mp:nao') { window.open('https://meu.pluggy.ai', '_blank', 'noopener'); return flVai('mp2'); }
-      if (k === 'mp:abrir') { window.open('https://meu.pluggy.ai', '_blank', 'noopener'); return; }
+      if (k === 'mp:nao') { window.open('https://meu.pluggy.ai/connections', '_blank', 'noopener'); return flVai('mp2'); }
+      if (k === 'mp:abrir') { window.open('https://meu.pluggy.ai/connections', '_blank', 'noopener'); return; }
     }
     if (k === 'conectar') { if (!flagOF()) return; return flVai('mp1'); }
     const kind = f.kind, accId = f.accId; flFecha(() => { if (kind === 'cartao') CT.novoCartaoForm(accId); else CT.nova(); });
@@ -3468,7 +3468,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   function fecha() { if (!L) return; const l = L; L = null; X = null; l.style.opacity = '0'; l.firstElementChild.style.transform = 'translateY(10px)'; setTimeout(() => l.remove(), 320); }
   const topo = texto => '<div style="display:flex;align-items:center;gap:16px;padding:20px 22px;min-height:78px"><span style="width:38px;flex:none"></span><span style="flex:1;text-align:center;font-size:13.5px;line-height:1.45;color:' + MU + ';text-wrap:balance">' + esc(texto) + '</span>'
     + '<span data-cx-x role="button" aria-label="Fechar" style="height:38px;width:38px;border-radius:99px;border:1.5px solid #3A3A40;display:flex;align-items:center;justify-content:center;color:#B4B4BA;cursor:pointer;flex:none;transition:color .25s ease,border-color .25s ease" onmouseover="this.style.color=\'#F2F0EB\';this.style.borderColor=\'#55555C\'" onmouseout="this.style.color=\'#B4B4BA\';this.style.borderColor=\'#3A3A40\'">' + IC.x + '</span></div>';
-  const LINK_MP = '<a href="https://meu.pluggy.ai" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px;font-size:12.5px;font-weight:700;color:' + FG + ';text-decoration:underline;text-underline-offset:3px">Meu banco não aparece: adicionar no MeuPluggy</a>';
+  const LINK_MP = '<a href="https://meu.pluggy.ai/connections" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px;font-size:12.5px;font-weight:700;color:' + FG + ';text-decoration:underline;text-underline-offset:3px">Meu banco não aparece: adicionar no MeuPluggy</a>';
   const centro = (t, sub, extra) => '<div style="flex:1;min-height:280px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px 48px;gap:8px"><b style="font-size:24px;letter-spacing:-.03em">' + esc(t) + '</b><span style="font-size:13.5px;color:' + MU + ';line-height:1.45;max-width:420px">' + esc(sub || '') + '</span>' + (extra || '') + '</div>';
   const sel = (k, valor, ops) => '<select data-cx-s="' + k + '" style="height:42px;border-radius:99px;border:1px solid #3A3A40;background:#0B0B0D;color:' + FG + ';font:inherit;font-size:13px;padding:0 14px;max-width:260px;outline:0;cursor:pointer">' + ops.map(o => '<option value="' + esc(o[0]) + '"' + (o[0] === valor ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('') + '</select>';
 
