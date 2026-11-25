@@ -159,6 +159,15 @@
     M.rowById = Object.fromEntries(M.rows.map(r => [r.id, r]));
     // regra única (igual às visões do banco): meio transferência, vínculo de transferência ou categoria Transferência
     const isTransf = (KD.isTransf = r => r.c === 'Transferência' || r.meio === 'transferencia' || !!r.xfer);
+    /* movimentação INTERNA: transferência entre as contas do próprio usuário (vínculo de transferência, ou Pix/transferência cujo nome é um dos "nomes nas transferências" do titular).
+       Não conta como gasto nem como ganho nos resumos do Extrato. Transferência para outra pessoa continua contando. */
+    const toksI = s => KD.norm(s).replace(/[^a-z0-9]+/g, ' ').split(' ').filter(w => w.length >= 3);
+    KD.isInterna = r => {
+      if (r.xfer) return true;
+      if (!(r.c === 'Transferência' || r.meio === 'transferencia' || r.meio === 'pix')) return false;
+      const nomes = (KD.M && KD.M.profile && KD.M.profile.nomes_titular) || []; if (!nomes.length) return false;
+      const T = new Set(toksI(r.e)); return nomes.some(n => { const N = toksI(n); return N.length && N.every(w => T.has(w)); });
+    };
 
     /* "Fora do comum": bem acima do habitual da categoria (§4.11, proposta).
        Mais de 3× a mediana dos 6 meses anteriores da mesma categoria, mínimo R$ 100,
