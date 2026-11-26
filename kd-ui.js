@@ -1653,7 +1653,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     e0.style.transitionDelay = '0s'; e0.style.opacity = '0'; e0.style.transform = 'translateY(10px)';
     setTimeout(() => {
       e0.remove(); const H = s0.host;
-      const novas = [H.animate([{ height: s0.h1 + 'px' }, { height: s0.h0 + 'px' }], { duration: 520, easing: EE, fill: 'forwards' })].concat(s0.kids.map(k => k.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 320, delay: 200, easing: 'ease', fill: 'forwards' })));
+      const novas = [H.animate([{ height: s0.h1 + 'px' }, { height: s0.h0 + 'px' }], { duration: 520, easing: EE, fill: 'forwards' })].concat(s0.kids.map(k => k.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 320, delay: 200, easing: 'ease', fill: 'both' })));
       velhas.forEach(a => a.cancel());
       novas[0].finished.then(() => setTimeout(() => novas.forEach(a => a.cancel()), 360)).catch(() => {});
     }, 260);
