@@ -505,7 +505,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
 .sbk{display:flex;flex-direction:column;gap:8px;margin-top:4px}.sbk .oft .tile{height:54px}
 .sbk .tile .ck{background:var(--verde);color:#000}.sbk .tile[aria-pressed=false]{border-color:#2A2A2F}
 .sbk .lgd{display:flex;align-items:center;gap:8px;margin:6px 0 10px 0;font-size:12.5px;color:var(--dim)}.sbk .lgd i{width:14px;height:14px;border-radius:50%;background:var(--verde);color:#000;font-style:normal;font-size:9px;font-weight:900;display:grid;place-items:center}
-.pal{display:flex;gap:8px;flex-wrap:nowrap;overflow:hidden;align-items:center;margin:0 0 0 20px}.pal button,.pal label{width:26px;height:26px;border-radius:50%;border:0;padding:0;cursor:pointer;position:relative;display:block;flex:none}
+.pal{display:flex;gap:8px;flex-wrap:nowrap;padding:4px;align-items:center;margin:-4px 0 -4px 16px}.pal button,.pal label{width:26px;height:26px;border-radius:50%;border:0;padding:0;cursor:pointer;position:relative;display:block;flex:none}
 .tile{height:58px;border-radius:20px;border:1.5px solid #3A3A40;background:var(--btn);display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;transition:border-color .25s,background .25s;padding:0}
 .tile:hover{border-color:#4A4A52}.tile[aria-pressed=true]{border-color:var(--ac)}
 .tile .ck{position:absolute;top:7px;right:8px;width:18px;height:18px;border-radius:50%;background:var(--ac);color:var(--on);font-size:11px;font-weight:900;display:grid;place-items:center;opacity:0;transform:scale(.6);transition:opacity .25s,transform .3s var(--E)}
