@@ -505,7 +505,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
 .sbk{display:flex;flex-direction:column;gap:8px;margin-top:4px}.sbk .oft .tile{height:54px}
 .sbk .tile .ck{background:var(--verde);color:#000}.sbk .tile[aria-pressed=false]{border-color:#2A2A2F}
 .sbk .lgd{display:flex;align-items:center;gap:8px;margin:6px 0 10px 0;font-size:12.5px;color:var(--dim)}.sbk .lgd i{width:14px;height:14px;border-radius:50%;background:var(--verde);color:#000;font-style:normal;font-size:9px;font-weight:900;display:grid;place-items:center}
-.pal{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 0 20px}.pal button,.pal label{width:26px;height:26px;border-radius:50%;border:0;padding:0;cursor:pointer;position:relative;display:block;flex:none}
+.pal{display:flex;gap:8px;flex-wrap:nowrap;overflow:hidden;align-items:center;margin:0 0 0 20px}.pal button,.pal label{width:26px;height:26px;border-radius:50%;border:0;padding:0;cursor:pointer;position:relative;display:block;flex:none}
 .tile{height:58px;border-radius:20px;border:1.5px solid #3A3A40;background:var(--btn);display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;transition:border-color .25s,background .25s;padding:0}
 .tile:hover{border-color:#4A4A52}.tile[aria-pressed=true]{border-color:var(--ac)}
 .tile .ck{position:absolute;top:7px;right:8px;width:18px;height:18px;border-radius:50%;background:var(--ac);color:var(--on);font-size:11px;font-weight:900;display:grid;place-items:center;opacity:0;transform:scale(.6);transition:opacity .25s,transform .3s var(--E)}
@@ -516,7 +516,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
 .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .bkh{display:flex;align-items:center;gap:14px;margin:0 0 2px 4px}
 .bkh .lg{height:28px;display:flex;align-items:center}
-#bkf{gap:8px}#bkf .fld{height:50px}#bkf .lab{margin-bottom:0}
+#bkf{gap:8px}#bkf .fld{height:50px}#bkf .lab{margin-bottom:0}.obr{display:flex;gap:10px;align-items:center}.obr .fld{flex:1;min-width:0}.icb{height:50px;flex:none;display:flex;align-items:center;gap:8px;padding:0 12px 0 11px;border-radius:9999px;border:1px solid #3A3A40;background:var(--btn);color:#9A9AA3;cursor:pointer;font:inherit;font-size:11px;font-weight:800;letter-spacing:.08em;transition:border-color .25s}.icb:hover{border-color:#6E6E78}.icb i{width:30px;height:30px;border-radius:50%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-style:normal}
 .bkr{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .pills{display:flex;gap:8px;flex-wrap:wrap}.pills button{height:40px;border-radius:99px;border:1.5px solid #3A3A40;background:transparent;padding:0 16px;font-size:12px;font-weight:800;letter-spacing:.08em;color:var(--mut);cursor:pointer;transition:all .25s}
 .pills button[aria-pressed=true]{background:#fff;color:#000;border-color:#fff}
@@ -588,6 +588,10 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
       const D = { nm: nameGuess || '', nl: '', nj: '', how: null, rd: '', dia: null, bancos: [], dados: {}, caminho: null, of: [] }; let i = 0; const LAST = ST.length - 1;
       /* ---- passo "Seus bancos": grade de logos → uma tela por banco; o passo vira anel de progresso na barra de cima ---- */
       const KD2 = window.KD, GRADE = ['Caixa', 'Nubank', 'Itaú', 'Bradesco', 'Banco do Brasil', 'Santander', 'Mercado Pago', 'PicPay', 'Inter', 'C6', 'PagBank', 'Neon', 'XP', 'Next', 'BV', 'Amazon'];   /* popularidade aproximada no Brasil */
+      // botão do ícone (conta "Outro"): mesmo seletor das categorias (KD.icPicker, src/cat-grade.js)
+      const icoBtn = d => { const lum = h => { const n = parseInt(String(h).slice(1), 16); return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255; };
+        const url = d.ico && window.KD && KD.icUri ? KD.icUri(d.ico, lum(d.cor) > .55 ? '#000000' : '#FFFFFF') : '';
+        return '<button type="button" class="icb" data-ic="1" aria-label="Escolher ícone" style="border-color:' + (url ? '#F2F0EB' : '#3A3A40') + '"><i style="' + (url ? 'background:' + d.cor : 'border:1.5px dashed #5E5E66') + '">' + (url ? '<span style="width:17px;height:17px;background:url(\'' + url + '\') center / contain no-repeat"></span>' : '+') + '</i>' + (url ? '' : 'ÍCONE') + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>'; };
       const COR_OUTRO = ['#6A4BFF', '#FF5A1F', '#00E08A', '#FFB800', '#FF3D8B', '#6AFF2A', '#B18CFF', '#FF5C5C', '#2CBFF8', '#F2F0EB'];
       const ICO = { corrente: '<path d="M3 21h18"/><path d="M5 21V10"/><path d="M19 21V10"/><path d="M9 21V10"/><path d="M15 21V10"/><path d="M12 3 3 8h18z"/>',
         poupanca: '<path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z"/><path d="M2 9v1c0 1.1.9 2 2 2h1"/><path d="M16 11h.01"/>',
@@ -674,7 +678,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
         else if (t.dataset.ofman) { D.caminho = 'manual'; ofx = null; ofErr = ''; sub = 0; entraAnel(); render(); desenhaBanco(); }
         else if (t.dataset.ofver) { ofx = 'achou'; ofErr = ''; render(); }
         else if (t.dataset.ofmais) conecta(); });
-      const dado = b => D.dados[b] || (D.dados[b] = { nome: '', tipo: 'corrente', saldo: '', cred: false, final: '', limite: '', fecha: '', vence: '', outro: '', cor: '#6A4BFF', pulou: false });
+      const dado = b => D.dados[b] || (D.dados[b] = { nome: '', tipo: 'corrente', saldo: '', cred: false, final: '', limite: '', fecha: '', vence: '', outro: '', ico: null, cor: '#6A4BFF', pulou: false });
       const nomePadrao = b => (b === 'Outro' ? (dado(b).outro || 'Outro banco').trim() : b) + ' Conta';
       const desenhaGrade = () => {
         $('#tiles').innerHTML = GRADE.map(b => '<button class="tile" type="button" data-b="' + esc(b) + '" aria-pressed="' + D.bancos.includes(b) + '" aria-label="' + esc(b) + '">' + (KD2.logo && KD2.logo.seletor ? KD2.logo.seletor(b, 20, 84) : logoDe(b, 20, 80)) + '<span class="ck">✓</span></button>').join('');
@@ -686,7 +690,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
         const b = LB()[sub], d = dado(b), n = LB().length;
         const f = (k, ph, v, pre) => '<div class="fld">' + (pre ? '<span class="pre">' + pre + '</span>' : '') + '<input data-k="' + k + '" value="' + esc(v) + '" placeholder="' + ph + '" inputmode="' + (/saldo|limite|final|fecha|vence/.test(k) ? 'numeric' : 'text') + '" autocomplete="off"></div>';
         $('#bkf').innerHTML = '<div class="bkh"><span class="lg">' + (b === 'Outro' ? '<span class="cap" style="color:#fff">Outro banco</span>' : logoDe(b, 26, 120)) + '</span><span class="cap" style="color:var(--mut)">Banco ' + (sub + 1) + ' de ' + n + '</span></div>'
-          + (b === 'Outro' ? '<label class="lab">Nome do banco</label>' + f('outro', 'Ex.: Banco Pan', d.outro) + '<label class="lab">Cor do banco</label><div class="pal" id="pal">' + COR_OUTRO.map(c => '<button type="button" data-cor="' + c + '" aria-label="Cor ' + c + '" style="background:' + c + ';box-shadow:' + (d.cor === c ? '0 0 0 2px #111114,0 0 0 4px #fff' : 'none') + '"></button>').join('')
+          + (b === 'Outro' ? '<label class="lab">Nome do banco</label><div class="obr">' + f('outro', 'Ex.: Banco Pan', d.outro) + icoBtn(d) + '</div><label class="lab">Cor do banco</label><div class="pal" id="pal">' + COR_OUTRO.map(c => '<button type="button" data-cor="' + c + '" aria-label="Cor ' + c + '" style="background:' + c + ';box-shadow:' + (d.cor === c ? '0 0 0 2px #111114,0 0 0 4px #fff' : 'none') + '"></button>').join('')
           + '<label title="Escolher outra cor" style="background:' + (COR_OUTRO.includes(d.cor) ? 'conic-gradient(#FF5C5C,#FFB800,#6AFF2A,#2CBFF8,#B18CFF,#FF3D8B,#FF5C5C)' : d.cor) + ';box-shadow:' + (COR_OUTRO.includes(d.cor) ? 'none' : '0 0 0 2px #111114,0 0 0 4px #fff') + '"><input type="color" data-cp="1" value="' + d.cor + '" aria-label="Escolher a cor do banco" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0"></label></div>' : '')
           + '<label class="lab">Nome da conta</label>' + f('nome', nomePadrao(b), d.nome)
           + '<div class="seg" role="radiogroup" aria-label="Tipo de conta"><i class="th" id="th" style="transform:translateX(' + TIPOS.findIndex(t => t[0] === d.tipo) * 100 + '%)"></i>' + TIPOS.map(t => '<button type="button" role="radio" data-tp="' + t[0] + '" aria-checked="' + (d.tipo === t[0]) + '">' + icone(t[0]) + '<span>' + t[1] + '</span></button>').join('') + '</div>'
@@ -756,7 +760,8 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
       $('#bkf').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset && e.target.dataset.k) { e.preventDefault(); $('#nx').click(); } else if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset && e.target.dataset.sw) { e.preventDefault(); e.target.click(); } });
       $('#bkf').addEventListener('input', e => { if (!(e.target.dataset && e.target.dataset.cp) || sub < 0) return; const d = dado(LB()[sub]); d.cor = e.target.value; const lb = e.target.parentElement; lb.style.background = d.cor; lb.style.boxShadow = '0 0 0 2px #111114,0 0 0 4px #fff'; $$('#pal button').forEach(x => { x.style.boxShadow = 'none'; }); });
       $('#bkf').addEventListener('change', e => { if (e.target.dataset && e.target.dataset.cp && sub >= 0) desenhaBanco(); });
-      $('#bkf').addEventListener('click', e => { const t = e.target.closest('[data-tp],[data-sw],[data-later],[data-cor]'); if (!t || busy || sub < 0) return; const d = dado(LB()[sub]);
+      $('#bkf').addEventListener('click', e => { const t = e.target.closest('[data-tp],[data-sw],[data-later],[data-cor],[data-ic]'); if (!t || busy || sub < 0) return; const d = dado(LB()[sub]);
+        if (t.dataset.ic) { if (window.KD && KD.icPicker) KD.icPicker.abre(t, { atual: d.ico, cor: d.cor, onPick: k => { d.ico = k; desenhaBanco(); } }); return; }
         if (t.dataset.cor) { d.cor = t.dataset.cor; desenhaBanco(); return; }
         if (t.dataset.tp) { d.tipo = t.dataset.tp; $$('#bkf [data-tp]').forEach(x => x.setAttribute('aria-checked', String(x === t))); const th = $('#th'); if (th) th.style.transform = 'translateX(' + TIPOS.findIndex(x => x[0] === d.tipo) * 100 + '%)'; }
         else if (t.dataset.sw) { d.cred = !d.cred; desenhaBanco(); } else if (t.dataset.later) avancaBanco(true); });
@@ -768,7 +773,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
           else if (ofx === 'mp') return conecta();
           else { if (LB().length) { ofx = null; sub = 0; entraAnel(); render(); desenhaBanco(); } else { ofx = null; i = proximo(); render(); } return; } }
         if (i < LAST) { i++; render(); } else { $('#nx .t').textContent = 'Abrindo…'; $('#nx').disabled = true; $('#bk').disabled = true;
-        done({ nm: D.nm.trim(), nomes: nomesBanco(), of: D.caminho === 'of' ? D.of.filter(x => x.on).map(x => ({ c: x.c, cx: x.cx, banco: bancoIt(x) })) : [], contas: LB().map(b => { const d = dado(b), p = d.pulou; return { banco: b, outro: (d.outro || '').trim(), cor: d.cor, nome: (p ? '' : d.nome).trim() || nomePadrao(b), tipo: p ? 'corrente' : d.tipo, saldo: p ? 0 : num(d.saldo), cred: !p && d.cred, final: d.final, limite: num(d.limite), fecha: +d.fecha || null, vence: +d.vence || null, pulou: p }; }), how: D.how, rd: D.rd ? parseInt(D.rd.replace(/\D/g, ''), 10) : null, dia: D.dia }); } };
+        done({ nm: D.nm.trim(), nomes: nomesBanco(), of: D.caminho === 'of' ? D.of.filter(x => x.on).map(x => ({ c: x.c, cx: x.cx, banco: bancoIt(x) })) : [], contas: LB().map(b => { const d = dado(b), p = d.pulou; return { banco: b, outro: (d.outro || '').trim(), ico: b === 'Outro' ? (d.ico || null) : null, cor: d.cor, nome: (p ? '' : d.nome).trim() || nomePadrao(b), tipo: p ? 'corrente' : d.tipo, saldo: p ? 0 : num(d.saldo), cred: !p && d.cred, final: d.final, limite: num(d.limite), fecha: +d.fecha || null, vence: +d.vence || null, pulou: p }; }), how: D.how, rd: D.rd ? parseInt(D.rd.replace(/\D/g, ''), 10) : null, dia: D.dia }); } };
       render(); drawNotch();
     });
   }
@@ -834,7 +839,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
     let ordC = 0;
     for (let k = 0; k < lista.length; k++) {
       const c = lista[k], inst = c.banco === 'Outro' ? (c.outro || 'Outro banco') : c.banco, br = c.banco === 'Outro' ? [c.cor || '#6A4BFF', ((h => { const n = parseInt(h.slice(1), 16); return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255 > 0.55 ? '#000000' : '#FFFFFF'; })(c.cor || '#6A4BFF'))] : (KD.BANK[c.banco] || ['#F2F0EB', '#000000']);
-      const r = await sb.from('accounts').insert({ user_id: user.id, nome: c.nome, instituicao: inst, tipo: c.tipo, funcao: TF[c.tipo] || 'pagamento', saldo: c.saldo || 0, saldo_em: hoje, cor: br[0], ordem: k + 1, ativo: true }).select().single();
+      const r = await sb.from('accounts').insert({ user_id: user.id, nome: c.nome, instituicao: inst, tipo: c.tipo, funcao: TF[c.tipo] || 'pagamento', saldo: c.saldo || 0, saldo_em: hoje, cor: br[0], ordem: k + 1, ativo: true, icone: c.ico || null }).select().single();
       if (r.error) { console.error('[kontar] onboarding conta', r.error); continue; }
       if (!c.cred) continue;
       const lim = c.limite || null, rc = await sb.from('cards').insert({ user_id: user.id, nome: inst, instituicao: inst, brand_hex: br[0], tinta: br[1], final4: c.final && c.final.length === 4 ? c.final : null, limite: lim, disponivel_informado: lim, limite_em: lim ? hoje : null, conta_pagamento_id: r.data.id, ordem: ++ordC, ativo: true }).select().single();

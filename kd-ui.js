@@ -118,15 +118,18 @@ window.KD_CATIC = {"keys": ["coffee", "cup-soda", "beer", "wine", "martini", "pi
   };
   Object.keys(EXTRA).forEach(k => { if (!CI.svg[k]) { CI.svg[k] = sv(EXTRA[k][1]); CI.labels[k] = EXTRA[k][0]; CI.keys.push(k); } });
 
+  const uri = (svg, cor) => 'data:image/svg+xml,' + encodeURIComponent(String(svg || '').replace(/currentColor|COLOR/g, cor).replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" '));
+  KD.icSvg = k => (KD._C && KD._C.CAT_IC && KD._C.CAT_IC[k]) || CI.svg[k] || '';   // ícones padrão das categorias (do protótipo) + os extras
+  KD.icUri = (k, cor) => uri(KD.icSvg(k), cor);
   KD.icGrade = function (q, atual, cor, pick, ICK, ICL) {
-    const C = KD._C, B = KD.icBusca; if (!C || !B) return [];
+    const B = KD.icBusca; if (!B) return [];
     const lb = Object.assign({}, CI.labels, ICL || {});
     let gs;
     if (!String(q || '').trim()) gs = B.grupos.map(g => ({ t: g.n, keys: g.ic.filter(k => ICK.includes(k)) }));
     else { const r = B.busca(q, ICK, lb); gs = [{ t: 'Resultados', keys: r.diretos }, { t: 'Relacionados', keys: r.relacionados }]; }
     return gs.filter(g => g.keys.length).map(g => ({ t: g.t, n: q ? String(g.keys.length) : '', it: g.keys.map(k => {
       const on = k === atual;
-      return { img: 'url("' + C.uri(C.CAT_IC[k], on ? cor : '#E4E4EA') + '")', lbl: lb[k] || k, bg: on ? '#26262B' : 'transparent', bd: on ? '#FFFFFF' : 'transparent', on: on ? '1' : '0', pick: () => pick(k) };
+      return { img: 'url("' + uri(KD.icSvg(k), on ? cor : '#E4E4EA') + '")', lbl: lb[k] || k, bg: on ? '#26262B' : 'transparent', bd: on ? '#FFFFFF' : 'transparent', on: on ? '1' : '0', pick: () => pick(k) };
     }) }));
   };
 
@@ -140,6 +143,52 @@ window.KD_CATIC = {"keys": ["coffee", "cup-soda", "beer", "wine", "martini", "pi
   const ajeita = m => { const r = m.getBoundingClientRect(); if (r.bottom > window.innerHeight - 8 && r.top - r.height - 60 > 70) { m.style.top = 'auto'; m.style.bottom = '52px'; } };
   const liga = () => new MutationObserver(ms => ms.forEach(x => x.addedNodes.forEach(n => { if (n.nodeType !== 1) return; (n.matches('[data-ic-grade]') ? [n] : [...n.querySelectorAll('[data-ic-grade]')]).forEach(ajeita); }))).observe(document.body, { childList: true, subtree: true });
   if (document.body) liga(); else document.addEventListener('DOMContentLoaded', liga);
+})();
+
+/* Kontar · seletor de ícone avulso (contas sem banco: painel de conta e onboarding). Mesma grade e busca das categorias,
+   num popover próprio preso ao botão que abriu. KD.icPicker.abre(botao, { atual, cor, onPick(chave) }) */
+(function () {
+  'use strict';
+  const KD = window.KD, CI = window.KD_CATIC;
+  const BASE = ['Alimentação', 'Mercado', 'Casa', 'Transporte', 'Assinaturas', 'Lazer', 'Saúde', 'Trabalho', 'Família', 'Outros'];
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  let pop = null, ctx = null;
+  const fecha = () => { if (!pop) return; const p = pop; pop = null; ctx = null; p.style.opacity = '0'; p.style.translate = '0 -6px'; setTimeout(() => p.remove(), 200); };
+  function grade(q) {
+    const ick = BASE.filter(k => KD.icSvg(k)).concat(CI.keys), icl = Object.assign({}, CI.labels);
+    const gs = KD.icGrade(q, ctx.atual, ctx.cor, k => { const f = ctx.onPick; fecha(); f && f(k); }, ick, icl);
+    ctx.picks = []; let h = '';
+    gs.forEach(g => {
+      h += '<div style="display:flex;gap:8px;margin:14px 6px 8px;font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#6E6E78">' + esc(g.t) + '<span style="color:#4A4A52;letter-spacing:.06em">' + esc(g.n) + '</span></div><div style="display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px">';
+      g.it.forEach(o => { ctx.picks.push(o.pick); h += '<span data-ic-cell="1" data-ip="' + (ctx.picks.length - 1) + '" data-tip="' + esc(o.lbl) + '" style="position:relative;aspect-ratio:1;border-radius:12px;display:flex;align-items:center;justify-content:center;background:' + o.bg + ';box-shadow:inset 0 0 0 1.5px ' + o.bd + ';cursor:pointer;transition:background .2s ease" onmouseover="if(this.style.background===\'transparent\')this.style.background=\'#26262B\'" onmouseout="if(this.dataset.on!==\'1\')this.style.background=\'' + o.bg + '\'" data-on="' + o.on + '"><span style="width:20px;height:20px;background-image:' + o.img + ';background-repeat:no-repeat;background-position:center;background-size:20px"></span></span>'; });
+      h += '</div>';
+    });
+    return h || '<div style="padding:26px 8px 14px;color:#8A8A93;font-size:13px;text-align:center">Nenhum ícone pra essa busca.</div>';
+  }
+  function posiciona(btn) {
+    const r = btn.getBoundingClientRect(), W = 432, H = Math.min(440, window.innerHeight - 24);
+    let left = Math.min(window.innerWidth - W - 12, Math.max(12, r.right - W)), top = r.bottom + 8;
+    if (top + H > window.innerHeight - 12 && r.top - H - 8 > 12) top = r.top - H - 8;
+    Object.assign(pop.style, { left: left + 'px', top: Math.max(12, Math.min(top, window.innerHeight - H - 12)) + 'px', maxHeight: H + 'px' });
+  }
+  KD.icPicker = {
+    abre(btn, o) {
+      if (pop) { const mesmo = ctx && ctx.btn === btn; fecha(); if (mesmo) return; }
+      ctx = Object.assign({ btn, atual: null, cor: '#FFFFFF' }, o || {});
+      pop = document.createElement('div'); pop.setAttribute('data-ic-grade', '1'); pop.className = 'kscroll';
+      pop.style.cssText = 'position:fixed;z-index:2147483000;width:432px;overflow-y:auto;overscroll-behavior:contain;box-sizing:border-box;padding:0 10px 12px;border-radius:20px;background:#141417;border:1px solid #2A2A2F;box-shadow:0 24px 48px rgba(0,0,0,.6);font-family:Helvetica,Arial,sans-serif;color:#fff;transition:opacity .2s ease,translate .2s ease';
+      pop.innerHTML = '<div style="position:sticky;top:0;z-index:3;background:#141417;padding:10px 0 2px"><label style="height:40px;display:flex;align-items:center;gap:10px;padding:0 16px;border-radius:9999px;border:1px solid #3A3A40;color:#8A8A93;box-sizing:border-box"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none;display:block"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg><input data-ip-q="1" placeholder="Buscar ícone (português ou inglês)" style="flex:1;min-width:0;border:0;outline:0;background:transparent;color:#fff;font:inherit;font-size:13.5px;padding:0"></label></div><div data-ip-g="1">' + grade('') + '</div>';
+      document.body.appendChild(pop); posiciona(btn);
+      const q = pop.querySelector('[data-ip-q]'); setTimeout(() => q && q.focus(), 60);
+      q.addEventListener('input', () => { pop.querySelector('[data-ip-g]').innerHTML = grade(q.value); });
+      pop.addEventListener('click', e => { const c = e.target.closest('[data-ip]'); if (c && ctx) ctx.picks[+c.getAttribute('data-ip')](); });
+      pop.addEventListener('mousedown', e => e.stopPropagation());
+    },
+    fecha, aberto: () => !!pop
+  };
+  document.addEventListener('mousedown', e => { if (pop && !pop.contains(e.target) && !(ctx && ctx.btn.contains(e.target))) fecha(); }, true);
+  document.addEventListener('keydown', e => { if (pop && e.key === 'Escape') { e.stopPropagation(); fecha(); } }, true);
+  window.addEventListener('resize', () => { if (pop && ctx) posiciona(ctx.btn); });
 })();
 
 /* Kontar · renomear categoria (26/11/2026). O app inteiro usa o nome como chave, então renomear grava no banco
@@ -2040,8 +2089,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const claro = h => { const m = /^#?([0-9a-f]{6})$/i.exec(String(h || '').trim()); if (!m) return false; const n = parseInt(m[1], 16); return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255 > 0.55; };
   /* banco sem arte própria: nome em texto, usado como máscara (pega a cor do texto do cartão) */
   const wordmark = nome => {
-    const t = String(nome || '').replace(/\s+Crédito.*$/i, '').trim().toLowerCase(); if (!t) return null;
-    const w = Math.max(60, Math.round(t.length * 21 + 8)), svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + w + ' 44"><text x="2" y="34" font-family="Helvetica Neue,Helvetica,Arial,sans-serif" font-weight="800" font-size="36" letter-spacing="-1.6" fill="#000">' + t.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</text></svg>';
+    const t = String(nome || '').replace(/\s+Crédito.*$/i, '').trim(); if (!t) return null;   // como foi digitado ("Carteira", não "carteira")
+    const w = Math.max(60, Math.round(t.length * 23 + 8)), svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + w + ' 44"><text x="2" y="34" font-family="Helvetica Neue,Helvetica,Arial,sans-serif" font-weight="800" font-size="36" letter-spacing="-1.6" fill="#000">' + t.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</text></svg>';
     const k = 'wm|' + t; if (!cache[k]) cache[k] = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
     const h = 5.4; return { url: cache[k], mask: true, h, w: Math.round(h * w / 44 * 100) / 100, asp: w / 44 };
   };
@@ -3596,10 +3645,12 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const textoDe = b => '<span style="font-size:15px;font-weight:800;letter-spacing:-.04em;color:' + corTxt(b) + ';white-space:nowrap">' + esc(b.toLowerCase()) + '</span>';
     const bancos = TODOS.map(b => btn(b, (KD.logo.seletor && KD.logo.seletor(b, 20, 70)) || textoDe(b))).join('')   // logo de cada banco (Figma); nome em texto só se faltar arte
       + '<span data-ct-bk="Outro" style="height:54px;border-radius:99px;border:1.5px solid ' + (S.banco === 'Outro' ? FG : '#3A3A40') + ';background:' + (S.banco === 'Outro' ? '#1C1C20' : 'transparent') + ';display:flex;align-items:center;padding:0 16px;font-size:11px;font-weight:800;letter-spacing:.08em;color:#9A9AA3;cursor:pointer;transition:border-color .25s ease,background .25s ease">OUTRO</span>';
-    const outro = S.banco === 'Outro' ? '<div style="display:flex;gap:12px;align-items:center;margin-top:12px">' + inp('outro', 'Nome do banco', S.outro) + '<div style="display:flex;gap:8px;flex-wrap:wrap;max-width:300px">' + CORES.map(c => '<span data-ct-cor="' + c + '" style="width:26px;height:26px;border-radius:50%;background:' + c + ';cursor:pointer;box-shadow:' + (S.cor === c ? '0 0 0 2px #141416,0 0 0 4px ' + FG : 'none') + '"></span>').join('')
+    // conta sem banco: nome + ícone (mesmo seletor das categorias) numa linha; cores numa linha só embaixo
+    const icBtn = '<span data-ct-ic="1" role="button" title="Escolher ícone" style="height:52px;flex:none;display:flex;align-items:center;gap:8px;padding:0 12px 0 11px;border-radius:99px;border:1px solid ' + (S.ico ? FG : '#3A3A40') + ';background:#0B0B0D;cursor:pointer;transition:border-color .25s ease"><span style="width:30px;height:30px;border-radius:50%;background:' + (S.ico ? S.cor : 'transparent') + ';border:' + (S.ico ? '0' : '1.5px dashed #5E5E66') + ';box-sizing:border-box;display:flex;align-items:center;justify-content:center">' + (S.ico ? '<span style="width:17px;height:17px;background:url(\'' + KD.icUri(S.ico, inkOn(S.cor)) + '\') center / contain no-repeat"></span>' : '<span style="font-size:15px;color:#9A9AA3;line-height:1">+</span>') + '</span><span style="font-size:11px;font-weight:800;letter-spacing:.08em;color:#9A9AA3">' + (S.ico ? '' : 'ÍCONE') + '</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9A9AA3" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none;display:block"><path d="m6 9 6 6 6-6"></path></svg></span>';
+    const outro = S.banco === 'Outro' ? '<div style="display:flex;gap:10px;align-items:center;margin-top:12px">' + inp('outro', 'Nome do banco', S.outro) + icBtn + '</div><div style="display:flex;gap:8px;align-items:center;flex-wrap:nowrap;overflow:hidden;margin-top:14px">' + CORES.map(c => '<span data-ct-cor="' + c + '" style="width:26px;height:26px;border-radius:50%;background:' + c + ';cursor:pointer;box-shadow:' + (S.cor === c ? '0 0 0 2px #141416,0 0 0 4px ' + FG : 'none') + '"></span>').join('')
       /* qualquer cor: o seletor nativo do navegador. Fica marcado quando a cor escolhida não é uma das da paleta */
       + '<label title="Escolher outra cor" style="position:relative;width:26px;height:26px;border-radius:50%;cursor:pointer;display:block;background:' + (CORES.includes(S.cor) ? 'conic-gradient(#FF5C5C,#FFB800,#6AFF2A,#2CBFF8,#B18CFF,#FF3D8B,#FF5C5C)' : S.cor) + ';box-shadow:' + (CORES.includes(S.cor) ? 'none' : '0 0 0 2px #141416,0 0 0 4px ' + FG) + '"><input type="color" data-ct-cp="1" value="' + (/^#[0-9a-f]{6}$/i.test(S.cor) ? S.cor : '#6A4BFF') + '" aria-label="Escolher a cor do banco" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0"></label>'
-      + '</div></div>' : '';
+      + '</div>' : '';
     const tipos = conta ? lab('TIPO') + '<div style="display:flex;gap:8px;flex-wrap:wrap">' + TIPOS.map(t => '<span data-ct-tp="' + t[0] + '" style="border:1.5px solid ' + (S.tipo === t[0] ? FG : '#3A3A40') + ';border-radius:99px;padding:10px 16px;font-size:11px;font-weight:800;letter-spacing:.08em;cursor:pointer;background:' + (S.tipo === t[0] ? FG : 'transparent') + ';color:' + (S.tipo === t[0] ? INK : '#9A9AA3') + ';transition:all .25s ease">' + t[1] + '</span>').join('') + '</div>'
       + lab('NOME E SALDO ATUAL') + '<div style="display:flex;gap:12px">' + inp('nome', 'Ex.: Itaú Salário', S.nome) + inp('saldo', 'R$ 0,00', S.saldo, 240, 'numeric') + '</div>'
       + (editar ? '' : '<div data-ct-sw="1" style="display:flex;align-items:center;gap:14px;margin-top:22px;padding:16px 20px;border-radius:24px;border:1px solid #2A2A2F;background:#0B0B0D;cursor:pointer"><span style="width:46px;height:28px;border-radius:99px;background:' + (S.credito ? '#6A4BFF' : '#2A2A2F') + ';position:relative;flex:none;transition:background .3s ease"><span style="position:absolute;top:3px;left:' + (S.credito ? '21px' : '3px') + ';width:22px;height:22px;border-radius:50%;background:#fff;transition:left .3s ' + EE + '"></span></span><div><b style="font-size:15px;letter-spacing:-.02em">Tem cartão de crédito</b><div style="font-size:12px;color:' + MU + ';margin-top:2px">Abre os campos do cartão. Pode ter vários na mesma conta; débito e Pix já contam na conta.</div></div></div>') : '';
@@ -3615,10 +3666,11 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const cr = c.querySelector('[data-ct-cr]'); if (anima && cr && cr.animate) cr.animate([{ opacity: 0, transform: 'translateY(-6px)' }, { opacity: 1, transform: 'none' }], { duration: 380, easing: EE });
   }
   function fecha() {
+    if (KD.icPicker) KD.icPicker.fecha();
     if (!layer) return; const l = layer; layer = null; S = null; l.style.opacity = '0'; l.firstElementChild.style.transform = 'translateY(10px)'; setTimeout(() => l.remove(), 320);
   }
   function abre(est) {
-    if (layer) return; S = Object.assign({ mode: 'conta', banco: null, outro: '', cor: CORES[0], tipo: 'corrente', nome: '', saldo: '', credito: false, final: '', limite: '', fecha: '', vence: '', busy: false, msg: '' }, est);
+    if (layer) return; S = Object.assign({ mode: 'conta', banco: null, outro: '', ico: null, cor: CORES[0], tipo: 'corrente', nome: '', saldo: '', credito: false, final: '', limite: '', fecha: '', vence: '', busy: false, msg: '' }, est);
     layer = document.createElement('div'); layer.setAttribute('data-ct-modal', '1');
     layer.style.cssText = 'position:fixed;inset:0;z-index:99985;background:rgba(0,0,0,.72);display:flex;align-items:flex-start;justify-content:center;overflow:auto;opacity:0;transition:opacity .3s ease;font-family:Helvetica,Arial,sans-serif;color:' + FG;
     layer.innerHTML = '<div data-ct-card="1" style="width:min(780px,calc(100% - 48px));margin:64px 0;border-radius:30px;background:#141416;border:1px solid #2A2A2F;padding:30px 34px;transform:translateY(10px);transition:transform .45s ' + EE + '"></div>';
@@ -3634,7 +3686,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     layer.addEventListener('input', e => { const p = e.target.getAttribute && e.target.getAttribute('data-ct-cp'); if (!p || !S) return; S.cor = e.target.value; const lb = e.target.parentElement; lb.style.background = S.cor; lb.style.boxShadow = '0 0 0 2px #141416,0 0 0 4px ' + FG; layer.querySelectorAll('[data-ct-cor]').forEach(x => { x.style.boxShadow = 'none'; }); });
     layer.addEventListener('change', e => { if (e.target.getAttribute && e.target.getAttribute('data-ct-cp') && S) desenha(false); });
     layer.addEventListener('click', e => {
-      const t = e.target.closest('[data-ct-bk],[data-ct-cor],[data-ct-tp],[data-ct-sw],[data-ct-x],[data-ct-ok],[data-ct-arq]'); if (!t || !S || S.busy) return;
+      const t = e.target.closest('[data-ct-bk],[data-ct-cor],[data-ct-tp],[data-ct-sw],[data-ct-x],[data-ct-ok],[data-ct-arq],[data-ct-ic]'); if (!t || !S || S.busy) return;
+      if (t.hasAttribute('data-ct-ic')) { KD.icPicker.abre(t, { atual: S.ico, cor: S.cor, onPick: k => { if (!S) return; S.ico = k; desenha(false); } }); return; }
       if (t.hasAttribute('data-ct-bk')) { S.banco = t.getAttribute('data-ct-bk'); if (S.mode === 'conta' && !S.nome.trim() && S.banco !== 'Outro') S._auto = S.nome = S.banco; desenha(false); }
       else if (t.hasAttribute('data-ct-cor')) { S.cor = t.getAttribute('data-ct-cor'); desenha(false); const o = layer.querySelector('[data-ct-in="outro"]'); if (o) o.focus(); }
       else if (t.hasAttribute('data-ct-tp')) { S.tipo = t.getAttribute('data-ct-tp'); desenha(false); }
@@ -3662,7 +3715,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       let accId = S.accId;
       if (conta) {
         const tp = TIPOS.find(t => t[0] === S.tipo) || TIPOS[0], ord = Math.max(0, ...M.accs.map(a => a.ordem || 0)) + 1;
-        const r = await sb.from('accounts').insert({ user_id: uid, nome, instituicao: instDe(), tipo: tp[0], funcao: tp[2], saldo: moedaNum(S.saldo), saldo_em: hoje, cor, ordem: ord, ativo: true }).select().single();
+        const r = await sb.from('accounts').insert({ user_id: uid, nome, instituicao: instDe(), tipo: tp[0], funcao: tp[2], saldo: moedaNum(S.saldo), saldo_em: hoje, cor, ordem: ord, ativo: true, icone: S.banco === 'Outro' ? (S.ico || null) : null }).select().single();
         if (r.error) throw r.error; accId = r.data.id;
       }
       if (cred) {
@@ -3684,7 +3737,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (nome.length < 2) return erro('Dê um nome para a conta.');
     if (nome.toLowerCase() !== a.nome.toLowerCase() && nomesUsados().has(nome.toLowerCase())) return erro('Já existe uma conta ou cartão com esse nome.');
     S.busy = true; desenha(false);
-    const [cor] = corDe(), tp = TIPOS.find(t => t[0] === S.tipo) || TIPOS[0], saldo = moedaNum(S.saldo), upd = { nome, instituicao: instDe(), tipo: tp[0], funcao: tp[2], cor };
+    const [cor] = corDe(), tp = TIPOS.find(t => t[0] === S.tipo) || TIPOS[0], saldo = moedaNum(S.saldo), upd = { nome, instituicao: instDe(), tipo: tp[0], funcao: tp[2], cor, icone: S.banco === 'Outro' ? (S.ico || null) : null };
     if (Math.abs(saldo - a.saldo) > 0.004) { upd.saldo = saldo; upd.saldo_em = KD.iso ? KD.iso(KD.today) : iso(KD.today); }
     try { const r = await KD.sb.from('accounts').update(upd).eq('id', a.id); if (r.error) throw r.error; }
     catch (e) { console.error('[kontar] contas', e); return erro('Não consegui salvar: ' + (e.message || e)); }
@@ -3706,7 +3759,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   CT.editar = id => {
     const M = KD.M, a = M.accById[id]; if (!a) return;
     const k = a.bank && TODOS.includes(a.bank) ? a.bank : (KD.logo.chave(a.inst) || KD.logo.chave(a.nome)), conhecido = k && TODOS.includes(k);
-    abre({ mode: 'editar', accId: a.id, banco: conhecido ? k : 'Outro', outro: conhecido ? '' : a.inst, cor: a.cor || CORES[0], tipo: a.tipo || 'corrente', nome: a.nome, saldo: moedaMask(String(Math.round(a.saldo * 100))) });
+    abre({ mode: 'editar', accId: a.id, banco: conhecido ? k : 'Outro', outro: conhecido ? '' : a.inst, ico: a.ico || null, cor: a.cor || CORES[0], tipo: a.tipo || 'corrente', nome: a.nome, saldo: moedaMask(String(Math.round(a.saldo * 100))) });
   };
 
   /* ---------- arquivadas: fim da página Contas, recolhido; "desarquivar" devolve tudo ---------- */
@@ -4048,7 +4101,9 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const lt = KD.logo.cartao && KD.logo.cartao(p.bank || p.inst || p.nome || p.n, ink, [5, 1, 1, p.bank || p.nome || p.n]);
     const logo = lt ? '<span title="' + esc(g.nome) + '" style="display:block;flex:none;height:' + lt.h + 'cqw;width:' + lt.w + 'cqw;max-width:46cqw;' + (lt.mask ? 'background:currentColor;-webkit-mask:url(\'' + lt.url + '\') left center / contain no-repeat;mask:url(\'' + lt.url + '\') left center / contain no-repeat' : 'background:url(\'' + lt.url + '\') left center / contain no-repeat') + '"></span>' : '<span style="font-size:4.2cqw;font-weight:800;letter-spacing:-.04em;white-space:nowrap">' + esc(g.nome) + '</span>';
     const c = g.cartoes[(CI[g.key] || 0) % (g.cartoes.length || 1)], fin = (g.contas[0] && g.contas[0].fin) || (c && c.fin) || '';
-    const topo = '<div data-tp-row style="display:flex;align-items:center;gap:2.5cqw;height:7.86cqw">' + logo + '<span data-tp-sp style="flex:1"></span>'
+    // conta sem banco conhecido com ícone escolhido: quadradinho na cor do texto com o ícone na cor do card, antes do nome
+    const icoQ = p.ico && KD.icUri && !(KD.logo.chave && KD.logo.chave(p.bank || p.inst || p.nome || p.n)) ? '<span aria-hidden="true" style="width:7.86cqw;height:7.86cqw;flex:none;border-radius:2.2cqw;background:' + ink + ';display:flex;align-items:center;justify-content:center"><span style="width:4.6cqw;height:4.6cqw;background:url(\'' + KD.icUri(p.ico, cor) + '\') center / contain no-repeat"></span></span>' : '';
+    const topo = '<div data-tp-row style="display:flex;align-items:center;gap:2.5cqw;height:7.86cqw">' + icoQ + logo + '<span data-tp-sp style="flex:1"></span>'
       + (fin ? '<span data-tp-fin style="font-size:2.5cqw;font-weight:700;letter-spacing:.08em;white-space:nowrap;overflow:hidden;max-width:30cqw;opacity:.7;transition:max-width .38s ' + EE + ',opacity .25s ease">···· ' + esc(fin) + '</span>' : '')
       + icones(g, view, cor)
       + '<span data-gp-ed="" role="button" aria-label="Editar" title="Editar" style="width:7.14cqw;height:7.14cqw;flex:none;border-radius:9999px;border:1.5px solid currentColor;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .25s cubic-bezier(.2,.7,.2,1)" onmouseover="this.style.background=\'rgba(0,0,0,.14)\'" onmouseout="this.style.background=\'transparent\'">' + icq(D_PEN, 3.4) + '</span></div>';
