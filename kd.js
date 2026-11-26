@@ -85,12 +85,12 @@
 
   const METH = { cartao: 'Créd', pix: 'Pix', boleto: 'Boleto', debito: 'Déb', transferencia: 'Transf', dinheiro: 'Dinheiro' };
 
+  const CHAVE = { user_prefs: 'user_id', profiles: 'user_id', transaction_notas: 'transaction_id' };   // tabelas sem coluna id
   async function all(sb, table, sel) {
     const out = []; let from = 0;
     for (;;) {
       /* paginação precisa de ordem fixa: sem ela o banco devolve páginas sobrepostas (linhas em dobro e outras faltando) */
-      let r = await sb.from(table).select(sel || '*').order('id').range(from, from + 999);
-      if (r.error && /column|id/i.test(r.error.message) && from === 0) { r = await sb.from(table).select(sel || '*').range(0, 999); if (!r.error && r.data.length >= 1000) throw new Error(table + ': sem coluna id para paginar'); }
+      const r = await sb.from(table).select(sel || '*').order(CHAVE[table] || 'id').range(from, from + 999);
       if (r.error) throw new Error(table + ': ' + r.error.message);
       out.push(...r.data); if (r.data.length < 1000) return out; from += 1000;
     }
