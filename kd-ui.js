@@ -1578,7 +1578,9 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const abs = [].concat(...nomes.map(n => (M.estByName[n] || { chaves: [] }).chaves)).filter(Boolean);
     if (!abs.length) return;
     const todas = [...new Set(A.chaves.concat(abs))].filter(Boolean);
-    ck(await sb.from('merchant_aliases').upsert(todas.map(k => { const r = { user_id: KD.user.id, chave: k, apelido: id.name, sempre_perguntar: !!id.alt }; if (logo) r.logo_url = logo; if (dom) r.dominio = dom; if (cid) r.category_id = cid; return r; }), { onConflict: 'user_id,chave' }));
+    // amostra é obrigatória: mantém a que já existe ou usa o nome da fatura daquela chave
+    const fat = {}; ((KD.raw && KD.raw.lanc) || []).forEach(l => { if (l.chave && !fat[l.chave]) fat[l.chave] = l.nome_fatura; });
+    ck(await sb.from('merchant_aliases').upsert(todas.map(k => { const r = { user_id: KD.user.id, chave: k, amostra: (M.maByChave[k] || {}).amostra || fat[k] || k, apelido: id.name, sempre_perguntar: !!id.alt }; if (logo) r.logo_url = logo; if (dom) r.dominio = dom; if (cid) r.category_id = cid; return r; }), { onConflict: 'user_id,chave' }));
     ck(await sb.from('transactions').update({ apelido: null }).in('chave', todas));
     if (cid) ck(await sb.from('transactions').update({ category_id: cid, categoria_origem: 'auto' }).in('chave', abs).eq('status', 'pendente_revisao'));
   };
@@ -1628,7 +1630,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       // coluna esquerda: ícone, título grande, descrição, resumo e botões
       + '<div style="min-width:0;min-height:0;padding:30px;border-right:1px solid #2A2A2F;display:flex;flex-direction:column;gap:22px">'
       + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px"><span style="width:88px;height:88px;border-radius:50%;flex:none;background:' + ROXO + ';color:#fff;display:flex;align-items:center;justify-content:center">' + IC_JUNTAR(40) + '</span>'
-      + '<span style="display:flex;align-items:center;gap:10px;max-width:210px;font-size:12.5px;line-height:1.45;color:#9A9AA3">' + av(id.name, id.cat, 30, id.logo || undefined) + '<span>Você começou em <b style="color:#fff">' + esc(id.name) + '</b>: ele é o principal.</span></span></div>'
+      + '<span style="display:flex;align-items:center;gap:10px;max-width:210px;font-size:12.5px;line-height:1.45;color:#9A9AA3">' + av(id.name, id.cat, 30, id.logo || undefined) + '<span>Você começou por aqui, então ele é o principal: nome, logo e regras vêm dele.</span></span></div>'
       + '<div style="min-width:0"><div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#8F7BFF">Juntar estabelecimentos</div>'
       + '<div style="margin-top:10px;font-size:clamp(34px,3.2vw,50px);font-weight:700;letter-spacing:-.06em;line-height:.92;text-transform:uppercase;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word">Juntar com ' + esc(id.name) + '</div>'
       + '<p style="margin:16px 0 0;font-size:15px;font-weight:500;line-height:1.45;letter-spacing:-.01em;color:#9A9AA3;text-wrap:pretty">' + desc + '</p></div>'
