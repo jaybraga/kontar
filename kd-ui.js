@@ -389,7 +389,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     }
     if (ch.includes('eov')) changedKeys(old.eov, st.eov).forEach(nome => { const e = M.estByName[nome], ov = st.eov[nome]; if (!e || !ov) return; queue(async () => {
       const p = {}; if (ov.name != null && ov.name.trim() && ov.name.trim() !== nome) p.apelido = ov.name.trim(); if (ov.cat) p.category_id = catId(ov.cat);
-      if (ov.logo !== undefined) p.logo_url = ov.logo ? await KD.smallImage(ov.logo) : null;
+      if (ov.logo !== undefined) p.logo_url = ov.logo ? await KD.smallImage(ov.logo) : null; if (ov.dom) p.dominio = ov.dom;
       if (Object.keys(p).length) ck(await sb().from('merchant_aliases').update(p).in('chave', e.chaves));
       if (p.apelido) ck(await sb().from('transactions').update({ apelido: null }).in('chave', e.chaves)); }); });
     if (ch.includes('cOv')) changedKeys(old.cOv, st.cOv).forEach(n => { const c = M.cards.find(x => x.n === n), o = st.cOv[n]; if (!c || !o) return; queue(async () => {
@@ -1537,6 +1537,148 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const r = await KD.sb.rpc('kontar_desfazer_mescla', { p_id: row.id });
     if (r.error) { alert('Não consegui desfazer: ' + (r.error.message || 'erro')); return; }
     if (KD.tx && KD.tx.close) KD.tx.close(true); await atualiza();
+  };
+})();
+
+/* Kontar · estabelecimentos: ícone pelo nome (Brandfetch) e "Juntar" (merge) — 26/11/2026
+   KD.estIcon(nome)  → { url, dom } ou null. Busca a marca pelo nome e usa o ícone do domínio achado.
+   KD.estJuntar.abrir(nome, el, ident) → overlay de 2 colunas por cima da vista expandida do estabelecimento.
+   Juntar não apaga nada: os escolhidos ganham o apelido, o logo e o "sempre perguntar" do de origem
+   (por chave, em merchant_aliases), então viram uma linha só e as próximas faturas caem no lugar certo.
+   A categoria só passa para as compras ainda em "Pra revisar"; as já classificadas ficam como estão. */
+(function () {
+  'use strict';
+  const KD = window.KD, CID = '1idBeIkJVIdWcUqMmGw', EE = 'cubic-bezier(.65,0,.35,1)', ROXO = '#5B3DF5';
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const nz = s => (KD.norm ? KD.norm(s) : String(s || '').toLowerCase()).replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+  /* ---------- ícone pelo nome ---------- */
+  const cache = {};
+  const busca = async q => { try { const r = await fetch('https://api.brandfetch.io/v2/search/' + encodeURIComponent(q) + '?c=' + CID); return r.ok ? await r.json() : []; } catch (e) { return []; } };
+  // a marca achada precisa "parecer" com o nome digitado (nome da marca ou domínio contêm uma palavra dele, ou vice-versa)
+  const bate = (b, q) => { if (!b || !b.domain) return false; const nb = nz(b.name).replace(/ /g, ''), nd = nz(b.domain.split('.')[0]).replace(/ /g, ''), nq = nz(q).replace(/ /g, ''), tk = nz(q).split(' ').filter(t => t.length >= 3);
+    return !!nb && (nb.includes(nq) || nq.includes(nb) || nd === nq || tk.some(t => nb.includes(t) || nd.includes(t))); };
+  KD.estIcon = async nome => {
+    const q = String(nome || '').replace(/[*#].*$/, '').replace(/\d+/g, ' ').replace(/\s+/g, ' ').trim(), k = nz(q);
+    if (k.length < 2) return null; if (k in cache) return cache[k];
+    let hit = (await busca(q)).find(b => bate(b, q));
+    const t0 = k.split(' ')[0];
+    if (!hit && t0 !== k && t0.length >= 4) hit = (await busca(t0)).find(b => bate(b, t0));
+    return (cache[k] = hit ? { url: 'https://cdn.brandfetch.io/domain/' + hit.domain + '/w/128/h/128/icon?c=' + CID, dom: hit.domain } : null);
+  };
+
+  /* ---------- gravação do merge ---------- */
+  KD.estMerge = async (orig, nomes, id) => {
+    const M = KD.M, sb = KD.sb, A = M.estByName[orig]; if (!A) throw new Error('estabelecimento sumiu');
+    const ck = r => { if (r && r.error) throw r.error; return r; };
+    const cid = id.alt ? null : ((M.catByName[id.cat] || {}).id || null);
+    const ma = A.chaves.map(k => M.maByChave[k]).filter(Boolean);
+    const logo = id.logo ? await KD.smallImage(id.logo) : ((ma.find(m => m.logo_url) || {}).logo_url || null);
+    const dom = id.dom || (ma.find(m => m.dominio) || {}).dominio || A.dom || null;
+    const abs = [].concat(...nomes.map(n => (M.estByName[n] || { chaves: [] }).chaves)).filter(Boolean);
+    if (!abs.length) return;
+    const todas = [...new Set(A.chaves.concat(abs))].filter(Boolean);
+    ck(await sb.from('merchant_aliases').upsert(todas.map(k => { const r = { user_id: KD.user.id, chave: k, apelido: id.name, sempre_perguntar: !!id.alt }; if (logo) r.logo_url = logo; if (dom) r.dominio = dom; if (cid) r.category_id = cid; return r; }), { onConflict: 'user_id,chave' }));
+    ck(await sb.from('transactions').update({ apelido: null }).in('chave', todas));
+    if (cid) ck(await sb.from('transactions').update({ category_id: cid, categoria_origem: 'auto' }).in('chave', abs).eq('status', 'pendente_revisao'));
+  };
+
+  /* ---------- overlay "Juntar" (2 colunas, linguagem do onboarding; indent do X tamanho S, HANDOFF §5.4) ---------- */
+  const NB = [16, 8, 14];
+  const IC_X = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="display:block"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
+  const IC_JUNTAR = sz => '<svg width="' + sz + '" height="' + sz + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex:none"><path d="m8 6 4-4 4 4"/><path d="M12 2v10.3a4 4 0 0 1-1.17 2.87L4 22"/><path d="m20 22-5-5"/></svg>';
+  const IC_BUSCA = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex:none;display:block"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
+  const IC_SETA = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>';
+  let S = null, el = null;
+  const plural = (n, a, b) => n + ' ' + (n === 1 ? a : b);
+  const logoDe = n => (KD.M.LOGO && KD.M.LOGO[n]) || (KD.M.DOM && KD.M.DOM[n] ? 'https://cdn.brandfetch.io/domain/' + KD.M.DOM[n] + '/w/64/h/64/icon?c=' + CID : '');
+  const corDe = c => { try { return KD.comp.cor(c); } catch (e) { return '#78788A'; } };
+  const av = (n, cat, sz, lg) => { lg = lg === undefined ? logoDe(n) : lg;
+    return '<span style="position:relative;width:' + sz + 'px;height:' + sz + 'px;flex:none;border-radius:50%;background:' + corDe(cat) + ';display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:' + Math.round(sz * .42) + 'px;font-weight:800;color:#000">' + esc((n || '?').trim().charAt(0).toUpperCase())
+      + (lg ? '<img alt="" src="' + esc(lg) + '" onerror="this.remove()" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#fff;padding:' + Math.round(sz * .16) + 'px;box-sizing:border-box">' : '') + '</span>'; };
+
+  function candidatos(orig) {
+    const t = nz(orig).split(' ').filter(x => x.length >= 3), sim = e => { const n = nz(e.nome); return t.reduce((a, x) => a + (n.includes(x) ? 1 : 0), 0); };
+    return KD.M.est.filter(e => e.nome !== orig).map(e => ({ e, s: sim(e) })).sort((a, b) => b.s - a.s || b.e.n - a.e.n || a.e.nome.localeCompare(b.e.nome, 'pt-BR')).map(x => x.e);
+  }
+  function lista(anim) {
+    const q = nz(S.q), L = S.todos.filter(e => !q || nz(e.nome).includes(q) || (e.orig || []).some(o => nz(o).includes(q)));
+    if (!L.length) return '<div style="padding:34px 8px;text-align:center;font-size:13.5px;color:#6E6E78">Nenhum estabelecimento com esse nome.</div>';
+    return L.map((e, i) => { const on = S.sel.has(e.nome);
+      return '<div data-ej-pick="' + esc(e.nome) + '" role="checkbox" aria-checked="' + on + '" style="flex:none;display:grid;grid-template-columns:38px minmax(0,1fr) 22px;align-items:center;gap:14px;padding:10px 16px 10px 10px;border-radius:20px;border:1px solid ' + (on ? ROXO : '#2A2A2F') + ';background:' + (on ? 'rgba(91,61,245,.12)' : '#1C1C20') + ';cursor:pointer;transition:border-color .25s ease,background .25s ease' + (anim ? ';animation:kRowIn .4s ' + EE + ' ' + Math.min(i, 10) * 30 + 'ms both' : '') + '">'
+        + av(e.nome, e.cat, 38)
+        + '<span style="min-width:0"><b style="display:block;font-size:15px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(e.nome) + '</b><small style="display:block;margin-top:2px;font-size:12.5px;color:#9A9AA3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + plural(e.n, 'compra', 'compras') + ' · ' + esc(e.cat) + '</small></span>'
+        + '<span style="width:22px;height:22px;box-sizing:border-box;border-radius:7px;border:1.5px solid ' + (on ? ROXO : '#4A4A52') + ';background:' + (on ? ROXO : 'transparent') + ';display:flex;align-items:center;justify-content:center;transition:background .25s ease,border-color .25s ease">' + (on ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>' : '') + '</span></div>'; }).join('');
+  }
+  function rodape() {
+    const sel = S.todos.filter(e => S.sel.has(e.nome)), n = sel.length, nc = sel.reduce((a, e) => a + e.n, 0), ok = n > 0 && !S.busy;
+    const resumo = n ? plural(n, 'escolhido', 'escolhidos') + ' · +' + plural(nc, 'compra', 'compras') : 'Nenhum escolhido ainda';
+    return '<div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:' + (n ? '#fff' : '#6A6A72') + ';transition:color .25s ease">' + resumo + '</div>'
+      + '<div style="min-height:18px;margin-top:8px;font-size:12.5px;color:#FF6A5C">' + esc(S.msg || '') + '</div>'
+      + '<div style="display:flex;align-items:center;gap:10px;margin-top:8px"><span data-ej-x role="button" style="height:48px;display:flex;align-items:center;padding:0 20px;border-radius:9999px;border:1px solid #3A3A40;font-size:14px;font-weight:600;cursor:pointer;transition:background .25s ease" onmouseover="this.style.background=\'#1C1C20\'" onmouseout="this.style.background=\'transparent\'">Cancelar</span>'
+      + '<span data-ej-ok role="button" style="margin-left:auto;height:48px;display:inline-flex;align-items:center;gap:16px;padding:0 6px 0 22px;border-radius:9999px;background:#F2F0EB;color:#000;font-size:15px;font-weight:700;white-space:nowrap;cursor:' + (ok ? 'pointer' : 'default') + ';opacity:' + (ok || S.busy ? 1 : .3) + ';transition:opacity .25s ease,filter .25s ease">' + (S.busy ? 'Juntando…' : n ? 'Juntar ' + n : 'Juntar') + '<span style="width:36px;height:36px;border-radius:50%;background:#000;display:grid;place-items:center">' + IC_SETA + '</span></span></div>';
+  }
+  function pinta() {
+    const NT = KD.notch.corner(...NB), EDGE = KD.notch.edge(...NB), MASK = KD.notch.mask(...NB) + ', linear-gradient(#000 0 0)', id = S.id;
+    const desc = 'As compras de quem você marcar passam a aparecer como <b style="color:#fff">' + esc(id.name) + '</b>, com o mesmo logo e o mesmo “Sempre perguntar”. '
+      + (id.alt ? 'Como ele sempre pergunta, as compras não revisadas continuam esperando sua escolha.' : 'Só as compras ainda não revisadas passam para <b style="color:#fff">' + esc(id.cat) + '</b>; as que você já classificou ficam como estão.');
+    el.innerHTML = '<div aria-hidden="true" style="position:absolute;inset:0;z-index:-1;box-sizing:border-box;border-radius:30px;pointer-events:none;background:#111114;border:1px solid #2A2A2F;-webkit-mask:' + MASK + ';-webkit-mask-composite:xor;mask:' + MASK + ';mask-composite:exclude"></div>'
+      + '<svg aria-hidden="true" width="' + NT.w + '" height="' + NT.h + '" style="position:absolute;right:0;top:0;z-index:-1;pointer-events:none;overflow:visible"><path d="' + EDGE + '" fill="none" stroke="#2A2A2F" stroke-width="1"/></svg>'
+      + '<span data-ej-x role="button" aria-label="Fechar" style="position:absolute;right:0;top:0;width:32px;height:32px;box-sizing:border-box;border-radius:50%;border:1px solid #3A3A40;background:#1C1C20;display:flex;align-items:center;justify-content:center;color:#B4B4BA;cursor:pointer;transition:color .25s ease,border-color .25s ease" onmouseover="this.style.color=\'#F2F0EB\';this.style.borderColor=\'#55555C\'" onmouseout="this.style.color=\'#B4B4BA\';this.style.borderColor=\'#3A3A40\'">' + IC_X + '</span>'
+      // coluna esquerda: ícone, título grande, descrição, resumo e botões
+      + '<div style="min-width:0;min-height:0;padding:30px;border-right:1px solid #2A2A2F;display:flex;flex-direction:column;gap:22px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px"><span style="width:88px;height:88px;border-radius:50%;flex:none;background:' + ROXO + ';color:#fff;display:flex;align-items:center;justify-content:center">' + IC_JUNTAR(40) + '</span>'
+      + '<span style="display:flex;align-items:center;gap:10px;max-width:210px;font-size:12.5px;line-height:1.45;color:#9A9AA3">' + av(id.name, id.cat, 30, id.logo || undefined) + '<span>Você começou em <b style="color:#fff">' + esc(id.name) + '</b>: ele é o principal.</span></span></div>'
+      + '<div style="min-width:0"><div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#8F7BFF">Juntar estabelecimentos</div>'
+      + '<div style="margin-top:10px;font-size:clamp(34px,3.2vw,50px);font-weight:700;letter-spacing:-.06em;line-height:.92;text-transform:uppercase;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word">Juntar com ' + esc(id.name) + '</div>'
+      + '<p style="margin:16px 0 0;font-size:15px;font-weight:500;line-height:1.45;letter-spacing:-.01em;color:#9A9AA3;text-wrap:pretty">' + desc + '</p></div>'
+      + '<div data-ej-rodape style="margin-top:auto">' + rodape() + '</div></div>'
+      // coluna direita: busca e lista com checkbox
+      + '<div style="min-width:0;min-height:0;display:flex;flex-direction:column;padding:22px 24px 0">'
+      + '<div style="display:flex;align-items:center;min-height:32px;padding:0 ' + (NT.w - 10) + 'px 0 20px;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#9A9AA3">Escolha com quais juntar</div>'
+      + '<label data-ej-fld style="margin-top:12px;display:flex;align-items:center;gap:10px;height:52px;flex:none;box-sizing:border-box;padding:0 20px;border-radius:9999px;border:1px solid #3A3A40;background:#1C1C20;color:#8A8A93;transition:border-color .25s ease">' + IC_BUSCA + '<input data-ej-q value="' + esc(S.q) + '" placeholder="Buscar pelo nome…" autocomplete="off" style="flex:1;min-width:0;height:100%;padding:0;background:transparent;border:0;outline:0;color:#fff;font-family:inherit;font-size:16px;font-weight:500"></label>'
+      + '<div data-ej-list class="kscroll" style="flex:1;min-height:0;margin-top:14px;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column;gap:8px;padding:0 0 28px;-webkit-mask-image:linear-gradient(180deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(180deg,#000 calc(100% - 28px),transparent)">' + lista(true) + '</div></div>';
+    const q = el.querySelector('[data-ej-q]'), fld = el.querySelector('[data-ej-fld]');
+    q.addEventListener('input', () => { S.q = q.value; el.querySelector('[data-ej-list]').innerHTML = lista(true); });
+    q.addEventListener('focus', () => { fld.style.borderColor = ROXO; }); q.addEventListener('blur', () => { fld.style.borderColor = '#3A3A40'; });
+  }
+  const redesenha = () => { if (!el) return; el.querySelector('[data-ej-list]').innerHTML = lista(false); el.querySelector('[data-ej-rodape]').innerHTML = rodape(); };
+  function fecha(rapido) {
+    if (!el) return; const e0 = el; el = null; S = null; document.removeEventListener('keydown', tecla, true);
+    if (rapido) { e0.remove(); return; }
+    e0.style.opacity = '0'; e0.style.transform = 'translateY(8px)'; setTimeout(() => e0.remove(), 360);
+  }
+  function tecla(e) { if (e.key === 'Escape' && S && !S.busy) { e.stopPropagation(); fecha(); } }
+  async function junta() {
+    if (!S || S.busy || !S.sel.size) return;
+    if (KD.isDemo()) { S.msg = 'Conta de demonstração: juntar fica travado.'; redesenha(); return; }
+    S.busy = true; S.msg = ''; redesenha();
+    try { await KD.estMerge(S.orig, [...S.sel], S.id); }
+    catch (e) { console.error('[kontar] juntar', e); if (!S) return; S.busy = false; S.msg = 'Não consegui juntar: ' + (e.message || 'erro'); redesenha(); return; }
+    fecha(); const C = KD.comp; if (C && C.closeEst) C.closeEst(); try { await KD.refresh(C); } catch (e) { console.error(e); }
+  }
+  KD.estJuntar = {
+    abrir(orig, from, id) {
+      const host = from && from.closest('[data-es-ed]'); if (!host || !KD.M.estByName[orig]) return;
+      if (el) fecha(true);
+      S = { orig, id, q: '', sel: new Set(), busy: false, msg: '', todos: candidatos(orig) };
+      el = document.createElement('div'); el.setAttribute('data-ej', '1');
+      el.style.cssText = 'position:absolute;left:0;right:8px;top:0;height:max(100%,500px);z-index:30;isolation:isolate;display:grid;grid-template-columns:minmax(0,.92fr) minmax(0,1fr);color:#fff;filter:drop-shadow(0 24px 48px rgba(0,0,0,.6));opacity:0;transform:translateY(8px);transition:opacity .35s ease,transform .45s ' + EE;
+      el.addEventListener('click', e => {
+        e.stopPropagation(); if (!S) return;
+        const t = e.target.closest('[data-ej-pick],[data-ej-x],[data-ej-ok]'); if (!t || S.busy) return;
+        if (t.hasAttribute('data-ej-x')) return fecha();
+        if (t.hasAttribute('data-ej-ok')) return junta();
+        const n = t.getAttribute('data-ej-pick'); S.sel.has(n) ? S.sel.delete(n) : S.sel.add(n); S.msg = ''; redesenha();
+      });
+      host.appendChild(el); pinta(); document.addEventListener('keydown', tecla, true);
+      requestAnimationFrame(() => requestAnimationFrame(() => { if (!el) return; el.style.opacity = '1'; el.style.transform = 'none';
+        // garante que o overlay inteiro fique à vista
+        const sc = host.closest('[data-page-scroll]'); if (sc) { const b = el.getBoundingClientRect().bottom + 16 - sc.getBoundingClientRect().bottom; if (b > 0) sc.scrollBy({ top: b, behavior: 'smooth' }); }
+        const q = el.querySelector('[data-ej-q]'); if (q) q.focus({ preventScroll: true }); }));
+    },
+    fechar: () => fecha(true),
+    aberto: () => !!el
   };
 })();
 
