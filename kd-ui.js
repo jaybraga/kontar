@@ -2284,7 +2284,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const nomes = S.nomes.map((n, k) => '<span style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 6px 0 12px;border-radius:99px;border:1.5px solid #3A3A40;font-size:12px;font-weight:700">' + esc(n) + '<span data-a="rmnome" data-k="' + k + '" title="Remover" style="width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:' + MU + ';font-size:14px">×</span></span>').join('')
       + (S.addNome ? '<input data-nome placeholder="Nome ou razão social" style="height:28px;box-sizing:border-box;border-radius:99px;border:1.5px solid ' + FG + ';background:#000;color:' + FG + ';padding:0 12px;font:700 12px Helvetica,Arial,sans-serif;outline:0;width:100%">'
         : '<span data-a="addnome" style="display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:99px;border:1.5px dashed #55555C;font-size:12px;font-weight:700;color:' + MU + ';cursor:pointer">+ nome</span>');
-    return '<aside data-side style="position:sticky;top:0;align-self:start;height:calc(100vh - 68px);box-sizing:border-box;padding:26px 28px 24px;display:flex;flex-direction:column;min-height:0">'
+    return '<aside data-side style="position:sticky;top:0;align-self:start;height:calc(100vh - var(--k-nav,68px));box-sizing:border-box;padding:26px 28px 24px;display:flex;flex-direction:column;min-height:0">'
       + '<div data-s style="flex:none"><div style="font-size:10.5px;font-weight:700;letter-spacing:.14em;color:' + MU + '">↘ REVISAR IMPORTAÇÃO</div>'
       + '<div style="font-size:52px;font-weight:700;letter-spacing:-.06em;line-height:.95;margin:8px 0 10px">Revisar<br>extrato</div>'
       + '<div style="font-size:12px;color:' + MU + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + esc(S.file) + '">' + esc(S.file) + (S.per ? ' · ' + ddmm(S.per[0]) + ' – ' + ddmm(S.per[1]) : '') + ' · ' + S.rows.length + (S.rows.length === 1 ? ' linha' : ' linhas') + '</div></div>'
@@ -2412,7 +2412,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     S = { file: file.name, ext, rows, targets, tk, open: {}, known: await conhecidos(rows.map(r => r.fitid)), per: isos.length ? [isos[0], isos[isos.length - 1]] : null, busy: false, err: '', nomes, pop: null };
     recalc();
     L = document.createElement('div');
-    L.setAttribute('data-imp', '1'); L.className = 'kscroll'; L.style.cssText = 'position:fixed;left:0;right:0;top:68px;bottom:0;background:#000;z-index:99990;font-family:Helvetica,Arial,sans-serif;color:' + FG + ';overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;opacity:0;transition:opacity .35s ease';
+    L.setAttribute('data-imp', '1'); L.className = 'kscroll'; L.style.cssText = 'position:fixed;left:0;right:0;top:var(--k-nav,68px);bottom:0;background:#000;z-index:99990;font-family:Helvetica,Arial,sans-serif;color:' + FG + ';overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;opacity:0;transition:opacity .35s ease';
     document.body.appendChild(L); render(true); requestAnimationFrame(() => { if (L) L.style.opacity = '1'; });
     L.addEventListener('click', onClick);
     L.addEventListener('keydown', ev => {
@@ -2481,10 +2481,10 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     warn._t = setTimeout(fechaAviso, 9000);
   }
   document.addEventListener('click', ev => {
-    if (H && !modal && ev.clientY < 68 && ev.target.closest && !ev.target.closest('[data-imp-hist],[data-imp-modal]')) fechaHist();
+    if (H && !modal && ev.clientY < KD.navBottom() && ev.target.closest && !ev.target.closest('[data-imp-hist],[data-imp-modal]')) fechaHist();
     if (!L || !S) return;
     const t = ev.target; if (!t || !t.closest || t.closest('[data-imp],[data-imp-warn],[data-kd-imp]')) { if (warn && t && t.closest && !t.closest('[data-imp-warn]')) fechaAviso(); return; }
-    if (ev.clientY >= 68) return;
+    if (ev.clientY >= KD.navBottom()) return;
     ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
     if (S.busy) return;
     if (!S.rows.some(vai)) { close(); setTimeout(() => reclica(t), 0); return; }
@@ -2563,7 +2563,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (!H) return;
     const at = list.filter(b => b.status !== 'descartado').length, off = list.length - at, desde = list.length ? dm(list[list.length - 1].created_at) : '';
     const bl = (v, on) => '<div style="display:flex;align-items:center;gap:12px;height:36px"><span style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;' + (on ? 'background:' + FG + ';color:' + INK : 'box-shadow:inset 0 0 0 1.5px #3A3A40;color:#B4B4BA') + '">' + v + '</span>' + (on ? 'Ativas' : 'Desfeitas') + '</div>';
-    H.innerHTML = '<div style="display:grid;grid-template-columns:330px minmax(0,1fr);max-width:1680px;margin:0 auto;min-height:100%"><aside style="position:sticky;top:0;align-self:start;height:calc(100vh - 68px);box-sizing:border-box;padding:26px 28px 24px;display:flex;flex-direction:column"><div data-s><div style="font-size:10.5px;font-weight:700;letter-spacing:.14em;color:' + MU + '">↘ IMPORTAÇÕES</div><div style="font-size:52px;font-weight:700;letter-spacing:-.06em;line-height:.95;margin:8px 0 10px">Histórico<br>de lotes</div><div style="font-size:12px;color:' + MU + '">' + list.length + (list.length === 1 ? ' importação' : ' importações') + (desde ? ' · desde ' + desde : '') + '</div></div>'
+    H.innerHTML = '<div style="display:grid;grid-template-columns:330px minmax(0,1fr);max-width:1680px;margin:0 auto;min-height:100%"><aside style="position:sticky;top:0;align-self:start;height:calc(100vh - var(--k-nav,68px));box-sizing:border-box;padding:26px 28px 24px;display:flex;flex-direction:column"><div data-s><div style="font-size:10.5px;font-weight:700;letter-spacing:.14em;color:' + MU + '">↘ IMPORTAÇÕES</div><div style="font-size:52px;font-weight:700;letter-spacing:-.06em;line-height:.95;margin:8px 0 10px">Histórico<br>de lotes</div><div style="font-size:12px;color:' + MU + '">' + list.length + (list.length === 1 ? ' importação' : ' importações') + (desde ? ' · desde ' + desde : '') + '</div></div>'
       + (list.length ? '<div data-s style="margin-top:26px;display:flex;flex-direction:column;gap:6px;font-size:15px;font-weight:700">' + bl(at, true) + bl(off, false) + '</div>' : '')
       + '<div data-s style="margin-top:auto"><span data-h="back" style="display:flex;align-items:center;justify-content:center;height:54px;border-radius:99px;background:' + FG + ';color:' + INK + ';font-size:12px;font-weight:900;letter-spacing:.12em;cursor:pointer">VOLTAR</span></div></aside>'
       + '<main style="padding:22px 32px 80px 4px;display:flex;flex-direction:column;gap:16px">' + (list.length ? list.map(histCard).join('') : '<div data-hc style="padding:40px 0;color:' + MU + ';font-size:15px">Nenhuma importação ainda. Use o botão Importar, na barra de cima, para ler um extrato.</div>') + '</main></div>';
@@ -2582,7 +2582,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   async function historico() {
     if (H) return;
     H = document.createElement('div'); H.setAttribute('data-imp-hist', '1'); H.className = 'kscroll';
-    H.style.cssText = 'position:fixed;left:0;right:0;top:68px;bottom:0;background:#000;z-index:99990;font-family:Helvetica,Arial,sans-serif;color:' + FG + ';overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;opacity:0;transition:opacity .35s ease';
+    H.style.cssText = 'position:fixed;left:0;right:0;top:var(--k-nav,68px);bottom:0;background:#000;z-index:99990;font-family:Helvetica,Arial,sans-serif;color:' + FG + ';overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;opacity:0;transition:opacity .35s ease';
     document.body.appendChild(H); requestAnimationFrame(() => { if (H) H.style.opacity = '1'; });
     H.addEventListener('click', ev => {
       const b = ev.target.closest('[data-h]'); if (!b) return;
@@ -3042,7 +3042,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   function camada() {
     if (layer) return layer;
     layer = document.createElement('div'); layer.setAttribute('data-fontes-layer', '1'); layer.className = 'kscroll';
-    layer.style.cssText = 'position:fixed;left:0;right:0;top:68px;bottom:0;z-index:40;background:#000;overflow-x:hidden;overflow-y:auto;padding:18px 24px 60px;opacity:0;transition:opacity .35s ease;pointer-events:auto';
+    layer.style.cssText = 'position:fixed;left:0;right:0;top:var(--k-nav,68px);bottom:0;z-index:40;background:#000;overflow-x:hidden;overflow-y:auto;padding:18px 24px 60px;opacity:0;transition:opacity .35s ease;pointer-events:auto';
     layer.innerHTML = '<div data-fontes-host-in="1"></div>';
     layer.addEventListener('click', ev => {
       const a = ev.target.closest('[data-ft-acao]'), md = ev.target.closest('[data-ft-modo]'), dd = ev.target.closest('[data-ft-dia]');
