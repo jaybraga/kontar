@@ -321,12 +321,13 @@
     /* faturas que vencem no mês */
     /* cartão do Open Finance: a fatura aberta é o valor que o banco informa (parcelas antigas, estornos e créditos já entram nela); vale pro mês do próximo vencimento */
     const fatOf0 = (c, m) => M.cash.filter(e => e.card === c.n && e.mi === m).reduce((a, e) => a + e.out, 0);
-    const fatOf = (c, m) => (c.fatInf != null && c.ve && m === mIdx(T) + (T.getDate() < c.ve ? 0 : 1)) ? c.fatInf : fatOf0(c, m);
+    /* fatura negativa (crédito do banco, pagamento em dobro...) aparece como o banco informa, mas nas contas vale 0 */
+    const fatOf = (c, m) => Math.max(0, (c.fatInf != null && c.ve && m === mIdx(T) + (T.getDate() < c.ve ? 0 : 1)) ? c.fatInf : fatOf0(c, m));
     const nFat = (c, m) => M.cash.filter(e => e.card === c.n && e.mi === m).length;
     out.FATS = M.cards.map(c => {
       if (isCur && c.fatInf != null) {   // conectado: no mês atual, a fatura aberta que o banco informa, com o próximo vencimento
         if (!c.fatInf) return null; const due = c.ve ? new Date(T.getFullYear(), T.getMonth() + (T.getDate() < c.ve ? 0 : 1), c.ve) : null;
-        return { n: c.nick || c.n, v: int(c.fatInf), sub: (due ? 'vence ' + dmes(due) + ' · ' : '') + 'aberta, pelo banco', cor: c.cor, ink: c.ink };
+        return { n: c.nick || c.n, v: int(c.fatInf), sub: (due ? 'vence ' + dmes(due) + ' · ' : '') + (c.fatInf < 0 ? 'crédito no banco, conta como 0' : 'aberta, pelo banco'), cor: c.cor, ink: c.ink };
       }
       const v = fatOf(c, mi); if (!v) return null;
       const due = c.ve ? new Date(Math.floor(mi / 12), mi % 12, Math.min(c.ve, nd)) : null;
