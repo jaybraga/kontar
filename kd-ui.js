@@ -374,7 +374,12 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const M = KD.M;
     if (ch.some(k => k in PREF)) { clearTimeout(prefT); prefT = setTimeout(() => KD.savePrefs(comp.state), 600); }
     if (ch.includes('cats')) changedKeys(old.cats, st.cats).forEach(id => { const n = st.cats[id]; if (!n) return; queue(async () => ck(await sb().from('transactions').update({ category_id: catId(n), status: 'confirmado', categoria_origem: 'usuario' }).eq('id', id))); });
-    if (ch.includes('alt')) changedKeys(old.alt, st.alt).forEach(nome => { const e = M.estByName[nome]; if (!e) return; queue(async () => ck(await sb().from('merchant_aliases').update({ sempre_perguntar: !!st.alt[nome] }).in('chave', e.chaves))); });
+    /* merchant_aliases: a maioria das chaves ainda não tem linha, então update() não gravava nada e a edição "voltava" no refresh.
+       Upsert por chave: cria a linha (amostra obrigatória = a existente ou o nome da fatura) ou atualiza só as colunas enviadas. */
+    const maSave = async (e, patch) => { const fat = {}; ((KD.raw && KD.raw.lanc) || []).forEach(l => { if (l.chave && !fat[l.chave]) fat[l.chave] = l.nome_fatura; });
+      const ks = (e.chaves || []).filter(Boolean); if (!ks.length) return;
+      ck(await sb().from('merchant_aliases').upsert(ks.map(k => Object.assign({ user_id: uid(), chave: k, amostra: (M.maByChave[k] || {}).amostra || fat[k] || k }, patch)), { onConflict: 'user_id,chave' })); };
+    if (ch.includes('alt')) changedKeys(old.alt, st.alt).forEach(nome => { const e = M.estByName[nome]; if (!e) return; queue(async () => maSave(e, { sempre_perguntar: !!st.alt[nome] })); });
     if (ch.includes('tet')) changedKeys(old.tet, st.tet).forEach(n => { const id = catId(n); if (!id) return; queue(async () => ck(await sb().from('categories').update({ teto_mensal: st.tet[n] || null }).eq('id', id))); });
     if (ch.includes('cor')) changedKeys(old.cor, st.cor).forEach(n => { const id = catId(n); if (!id) return; queue(async () => ck(await sb().from('categories').update({ cor: st.cor[n] || KD.CAT_DEF[n] || '#78788A' }).eq('id', id))); });
     if (ch.includes('ico')) changedKeys(old.ico, st.ico).forEach(n => { const id = catId(n); if (!id) return; queue(async () => ck(await sb().from('categories').update({ icone: st.ico[n] || (n in KD.CAT_DEF ? n : 'Outros') }).eq('id', id))); });
@@ -390,7 +395,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (ch.includes('eov')) changedKeys(old.eov, st.eov).forEach(nome => { const e = M.estByName[nome], ov = st.eov[nome]; if (!e || !ov) return; queue(async () => {
       const p = {}; if (ov.name != null && ov.name.trim() && ov.name.trim() !== nome) p.apelido = ov.name.trim(); if (ov.cat) p.category_id = catId(ov.cat);
       if (ov.logo !== undefined) p.logo_url = ov.logo ? await KD.smallImage(ov.logo) : null; if (ov.dom) p.dominio = ov.dom;
-      if (Object.keys(p).length) ck(await sb().from('merchant_aliases').update(p).in('chave', e.chaves));
+      if (Object.keys(p).length) await maSave(e, p);
       if (p.apelido) ck(await sb().from('transactions').update({ apelido: null }).in('chave', e.chaves)); }); });
     if (ch.includes('cOv')) changedKeys(old.cOv, st.cOv).forEach(n => { const c = M.cards.find(x => x.n === n), o = st.cOv[n]; if (!c || !o) return; queue(async () => {
       const lim = Number(o.lim) || null; ck(await sb().from('cards').update({ apelido: o.name || null, final4: o.fin || null, limite: lim, disponivel_informado: lim != null ? Math.max(0, lim - c.used) : null, limite_em: KD.iso(KD.today) }).eq('id', c.id));
