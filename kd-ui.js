@@ -1622,8 +1622,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   }
   function pinta() {
     const NT = KD.notch.corner(...NB), EDGE = KD.notch.edge(...NB), MASK = KD.notch.mask(...NB) + ', linear-gradient(#000 0 0)', id = S.id;
-    const desc = 'As compras de quem você marcar passam a aparecer como <b style="color:#fff">' + esc(id.name) + '</b>, com o mesmo logo e o mesmo “Sempre perguntar”. '
-      + (id.alt ? 'Como ele sempre pergunta, as compras não revisadas continuam esperando sua escolha.' : 'Só as compras ainda não revisadas passam para <b style="color:#fff">' + esc(id.cat) + '</b>; as que você já classificou ficam como estão.');
+    const desc = 'As compras de quem você marcar passam a aparecer como <b style="color:#fff">' + esc(id.name) + '</b>, com o mesmo logo e o mesmo “Pode ser trabalho?”. '
+      + (id.alt ? 'Como ele pode ser trabalho, as compras não revisadas continuam esperando sua escolha.' : 'Só as compras ainda não revisadas passam para <b style="color:#fff">' + esc(id.cat) + '</b>; as que você já classificou ficam como estão.');
     el.innerHTML = '<div aria-hidden="true" style="position:absolute;inset:0;z-index:-1;box-sizing:border-box;border-radius:30px;pointer-events:none;background:#111114;border:1px solid #2A2A2F;-webkit-mask:' + MASK + ';-webkit-mask-composite:xor;mask:' + MASK + ';mask-composite:exclude"></div>'
       + '<svg aria-hidden="true" width="' + NT.w + '" height="' + NT.h + '" style="position:absolute;right:0;top:0;z-index:-1;pointer-events:none;overflow:visible"><path d="' + EDGE + '" fill="none" stroke="#2A2A2F" stroke-width="1"/></svg>'
       + '<span data-ej-x role="button" aria-label="Fechar" style="position:absolute;right:0;top:0;width:32px;height:32px;box-sizing:border-box;border-radius:50%;border:1px solid #3A3A40;background:#1C1C20;display:flex;align-items:center;justify-content:center;color:#B4B4BA;cursor:pointer;transition:color .25s ease,border-color .25s ease" onmouseover="this.style.color=\'#F2F0EB\';this.style.borderColor=\'#55555C\'" onmouseout="this.style.color=\'#B4B4BA\';this.style.borderColor=\'#3A3A40\'">' + IC_X + '</span>'
