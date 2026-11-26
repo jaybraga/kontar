@@ -113,7 +113,7 @@ window.KD_CATIC = {"keys": ["coffee", "cup-soda", "beer", "wine", "martini", "pi
   const sv = inner => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
   const EXTRA = {
     lata: ['Lata', '<path d="M8 3h8"/><path d="M7 5.5 8 3"/><path d="m17 5.5-1-2.5"/><path d="M7 5.5h10v13.5a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2z"/><path d="M7 9.5h10"/><path d="M7 16.5h10"/><path d="m10.5 12 2.5-1v3l2-1"/>'],
-    galao: ['Galão de gasolina', '<path d="M5 7a2 2 0 0 1 2-2h7.5L19 9.5V19a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><path d="M8 5V3h4v2"/><path d="m16.5 7 2.5-2.5 1.5 1.5L18 8.5"/><path d="m8.5 10.5 6 6"/><path d="m14.5 10.5-6 6"/>'],
+    galao: ['Galão de gasolina', '<path d="M5 7a2 2 0 0 1 2-2h7.5L19 9.5V19a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><path stroke-width="1.5" d="M8.25 4.9V3.25h3.5V4.9"/><path stroke-width="1.5" d="m16.6 7.1 2.4-2.4 1.3 1.3-2.4 2.4"/>'],
     'car-front': ['Carro de frente', '<path d="m21 8-2 2-1.5-3.7A2 2 0 0 0 15.646 5H8.4a2 2 0 0 0-1.903 1.257L5 10 3 8"/><path d="M7 14h.01"/><path d="M17 14h.01"/><rect width="18" height="8" x="3" y="10" rx="2"/><path d="M5 18v2"/><path d="M19 18v2"/>']
   };
   Object.keys(EXTRA).forEach(k => { if (!CI.svg[k]) { CI.svg[k] = sv(EXTRA[k][1]); CI.labels[k] = EXTRA[k][0]; CI.keys.push(k); } });
