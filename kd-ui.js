@@ -1646,9 +1646,17 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   }
   const redesenha = () => { if (!el) return; el.querySelector('[data-ej-list]').innerHTML = lista(false); el.querySelector('[data-ej-rodape]').innerHTML = rodape(); };
   function fecha(rapido) {
-    if (!el) return; const e0 = el; el = null; S = null; document.removeEventListener('keydown', tecla, true);
-    if (rapido) { e0.remove(); return; }
-    e0.style.opacity = '0'; e0.style.transform = 'translateY(8px)'; setTimeout(() => e0.remove(), 360);
+    if (!el) return; const e0 = el, s0 = S; el = null; S = null; document.removeEventListener('keydown', tecla, true);
+    const velhas = (s0 && s0.anims) || [];
+    if (rapido || !s0 || !s0.host || !s0.host.isConnected) { velhas.forEach(a => a.cancel()); e0.remove(); return; }
+    // ordem inversa: overlay some, o card volta ao tamanho e o conteúdo reaparece
+    e0.style.transitionDelay = '0s'; e0.style.opacity = '0'; e0.style.transform = 'translateY(10px)';
+    setTimeout(() => {
+      e0.remove(); const H = s0.host;
+      const novas = [H.animate([{ height: s0.h1 + 'px' }, { height: s0.h0 + 'px' }], { duration: 520, easing: EE, fill: 'forwards' })].concat(s0.kids.map(k => k.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 320, delay: 200, easing: 'ease', fill: 'forwards' })));
+      velhas.forEach(a => a.cancel());
+      novas[0].finished.then(() => setTimeout(() => novas.forEach(a => a.cancel()), 360)).catch(() => {});
+    }, 260);
   }
   function tecla(e) { if (e.key === 'Escape' && S && !S.busy) { e.stopPropagation(); fecha(); } }
   async function junta() {
@@ -1665,7 +1673,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       if (el) fecha(true);
       S = { orig, id, q: '', sel: new Set(), busy: false, msg: '', todos: candidatos(orig) };
       el = document.createElement('div'); el.setAttribute('data-ej', '1');
-      el.style.cssText = 'position:absolute;left:0;right:8px;top:0;height:max(100%,500px);z-index:30;isolation:isolate;display:grid;grid-template-columns:minmax(0,.92fr) minmax(0,1fr);color:#fff;filter:drop-shadow(0 24px 48px rgba(0,0,0,.6));opacity:0;transform:translateY(8px);transition:opacity .35s ease,transform .45s ' + EE;
+      el.style.cssText = 'position:absolute;left:0;right:8px;top:0;bottom:0;z-index:30;isolation:isolate;display:grid;grid-template-columns:minmax(0,.92fr) minmax(0,1fr);color:#fff;opacity:0;transform:translateY(10px);transition:opacity .35s ease .2s,transform .5s ' + EE + ' .2s';
       el.addEventListener('click', e => {
         e.stopPropagation(); if (!S) return;
         const t = e.target.closest('[data-ej-pick],[data-ej-x],[data-ej-ok]'); if (!t || S.busy) return;
@@ -1673,11 +1681,15 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
         if (t.hasAttribute('data-ej-ok')) return junta();
         const n = t.getAttribute('data-ej-pick'); S.sel.has(n) ? S.sel.delete(n) : S.sel.add(n); S.msg = ''; redesenha();
       });
+      // o card cresce (empurrando a lista) e o conteúdo dele some, sobrando só o fundo; tudo via WAAPI pra não brigar com o estilo do React
+      const h0 = host.offsetHeight, h1 = Math.max(h0, 520), kids = [...host.children];
+      S.host = host; S.h0 = h0; S.h1 = h1; S.kids = kids;
+      S.anims = [host.animate([{ height: h0 + 'px' }, { height: h1 + 'px' }], { duration: 560, easing: EE, fill: 'forwards' })].concat(kids.map(k => k.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, easing: 'ease', fill: 'forwards' })));
       host.appendChild(el); pinta(); document.addEventListener('keydown', tecla, true);
       requestAnimationFrame(() => requestAnimationFrame(() => { if (!el) return; el.style.opacity = '1'; el.style.transform = 'none';
-        // garante que o overlay inteiro fique à vista
-        const sc = host.closest('[data-page-scroll]'); if (sc) { const b = el.getBoundingClientRect().bottom + 16 - sc.getBoundingClientRect().bottom; if (b > 0) sc.scrollBy({ top: b, behavior: 'smooth' }); }
         const q = el.querySelector('[data-ej-q]'); if (q) q.focus({ preventScroll: true }); }));
+      // garante que o card inteiro fique à vista depois de crescer
+      setTimeout(() => { if (!el) return; const sc = host.closest('[data-page-scroll]'); if (sc) { const b = host.getBoundingClientRect().bottom + 16 - sc.getBoundingClientRect().bottom; if (b > 0) sc.scrollBy({ top: b, behavior: 'smooth' }); } }, 580);
     },
     fechar: () => fecha(true),
     aberto: () => !!el
