@@ -455,3 +455,24 @@
     ['kontar-cat-cores', 'kontar-cat-icones', 'kontar-cat-custom', 'kontar-foto'].forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
   };
 })();
+
+/* Kontar · barra de cima em telas largas. O conteúdo escala com a largura da janela, então em tela grande (2K/4K) a barra
+   passa dos 68px que as telas cheias (Fontes, importador) usavam como topo fixo, e elas cobriam o pé da barra.
+   Aqui toda camada fixa presa embaixo da barra acompanha a altura real dela (ao abrir, ao redimensionar e se a barra mudar). */
+(function () {
+  const KD = window.KD;
+  const barra = () => Array.prototype.find.call(document.querySelectorAll('[data-dc-tpl]'), e => e.style.zIndex === '8' && e.style.borderBottomWidth === '1px' && e.getBoundingClientRect().top < 2);
+  KD.navBottom = () => { const b = barra(); return b ? Math.ceil(b.getBoundingClientRect().bottom) : 68; };
+  const camadas = () => Array.prototype.filter.call(document.body.children, e => e.style && e.style.position === 'fixed' && (e.dataset.colaBarra || e.style.top === '68px'));
+  let pend = 0;
+  const ajusta = () => { pend = 0; const ls = camadas(); if (!ls.length) return; const t = KD.navBottom() + 'px'; ls.forEach(e => { e.dataset.colaBarra = '1'; if (e.style.top !== t) e.style.top = t; }); };
+  const agenda = () => { if (!pend) pend = requestAnimationFrame(ajusta); };
+  const liga = () => {
+    new MutationObserver(agenda).observe(document.body, { childList: true });
+    window.addEventListener('resize', agenda);
+    // a barra pode ser redesenhada: confere de tempos em tempos qual é a atual e observa o tamanho dela
+    let ro = null, vista = null; const vigia = () => { const b = barra(); if (!b || b === vista || !window.ResizeObserver) return; if (ro) ro.disconnect(); ro = new ResizeObserver(agenda); ro.observe(b); vista = b; agenda(); };
+    vigia(); setInterval(vigia, 2000);
+  };
+  if (document.body) liga(); else document.addEventListener('DOMContentLoaded', liga);
+})();
