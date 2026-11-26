@@ -125,7 +125,7 @@
     M.cards = R.cards.filter(c => !c.removido_em && !ARQ.has(c.conta_pagamento_id)).sort((a, b) => ALF(a.apelido || a.nome, b.apelido || b.nome) || a.ordem - b.ordem).map(c => {
       const col = colorOf(c.nome, c.instituicao, c.brand_hex), cy = cycOf(c.id, T), lim = Number(c.limite) || 0;
       const used = lim && c.disponivel_informado != null ? Math.max(0, lim - Number(c.disponivel_informado)) : 0;
-      return { criado: c.created_at || null, fatInf: c.fonte_modo === 'open_finance' && c.fatura_informada != null ? Number(c.fatura_informada) : null, fatEm: c.fatura_em || null, id: c.id, acc: c.conta_pagamento_id || null, destaque: (KD.destaque && KD.destaque(bankOf(c.nome, c.instituicao), '#141416')) || col[0], n: c.nome, informed: lim && c.disponivel_informado != null, nick: c.apelido || '', fin: c.final4 || '····', lim, used, cor: col[0], ink: KD.tema(col[0], bankOf(c.nome, c.instituicao), c.tinta || col[1]).ink, bank: bankOf(c.nome, c.instituicao), cy,
+      return { criado: c.created_at || null, fatInf: c.fonte_modo === 'open_finance' && c.fatura_informada != null ? Number(c.fatura_informada) : null, fatEm: c.fatura_em || null, of: c.fonte_modo === 'open_finance', fatFech: c.fonte_modo === 'open_finance' && Number(c.fatura_fechada) > 0 ? Number(c.fatura_fechada) : 0, fatFechVe: c.fatura_fechada_vence ? pd(c.fatura_fechada_vence) : null, fatAbVe: c.fatura_aberta_vence ? pd(c.fatura_aberta_vence) : null, fatAbFe: c.fatura_aberta_fecha ? pd(c.fatura_aberta_fecha) : null, conferir: c.fonte_modo === 'open_finance' && !!c.fatura_conferir, id: c.id, acc: c.conta_pagamento_id || null, destaque: (KD.destaque && KD.destaque(bankOf(c.nome, c.instituicao), '#141416')) || col[0], n: c.nome, informed: lim && c.disponivel_informado != null, nick: c.apelido || '', fin: c.final4 || '····', lim, used, cor: col[0], ink: KD.tema(col[0], bankOf(c.nome, c.instituicao), c.tinta || col[1]).ink, bank: bankOf(c.nome, c.instituicao), cy,
         fe: cy ? cy.dia_fechamento : null, ve: cy ? cy.dia_vencimento : null, orig: cy ? ({ fatura: 'fatura real', chute: 'chute', manual: 'cadastro manual' })[cy.origem] || 'chute' : 'chute',
         since: cy && cy.vigencia_inicio > '2025-01-01' ? cy.vigencia_inicio : null };
     });
@@ -322,12 +322,21 @@
     /* cartão do Open Finance: a fatura aberta é o valor que o banco informa (parcelas antigas, estornos e créditos já entram nela); vale pro mês do próximo vencimento */
     const fatOf0 = (c, m) => M.cash.filter(e => e.card === c.n && e.mi === m).reduce((a, e) => a + e.out, 0);
     /* fatura negativa (crédito do banco, pagamento em dobro...) aparece como o banco informa, mas nas contas vale 0 */
-    const fatOf = (c, m) => Math.max(0, (c.fatInf != null && c.ve && m === mIdx(T) + (T.getDate() < c.ve ? 0 : 1)) ? c.fatInf : fatOf0(c, m));
+    const abVe = c => c.fatAbVe || (c.ve ? new Date(T.getFullYear(), T.getMonth() + (T.getDate() < c.ve ? 0 : 1), c.ve) : null);
+    const fatOf = (c, m) => {
+      if (c.fatInf != null) { const a = abVe(c);
+        if (c.fatFechVe && m === mIdx(c.fatFechVe)) return c.fatFech;
+        if (a && m === mIdx(a)) return Math.max(0, c.fatInf);
+      }
+      return Math.max(0, fatOf0(c, m));
+    };
     const nFat = (c, m) => M.cash.filter(e => e.card === c.n && e.mi === m).length;
     out.FATS = M.cards.map(c => {
-      if (isCur && c.fatInf != null) {   // conectado: no mês atual, a fatura aberta que o banco informa, com o próximo vencimento
-        if (!c.fatInf) return null; const due = c.ve ? new Date(T.getFullYear(), T.getMonth() + (T.getDate() < c.ve ? 0 : 1), c.ve) : null;
-        return { n: c.nick || c.n, v: int(c.fatInf), sub: (due ? 'vence ' + dmes(due) + ' · ' : '') + (c.fatInf < 0 ? 'crédito no banco, conta como 0' : 'aberta, pelo banco'), cor: c.cor, ink: c.ink };
+      if (isCur && c.fatInf != null) {   // conectado: a fatura que o banco informa. Fechada e não paga vem primeiro (é a que vence); senão, a aberta
+        const conf = c.conferir ? ' · conferir no banco' : '';
+        if (c.fatFech > 0 && c.fatFechVe) return { n: c.nick || c.n, v: int(c.fatFech), sub: 'vence ' + dmes(c.fatFechVe) + ' · fechada' + (c.fatInf > 0 ? ' · próxima ' + int(c.fatInf) : '') + conf, cor: c.cor, ink: c.ink };
+        if (!c.fatInf) return null; const due = abVe(c), fe = c.fatAbFe && c.fatAbFe >= T ? daysBetween(T, c.fatAbFe) : null;
+        return { n: c.nick || c.n, v: int(c.fatInf), sub: (due ? 'vence ' + dmes(due) + ' · ' : '') + (c.fatInf < 0 ? 'crédito no banco, conta como 0' : fe != null ? 'aberta, fecha ' + fmtD(fe) : 'aberta, pelo banco') + conf, cor: c.cor, ink: c.ink };
       }
       const v = fatOf(c, mi); if (!v) return null;
       const due = c.ve ? new Date(Math.floor(mi / 12), mi % 12, Math.min(c.ve, nd)) : null;

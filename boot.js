@@ -818,7 +818,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
       const cor = b ? corDe(b)[0] : host ? host.cor : '#6A4BFF', tinta = b ? corDe(b)[1] : ink(cor), lim = c.limite || null;
       const r = await sb.from('cards').insert(Object.assign({ user_id: user.id, nome: inst, instituicao: inst, brand_hex: cor, tinta, final4: c.final || null, limite: lim, disponivel_informado: c.disponivel != null ? c.disponivel : lim, limite_em: lim ? hoje : null, conta_pagamento_id: host ? host.id : null, ordem: ++ordC, ativo: true }, liga(x))).select().single();
       if (r.error) { console.error('[kontar] onboarding OF cartão', r.error); continue; }
-      const y = await sb.from('card_cycles').insert({ user_id: user.id, card_id: r.data.id, vigencia_inicio: hoje, dia_fechamento: c.fecha || 1, dia_vencimento: c.vence || 10, regra: 'dia_fixo', origem: 'manual' });
+      const y = await sb.from('card_cycles').insert({ user_id: user.id, card_id: r.data.id, vigencia_inicio: hoje, dia_fechamento: c.fecha || 1, dia_vencimento: c.vence || 10, regra: 'dia_fixo', origem: 'chute' });
       if (y.error) console.error('[kontar] onboarding OF ciclo', y.error);
     }
     try { await KD.load(sb, user); } catch (e) { console.error(e); }
@@ -860,6 +860,19 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
       const L2 = loader(); await mountApp(); dismissRoot(); await L2.finish(); return;
     }
     await mountApp(); dismissRoot(); await L.finish();
+    syncSeVelho(sb, user);
+  }
+  /* Open Finance: ao abrir o app, se a última atualização tem mais de 12h, busca do banco em segundo plano e redesenha quando chegar */
+  async function syncSeVelho(sb, user) {
+    try {
+      if (window.KD.isDemo && window.KD.isDemo()) return;
+      const r = await sb.from('fonte_conexoes').select('ultima_sync,status').eq('user_id', user.id).eq('provedor', 'pluggy').neq('status', 'desconectado');
+      const cx = r.data || []; if (!cx.length) return;
+      const velha = cx.some(c => !c.ultima_sync || Date.now() - Date.parse(c.ultima_sync) > 12 * 3600e3); if (!velha) return;
+      const s = await sb.functions.invoke('open-finance', { body: { acao: 'sync' } }); if (s.error) return console.error('[kontar] sync ao abrir', s.error);
+      const KD = window.KD; if (KD.refresh && KD.comp) await KD.refresh(KD.comp); else await KD.load(sb, user);
+      if (KD.fontes && KD.fontes.carregar) KD.fontes.carregar();
+    } catch (e) { console.error('[kontar] sync ao abrir', e); }
   }
   async function main() {
     const mock = local && /[?&]mock=1/.test(location.search), tela = qs('tela');
