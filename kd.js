@@ -88,7 +88,9 @@
   async function all(sb, table, sel) {
     const out = []; let from = 0;
     for (;;) {
-      const r = await sb.from(table).select(sel || '*').range(from, from + 999);
+      /* paginação precisa de ordem fixa: sem ela o banco devolve páginas sobrepostas (linhas em dobro e outras faltando) */
+      let r = await sb.from(table).select(sel || '*').order('id').range(from, from + 999);
+      if (r.error && /column|id/i.test(r.error.message) && from === 0) { r = await sb.from(table).select(sel || '*').range(0, 999); if (!r.error && r.data.length >= 1000) throw new Error(table + ': sem coluna id para paginar'); }
       if (r.error) throw new Error(table + ': ' + r.error.message);
       out.push(...r.data); if (r.data.length < 1000) return out; from += 1000;
     }
@@ -125,7 +127,7 @@
     M.cards = R.cards.filter(c => !c.removido_em && !ARQ.has(c.conta_pagamento_id)).sort((a, b) => ALF(a.apelido || a.nome, b.apelido || b.nome) || a.ordem - b.ordem).map(c => {
       const col = colorOf(c.nome, c.instituicao, c.brand_hex), cy = cycOf(c.id, T), lim = Number(c.limite) || 0;
       const used = lim && c.disponivel_informado != null ? Math.max(0, lim - Number(c.disponivel_informado)) : 0;
-      return { criado: c.created_at || null, fatInf: c.fonte_modo === 'open_finance' && c.fatura_informada != null ? Number(c.fatura_informada) : null, fatEm: c.fatura_em || null, of: c.fonte_modo === 'open_finance', fatFech: c.fonte_modo === 'open_finance' && Number(c.fatura_fechada) > 0 ? Number(c.fatura_fechada) : 0, fatFechVe: c.fatura_fechada_vence ? pd(c.fatura_fechada_vence) : null, fatAbVe: c.fatura_aberta_vence ? pd(c.fatura_aberta_vence) : null, fatAbFe: c.fatura_aberta_fecha ? pd(c.fatura_aberta_fecha) : null, conferir: c.fonte_modo === 'open_finance' && !!c.fatura_conferir, id: c.id, acc: c.conta_pagamento_id || null, destaque: (KD.destaque && KD.destaque(bankOf(c.nome, c.instituicao), '#141416')) || col[0], n: c.nome, informed: lim && c.disponivel_informado != null, nick: c.apelido || '', fin: c.final4 || '····', lim, used, cor: col[0], ink: KD.tema(col[0], bankOf(c.nome, c.instituicao), c.tinta || col[1]).ink, bank: bankOf(c.nome, c.instituicao), cy,
+      return { criado: c.created_at || null, fatInf: c.fonte_modo === 'open_finance' && c.fatura_informada != null ? Number(c.fatura_informada) : null, fatEm: c.fatura_em || null, of: c.fonte_modo === 'open_finance', parcOf: c.fonte_modo === 'open_finance' && Array.isArray(c.parcelas_of) ? c.parcelas_of : null, histOf: c.fonte_modo === 'open_finance' && Array.isArray(c.faturas_of) ? c.faturas_of : null, fatFech: c.fonte_modo === 'open_finance' && Number(c.fatura_fechada) > 0 ? Number(c.fatura_fechada) : 0, fatFechVe: c.fatura_fechada_vence ? pd(c.fatura_fechada_vence) : null, fatAbVe: c.fatura_aberta_vence ? pd(c.fatura_aberta_vence) : null, fatAbFe: c.fatura_aberta_fecha ? pd(c.fatura_aberta_fecha) : null, conferir: c.fonte_modo === 'open_finance' && !!c.fatura_conferir, fatDif: Number(c.fatura_diferenca) || 0, id: c.id, acc: c.conta_pagamento_id || null, destaque: (KD.destaque && KD.destaque(bankOf(c.nome, c.instituicao), '#141416')) || col[0], n: c.nome, informed: lim && c.disponivel_informado != null, nick: c.apelido || '', fin: c.final4 || '····', lim, used, cor: col[0], ink: KD.tema(col[0], bankOf(c.nome, c.instituicao), c.tinta || col[1]).ink, bank: bankOf(c.nome, c.instituicao), cy,
         fe: cy ? cy.dia_fechamento : null, ve: cy ? cy.dia_vencimento : null, orig: cy ? ({ fatura: 'fatura real', chute: 'chute', manual: 'cadastro manual' })[cy.origem] || 'chute' : 'chute',
         since: cy && cy.vigencia_inicio > '2025-01-01' ? cy.vigencia_inicio : null };
     });
@@ -163,6 +165,8 @@
     M.rowById = Object.fromEntries(M.rowsAll.map(r => [r.id, r]));
     // regra única (igual às visões do banco): meio transferência, vínculo de transferência ou categoria Transferência
     const isTransf = (KD.isTransf = r => r.c === 'Transferência' || r.meio === 'transferencia' || !!r.xfer);
+    /* estorno no cartão: crédito que não é pagamento de fatura abate o gasto (fica como saída negativa na categoria da compra), não é ganho */
+    M.rowsAll.forEach(r => { if (r.card && r.inn > 0 && !isTransf(r) && !/pagamento|inclus[aã]o de pagamento|^ajuste a d[eé]bito|^estorno saldo/i.test(r.e)) { r.out = -r.inn; r.inn = 0; r.estorno = true; } });
     /* movimentação INTERNA: transferência entre as contas do próprio usuário (vínculo de transferência, ou Pix/transferência cujo nome é um dos "nomes nas transferências" do titular).
        Não conta como gasto nem como ganho nos resumos do Extrato. Transferência para outra pessoa continua contando. */
     const toksI = s => KD.norm(s).replace(/[^a-z0-9]+/g, ' ').split(' ').filter(w => w.length >= 3);
@@ -196,7 +200,11 @@
     /* eventos de caixa: saída do dinheiro de verdade */
     M.cash = [];
     M.rows.forEach(r => { if (isTransf(r) || hasInst.has(r.id)) return; if (r.out || r.inn) M.cash.push({ r, dt: r.dt, mi: r.mi, out: r.out, inn: r.inn, card: r.out && r.card ? r.card : null }); });
-    M.inst.forEach(i => { if (isTransf(i.r)) return; const o = i.r.out ? i.v : 0; M.cash.push({ r: i.r, dt: i.dt, mi: i.mi, out: o, inn: i.r.inn ? i.v : 0, card: o && i.r.card ? i.r.card : null }); });
+    M.inst.forEach(i => { if (isTransf(i.r)) return; const o = i.r.out ? Math.sign(i.r.out) * i.v : 0; M.cash.push({ r: i.r, dt: i.dt, mi: i.mi, out: o, inn: i.r.inn ? i.v : 0, card: o && i.r.card ? i.r.card : null }); });
+    /* parcelas que o banco não lista (C6, Amazon): previstas mês a mês a partir da última que apareceu */
+    const catDeSerie = KD.catDeSerie = (c, e) => { const k = KD.norm(e).slice(0, 12), r = M.rows.find(x => x.card === c.n && KD.norm(x.e).slice(0, 12) === k); return r ? r.c : 'Outros'; };
+    M.cards.forEach(c => (c.parcOf || []).forEach(sr => (sr.vence || []).forEach((d, k) => { const dt = pd(d), r = { id: 'prev:' + c.id + ':' + sr.e + ':' + k, e: sr.e, c: catDeSerie(c, sr.e), card: c.n, out: sr.v, inn: 0, dt, mi: mIdx(dt), prevista: true };
+      M.cash.push({ r, dt, mi: r.mi, out: sr.v, inn: 0, card: c.n }); })));
     /* F1: sem "disponível informado", o limite usado = fatura aberta (compras à vista do ciclo atual) + parcelas que ainda vão vencer */
     M.cards.forEach(c => { if (!c.lim || c.informed) return; const T0 = new Date(T.getFullYear(), T.getMonth(), T.getDate()), fe = Number(c.fe) || 1,
         close = new Date(T0.getFullYear(), T0.getMonth() - (T0.getDate() >= fe ? 0 : 1), fe); let u = 0;
@@ -327,13 +335,15 @@
       if (c.fatInf != null) { const a = abVe(c);
         if (c.fatFechVe && m === mIdx(c.fatFechVe)) return c.fatFech;
         if (a && m === mIdx(a)) return Math.max(0, c.fatInf);
+        const h = c.histOf && a && m < mIdx(a) && c.histOf.find(x => mIdx(pd(x.vence)) === m);   // fatura que já fechou: o total do banco
+        if (h) return Math.max(0, Number(h.total) || 0);
       }
       return Math.max(0, fatOf0(c, m));
     };
     const nFat = (c, m) => M.cash.filter(e => e.card === c.n && e.mi === m).length;
     out.FATS = M.cards.map(c => {
       if (isCur && c.fatInf != null) {   // conectado: a fatura que o banco informa. Fechada e não paga vem primeiro (é a que vence); senão, a aberta
-        const conf = c.conferir ? ' · conferir no banco' : '';
+        const conf = c.conferir ? (c.fatDif > 0 ? ' · + ' + int(c.fatDif) + ' no limite, ainda sem detalhe' : ' · conferir no banco') : '';
         if (c.fatFech > 0 && c.fatFechVe) return { n: c.nick || c.n, v: int(c.fatFech), sub: 'vence ' + dmes(c.fatFechVe) + ' · fechada' + (c.fatInf > 0 ? ' · próxima ' + int(c.fatInf) : '') + conf, cor: c.cor, ink: c.ink };
         if (!c.fatInf) return null; const due = abVe(c), fe = c.fatAbFe && c.fatAbFe >= T ? daysBetween(T, c.fatAbFe) : null;
         return { n: c.nick || c.n, v: int(c.fatInf), sub: (due ? 'vence ' + dmes(due) + ' · ' : '') + (c.fatInf < 0 ? 'crédito no banco, conta como 0' : fe != null ? 'aberta, fecha ' + fmtD(fe) : 'aberta, pelo banco') + conf, cor: c.cor, ink: c.ink };
@@ -359,6 +369,9 @@
       const rest = list.filter(i => i.dt > ref).reduce((a, i) => a + i.v, 0), last = list[list.length - 1];
       out.PARC.push({ c: r.c, n: r.e, k: r.card ? (M.cards.find(c => c.n === r.card) || {}).nick || r.card : r.k, tot: brl0(r.out) + ' em ' + r.x + 'x', x: r.x, f, ate: mShort(last.mi), r: Math.round(rest * 100) / 100 });
     });
+    if (isCur) M.cards.forEach(c => (c.parcOf || []).forEach(sr => { const f = sr.N - sr.n; if (f <= 0) return;   // conectado: o banco diz quantas parcelas faltam
+      const k = c.nick || c.n; out.PARC = out.PARC.filter(x => !(x.k === k && KD.norm(x.n).slice(0, 12) === KD.norm(sr.e).slice(0, 12)));
+      out.PARC.push({ c: KD.catDeSerie(c, sr.e), n: sr.e, k, tot: brl0(sr.v * sr.N) + ' em ' + sr.N + 'x', x: sr.N, f, ate: mShort(mIdx(pd(sr.ate))), r: Math.round(sr.v * f * 100) / 100 }); }));
     out.PARC.sort((a, b) => b.r - a.r);
 
     /* para onde foi (competência por categoria) */
