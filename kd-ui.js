@@ -2208,6 +2208,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   // ---- 5) shape de fundo: svg dentro da face, atrás de tudo (z-index -1 numa face isolada), cortado pelo canto arredondado
   const formaSvg = b => '<svg fill="none" data-bk-forma="' + b.slug + '" viewBox="0 0 440 277.4" preserveAspectRatio="xMidYMid slice" aria-hidden="true" style="position:absolute;left:0;top:0;width:100%;height:100%;z-index:-1;pointer-events:none;border-radius:inherit;overflow:hidden;opacity:0;transition:opacity .5s cubic-bezier(.65,0,.35,1)' + (b.blend ? ';mix-blend-mode:' + b.blend : '') + '">' + b.forma + '</svg>';
   const mesma = (a, b) => String(a || '').toUpperCase() === String(b || '').toUpperCase();
+  // shape pronto pra quem desenha o próprio card (página Contas, src/grupos.js): só quando o card está na cor da marca; sem fade (o card já anima)
+  KD.formaFundo = (nome, inst, cor) => { const b = KD.banco(nome, inst); return b && b.forma && mesma(cor, b.cor) ? formaSvg(b).replace('opacity:0;', 'opacity:1;') : ''; };
   function formas() {
     if (!KD.M || !KD.M.cards) return;
     document.querySelectorAll('[data-ce-pen]').forEach(sp => {
@@ -4013,11 +4015,15 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const salvaVW = () => { try { localStorage.setItem('kd-gview', JSON.stringify(VW)); } catch (e) { /* sem armazenamento */ } };
   const viewDe = g => { const cc = g.contas.length || g.cartoes.length, inv = g.inv.length; const v = VW[g.key]; if (v === 'inv' && inv) return 'inv'; if (v === 'cc' && cc) return 'cc'; return cc ? 'cc' : 'inv'; };
 
-  /* fatura atual = compras no cartão desde o último fechamento; preso em parcelas = o que ainda vai vencer */
+  /* fatura atual = a fatura que fecha no próximo fechamento: tudo que vence no vencimento dela (compras desde o último fechamento,
+     a parcela do mês das compras parceladas e estornos). M.cash guarda cada lançamento na data em que sai do caixa (o vencimento),
+     então filtrar pela data de caixa "até hoje" dava sempre 0 nos cartões sem Open Finance. Preso em parcelas = o que ainda vai vencer. */
   function faturaAberta(c) {
     if (c.fatInf != null) return c.fatInf;   // conectado: o valor que o banco informa (já com parcelas, estornos e créditos)
-    const M = KD.M, T = KD.today, T0 = new Date(T.getFullYear(), T.getMonth(), T.getDate()), fe = Number(c.fe) || 1, close = new Date(T0.getFullYear(), T0.getMonth() - (T0.getDate() >= fe ? 0 : 1), fe);
-    return Math.round((M.cash || []).filter(e => e.card === c.n && e.dt > close && e.dt <= T0).reduce((a, e) => a + e.out, 0) * 100) / 100;
+    const M = KD.M, T = KD.today, T0 = new Date(T.getFullYear(), T.getMonth(), T.getDate()), fe = Number(c.fe) || 1, ve = Number(c.ve) || fe;
+    const close = new Date(T0.getFullYear(), T0.getMonth() - (T0.getDate() >= fe ? 0 : 1), fe), prox = new Date(close.getFullYear(), close.getMonth() + 1, fe);
+    const due = new Date(prox.getFullYear(), prox.getMonth() + (ve > fe ? 0 : 1), ve), ym = due.getFullYear() * 12 + due.getMonth();
+    return Math.round((M.cash || []).filter(e => e.card === c.n && e.dt && e.dt.getFullYear() * 12 + e.dt.getMonth() === ym).reduce((a, e) => a + e.out, 0) * 100) / 100;
   }
   const preso = c => { const C = KD._C; return Math.round(((C && C.PARC) || []).filter(x => x.k === c.n).reduce((a, x) => a + (Number(x.r) || 0), 0) * 100) / 100; };
   const statusDe = (tipo, id) => { const FT = KD.fontes, rows = FT && FT.rows && FT.rows(), r = rows && rows.find(x => x.k === (tipo === 'c' ? 'c' : 'a') + id); return r ? { r, e: FT.estado(r) } : null; };
@@ -4075,7 +4081,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const alvo = view === 'cc' ? (c ? statusDe('c', c.id) : g.contas[0] ? statusDe('a', g.contas[0].id) : null) : (g.inv[0] ? statusDe('a', g.inv[0].id) : null);
     if (alvo && alvo.e.nivel !== 'ok') aviso = '<div style="display:flex;align-items:center;gap:2cqw;margin-top:1.6cqw;font-size:2.23cqw;font-weight:700"><span style="display:inline-flex;align-items:center;gap:1.2cqw;background:' + tm.chipBg + ';color:' + tm.chipInk + ';border-radius:9999px;padding:1cqw 2.4cqw;white-space:nowrap"><i style="width:1.6cqw;height:1.6cqw;border-radius:50%;background:' + AMB + ';display:block"></i>' + esc(alvo.e.txt.length > 46 ? alvo.e.txt.slice(0, 44) + '…' : alvo.e.txt) + '</span>'
       + (alvo.e.acao ? '<span data-gp-ac="' + esc(alvo.r.k) + '|' + alvo.e.acao + '" role="button" style="border:1.5px solid currentColor;border-radius:9999px;padding:.9cqw 2.4cqw;cursor:pointer;white-space:nowrap">' + esc((alvo.e.rotulo || '').charAt(0) + (alvo.e.rotulo || '').slice(1).toLowerCase()) + '</span>' : '') + '</div>';
-    return '<div style="position:relative;height:100%;box-sizing:border-box;border-radius:4.29cqw;background:' + cor + ';color:' + ink + ';padding:4.29cqw 4.64cqw 3.93cqw 5.00cqw;display:flex;flex-direction:column">' + topo + aviso + corpo + base + '</div>';
+    const forma = KD.formaFundo ? KD.formaFundo(p.bank || p.nome || p.n, p.inst, cor) : '';   // shape de fundo da marca (como nos cartões antigos)
+    return '<div style="position:relative;isolation:isolate;height:100%;box-sizing:border-box;border-radius:4.29cqw;background:' + cor + ';color:' + ink + ';padding:4.29cqw 4.64cqw 3.93cqw 5.00cqw;display:flex;flex-direction:column">' + forma + topo + aviso + corpo + base + '</div>';
   }
 
   /* ---------- nó do card (frente = face; verso = painel de edição) ---------- */
