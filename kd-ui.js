@@ -3470,7 +3470,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   function copia(el) {
     const txt = el.getAttribute('data-ext-copiar'), lbl = el.querySelector('[data-ext-lbl]');
     const ok = () => { if (lbl) { lbl.textContent = 'Copiado ✓'; setTimeout(() => { lbl.textContent = 'Copiar'; }, 1800); } };
-    if (navigator.clipboard) navigator.clipboard.writeText(txt).then(ok, () => {}); else { const t = document.createElement('textarea'); t.value = txt; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); ok(); }
+    const velho = () => { const t = document.createElement('textarea'); t.value = txt; t.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); } catch (e) {} t.remove(); ok(); };
+    if (navigator.clipboard) navigator.clipboard.writeText(txt).then(ok, velho); else velho();
   }
   function testa() {
     const r = document.querySelector('[data-ext-res]'); if (!r) return; const v = AT.ext();
