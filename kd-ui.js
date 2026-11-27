@@ -1885,7 +1885,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
      (Antes todo número sumia: "C6 BANK" virava "C BANK" e a busca trazia C&A.) */
   const limpa = nome => String(nome || '').replace(/[*#].*$/, '').replace(/\b\d{3,}\b/g, ' ').replace(/\b([a-zA-ZÀ-ú]{3,})\d{2,}\b/g, '$1').replace(/\s+/g, ' ').trim();
   /* palavras genéricas não identificam a marca (banco, mercado, posto...): pra completar a lista, o resultado precisa ter a palavra que identifica */
-  const GEN = new Set(['bank', 'banco', 'supermercado', 'supermercados', 'mercado', 'loja', 'lojas', 'posto', 'drogaria', 'farmacia', 'padaria', 'restaurante', 'bar', 'atacadista', 'atacado', 'comercio', 'servicos', 'pagamentos', 'brasil', 'ltda', 'sao', 'paulo', 'bra']);
+  const GEN = new Set(['bank', 'banco', 'supermercado', 'supermercados', 'mercado', 'loja', 'lojas', 'posto', 'drogaria', 'farmacia', 'padaria', 'restaurante', 'bar', 'atacadista', 'atacado', 'comercio', 'servicos', 'pagamentos', 'brasil', 'ltda', 'sao', 'paulo', 'bra', 'pago', 'pay', 'store', 'shop', 'delivery']);
   KD.estIcon = async nome => {
     const q = limpa(nome), k = nz(q);
     if (k.length < 2) return null; if (k in cache) return cache[k];
@@ -1904,7 +1904,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const q = limpa(nome), k = nz(q);
     if (k.length < 2) return []; if (opCache[k]) return opCache[k];
     const nq = k.replace(/ /g, ''), tk = k.split(' ').filter(t => t.length >= 4);
-    const palpites = [...new Set([nq + '.com.br', nq + '.com'].concat(tk.length > 1 ? tk.map(t => t + '.com.br') : []))];
+    const palpites = [...new Set([nq + '.com.br', nq + '.com'].concat(tk.length > 1 ? tk.filter(t => !GEN.has(t)).map(t => t + '.com.br') : []))];
     const [res, vivos] = await Promise.all([busca(q), Promise.all(palpites.map(favOk))]);
     const doms = [], add = d => { d = String(d || '').toLowerCase(); if (d && !doms.includes(d)) doms.push(d); };
     (res || []).map(b => ({ b, v: bate(b, q) })).filter(x => x.v).sort((a, b) => b.v - a.v).forEach(x => add(x.b.domain));
