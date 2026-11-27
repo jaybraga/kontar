@@ -119,6 +119,7 @@
   /* Roteiro (cada gatilho move as colunas UMA vez): abre no preto → claro → (não carregou) preto → claro … ; a conclusão entra na fila e o ÚLTIMO gatilho é sempre claro → preto.
      Tempo encurtado a pedido do Jay (≈2,7s numa carga rápida; o canvas tinha ≈4,2s). */
   let LOADER = null;
+  window.KontarLoaderNovo = () => loader();   // pra conferir a animação quadro a quadro com o app aberto
   function loader() {
     if (LOADER) LOADER.abort(true);
     const st = document.createElement('style'); st.textContent = scope(CSS_LOAD, '#kload'); injectProps(); document.head.appendChild(st);
