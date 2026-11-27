@@ -136,8 +136,11 @@
     LOADER = ctl; window.KontarLoader = ctl;
     (async () => { await wait(250);
       if (reduce()) { while (!ready && !dead) await wait(120); end(); return; }
-      for (;;) { if (dead) return; await toLight(); if (ready) break; await wait(HOLD); if (ready) break; if (dead) return; await toDark(); await wait(HOLD); }
-      if (dead) return; await wait(100); ld.classList.add('fin'); await toDark(); await wait(80); end(); })();
+      let escuro = false;   // pronto com a tela já escura: sai dali mesmo (antes rodava mais um claro → escuro inteiro, até ~2,2s a mais)
+      for (;;) { if (dead) return; await toLight(); if (ready) break; await wait(HOLD); if (ready) break; if (dead) return; await toDark(); if (ready) { escuro = true; break; } await wait(HOLD); if (ready) { escuro = true; break; } }
+      if (dead) return;
+      if (escuro) { ld.classList.add('fin'); await wait(700); end(); return; }
+      await wait(100); ld.classList.add('fin'); await toDark(); await wait(80); end(); })();
     return ctl;
   }
 
@@ -852,8 +855,10 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
   async function start(sb, user) {
     if (started) return; started = true;
     const L = loader(), KD = window.KD;
+    /* o runtime do protótipo e o React baixam enquanto os dados chegam (antes só começavam depois deles) */
+    ['./support.js', './vendor/react.production.min.js', './vendor/react-dom.production.min.js'].forEach(h => { const l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = h; document.head.appendChild(l); });
     try {
-      await KD.load(sb, user);
+      await KD.load(sb, user); performance.mark('kontar:dados');
       const p = KD.M.profile;
       if (p && p.avatar_url && sb.storage) { try { const r = await sb.storage.from('avatars').createSignedUrl(p.avatar_url, 3600 * 24 * 30); KD.avatarUrl = (r.data && r.data.signedUrl) || ''; } catch (e) {} }
       KD.primeLocalStorage();
@@ -864,7 +869,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
       try { await saveOnboarding(sb, user, a); } catch (e) { console.error(e); }
       const L2 = loader(); await mountApp(); dismissRoot(); await L2.finish(); return;
     }
-    await mountApp(); dismissRoot(); await L.finish();
+    await mountApp(); performance.mark('kontar:app'); dismissRoot(); await L.finish(); performance.mark('kontar:pronto');
     syncSeVelho(sb, user);
   }
   /* Open Finance: ao abrir o app, se a última atualização tem mais de 12h, busca do banco em segundo plano e redesenha quando chegar */

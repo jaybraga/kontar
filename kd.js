@@ -87,13 +87,16 @@
 
   const CHAVE = { user_prefs: 'user_id', profiles: 'user_id', transaction_notas: 'transaction_id' };   // tabelas sem coluna id
   async function all(sb, table, sel) {
-    const out = []; let from = 0;
-    for (;;) {
-      /* paginação precisa de ordem fixa: sem ela o banco devolve páginas sobrepostas (linhas em dobro e outras faltando) */
-      const r = await sb.from(table).select(sel || '*').order(CHAVE[table] || 'id').range(from, from + 999);
-      if (r.error) throw new Error(table + ': ' + r.error.message);
-      out.push(...r.data); if (r.data.length < 1000) return out; from += 1000;
-    }
+    /* paginação precisa de ordem fixa: sem ela o banco devolve páginas sobrepostas (linhas em dobro e outras faltando).
+       A 1ª página traz o total (count); as páginas que faltam vão todas ao mesmo tempo, em vez de uma depois da outra. */
+    const P = 1000, pag = (from, cnt) => sb.from(table).select(sel || '*', cnt ? { count: 'exact' } : undefined).order(CHAVE[table] || 'id').range(from, from + P - 1);
+    const r = await pag(0, true); if (r.error) throw new Error(table + ': ' + r.error.message);
+    const out = r.data.slice(); if (r.data.length < P) return out;
+    const total = r.count != null ? r.count : null;
+    if (total == null) { let from = P; for (;;) { const q = await pag(from); if (q.error) throw new Error(table + ': ' + q.error.message); out.push(...q.data); if (q.data.length < P) return out; from += P; } }
+    const resto = await Promise.all(Array.from({ length: Math.ceil(total / P) - 1 }, (_, i) => pag((i + 1) * P)));
+    for (const q of resto) { if (q.error) throw new Error(table + ': ' + q.error.message); out.push(...q.data); }
+    return out;
   }
 
   KD.load = async function (sb, user) {
