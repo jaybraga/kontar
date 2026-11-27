@@ -3208,11 +3208,16 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const m = FT.nomeMes(), doc = r.card ? 'fatura' : 'extrato', a = r.card ? 'a fatura' : 'o extrato';
     if (r.modo === 'manual') return r.ok ? { txt: 'Conferido em ' + dm(r.ultima) + (r.n_mes ? ' · ' + r.n_mes + (r.n_mes === 1 ? ' lançamento' : ' lançamentos') : ''), nivel: 'ok', acao: 'desmarcar', rotulo: 'DESMARCAR' }
       : { txt: (r.n_mes || 0) + (r.n_mes === 1 ? ' lançamento' : ' lançamentos') + ' em ' + m + ' · falta conferir', nivel: 'pend', acao: 'conferir', rotulo: 'CONFERI' };
-    if (r.modo === 'open_finance') return r.ok ? { txt: 'Atualizado ' + (r.ultima === iso(KD.today) ? 'hoje' : 'em ' + dm(r.ultima)), nivel: 'ok', acao: null }
+    if (r.modo === 'open_finance') return r.ok ? { txt: 'Atualizado ' + (r.conexao_sync ? FT.ha(r.conexao_sync) : r.ultima === iso(KD.today) ? 'hoje' : 'em ' + dm(r.ultima)), nivel: 'ok', acao: null }
       : { txt: r.conexao_status === 'expirado' ? 'Conexão expirada' + (r.ultima ? ' · último sync ' + dm(r.ultima) : '') : r.conexao_status === 'erro' ? 'A sincronização falhou' : 'Sem sincronização recente', nivel: 'erro', acao: 'reconectar', rotulo: 'RECONECTAR' };
     return r.ok ? { txt: 'Em dia · ' + doc + ' até ' + dm(r.ultima), nivel: 'ok', acao: 'reimportar', rotulo: 'REIMPORTAR' }
       : { txt: (FT.atrasado() ? 'Atrasado · falta ' : 'Falta ') + a + ' de ' + m + (r.ultima ? ' · último até ' + dm(r.ultima) : ''), nivel: 'pend', acao: 'importar', rotulo: r.card ? 'IMPORTAR FATURA' : 'IMPORTAR EXTRATO' };
   };
+  // "há 12 minutos", "há 3 horas", "há 2 dias" (a página se redesenha a cada minuto pra acompanhar)
+  FT.ha = t => { const m = Math.max(0, Math.floor((Date.now() - new Date(t).getTime()) / 6e4));
+    if (m < 1) return 'agora há pouco'; if (m < 60) return 'há ' + m + (m === 1 ? ' minuto' : ' minutos');
+    const h = Math.floor(m / 60); if (h < 24) return 'há ' + h + (h === 1 ? ' hora' : ' horas');
+    const d = Math.floor(h / 24); return 'há ' + d + (d === 1 ? ' dia' : ' dias'); };
   const aviso = msg => { const n = document.createElement('div'); n.textContent = msg; n.style.cssText = 'position:fixed;left:50%;bottom:30px;transform:translate(-50%,8px);background:#1b1b1d;color:' + FG + ';border:1px solid #2A2A2F;border-radius:30px;padding:14px 22px;font:700 13px Helvetica,Arial,sans-serif;z-index:99999;opacity:0;transition:opacity .3s ease,transform .45s ' + EE; document.body.appendChild(n); requestAnimationFrame(() => { n.style.opacity = '1'; n.style.transform = 'translate(-50%,0)'; }); setTimeout(() => { n.style.opacity = '0'; n.style.transform = 'translate(-50%,8px)'; setTimeout(() => n.remove(), 360); }, 3800); };
   FT.aviso = aviso;
   // executa a ação de uma fonte (botão da linha, do card ou do Fechar o mês)
@@ -3301,6 +3306,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       naPagina = false; const l = layer; if (l) { l.style.opacity = '0'; setTimeout(() => { if (!naPagina) l.style.display = 'none'; }, 360); }
     }
   }
+  setInterval(() => { if (naPagina && rows && rows.some(r => r.modo === 'open_finance')) window.dispatchEvent(new Event('kd:fontes-redesenha')); }, 60000);
   window.addEventListener('kd:fontes-redesenha', () => { const host = layer && naPagina && layer.firstElementChild; if (host) pagina(host, false); });
   window.addEventListener('kd:fontes', () => { const host = layer && naPagina && layer.firstElementChild; if (host) { const s = JSON.stringify(rows); if (s !== host.__sig) { const prim = host.__sig === 'null'; host.__sig = s; pagina(host, prim); } } sincCartoes(true); });
 
