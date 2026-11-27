@@ -99,19 +99,62 @@
     return out;
   }
 
+  /* modo leve (cálculo no servidor): ao abrir, NÃO baixa a lista de lançamentos. Vêm só os cadastros (contas, cartões, categorias...)
+     e o que o servidor já calculou: resumo do mês atual, números gerais e Estabelecimentos. O Extrato busca 50 por vez (src/extrato.js).
+     Importador, mescla e exportar CSV precisam do histórico inteiro: pedem KD.tudo(), que liga o modo completo nesta sessão. */
+  KD.LEVE = false;   // liga depois da conferência; localStorage 'kontar:leve' = '1' liga, '0' desliga neste navegador
+  KD.leve = () => { let v = null; try { v = localStorage.getItem('kontar:leve'); } catch (e) {} return KD.calcSrv() && !KD._tudo && (v === '1' ? true : v === '0' ? false : KD.LEVE); };
   KD.load = async function (sb, user) {
     KD.sb = sb; KD.user = user; KD.srv.mes = {};
+    const leve = KD.leve(), vazio = Promise.resolve([]);
     /* resumo do mês atual calculado no servidor: vem junto com as tabelas */
-    const pS = KD.calcSrv() ? Promise.all([KD.srv.buscaGeral(), KD.srv.buscaMes(mIdx(KD.today))]).catch(e => console.error(e)) : null;
+    const pS = KD.calcSrv() ? Promise.all([KD.srv.buscaGeral(), KD.srv.buscaMes(mIdx(KD.today)), leve ? KD.srv.buscaEst() : null]).catch(e => console.error(e)) : null;
     const [lanc, tx, inst, cards, cyc, accs, cats, ma, goals, prefs, prof, parts, items, notas] = await Promise.all([
-      all(sb, 'v_lancamento'), all(sb, 'transactions', 'id,card_id,account_id,category_id,categoria_origem,fora_do_comum,chave,created_at,transfer_id,mesclada_em,mescla_origem,of_status'),
-      all(sb, 'installments', 'transaction_id,numero,valor,data_caixa'), all(sb, 'cards'), all(sb, 'card_cycles'), all(sb, 'accounts'),
+      leve ? vazio : all(sb, 'v_lancamento'), leve ? vazio : all(sb, 'transactions', 'id,card_id,account_id,category_id,categoria_origem,fora_do_comum,chave,created_at,transfer_id,mesclada_em,mescla_origem,of_status'),
+      leve ? vazio : all(sb, 'installments', 'transaction_id,numero,valor,data_caixa'), all(sb, 'cards'), all(sb, 'card_cycles'), all(sb, 'accounts'),
       all(sb, 'categories'), all(sb, 'merchant_aliases'), all(sb, 'goals'), all(sb, 'user_prefs'), all(sb, 'profiles'),
-      all(sb, 'transaction_parts').catch(() => []), all(sb, 'transaction_items').catch(() => []), all(sb, 'transaction_notas').catch(() => [])
+      leve ? vazio : all(sb, 'transaction_parts').catch(() => []), leve ? vazio : all(sb, 'transaction_items').catch(() => []), leve ? vazio : all(sb, 'transaction_notas').catch(() => [])
     ]);
     KD.raw = { lanc, tx, inst, cards, cyc, accs, cats, ma, goals, prefs, prof, parts, items, notas };
     build();
     if (pS) await pS;
+    if (leve) aplicaLeve();
+  };
+  /* no modo leve, o que build() tiraria da lista de lançamentos vem do servidor */
+  function aplicaLeve() {
+    const M = KD.M, G = KD.srv.geral || {};
+    if (KD.srv.est) {
+      M.est = KD.srv.est.map(x => ({ nome: x[0], n: Number(x[1]) || 0, cat: x[2] || 'Outros', mix: x[3] || '', alterna: !!x[4], chaves: x[5] || [], orig: x[6] || [], dom: x[7] || null, logo: x[8] || null, assin: !!x[9] }))
+        .sort((a, b) => b.n - a.n || a.nome.localeCompare(b.nome, 'pt-BR'));
+      M.estByName = Object.fromEntries(M.est.map(e => [e.nome, e]));
+      M.DOM = {}; M.LOGO = {}; M.est.forEach(e => { if (e.dom) M.DOM[e.nome] = e.dom; if (e.logo) M.LOGO[e.nome] = e.logo; });
+    }
+    if (G.min != null) M.MIN = Math.min(M.CUR, G.min);
+    M.cards.forEach(c => { const u = G.used && G.used[c.id]; if (u != null) c.used = Math.min(c.lim, Math.round(Number(u) * 100) / 100); });
+    KD._mc = {};
+  }
+  KD.srv.buscaEst = async () => { const r = await KD.sb.rpc('kontar_estabs'); if (r.error) throw new Error('kontar_estabs: ' + r.error.message); return (KD.srv.est = r.data); };
+  /* quantos lançamentos a pessoa tem (conta nova = 0) */
+  KD.nLanc = () => KD.leve() ? Number((KD.srv.geral || {}).n) || 0 : (KD.M && KD.M.rows ? KD.M.rows.length : 0);
+  /* um lançamento pelo id, no formato do app (guarda em M.rowById) */
+  KD.buscaLinha = async id => {
+    const r = await KD.sb.rpc('kontar_lanc_det', { p_ids: [id] }); if (r.error) throw new Error('kontar_lanc_det: ' + r.error.message);
+    const d = (r.data || [])[0]; if (!d) return null; const row = mkRow(d.l, d.t || {}, d.parts, d.items, d.nota); aplicaEstorno(row);
+    const old = KD.M.rowById[id]; if (old && old.atyp != null && !d.t.fora_do_comum) row.atyp = old.atyp;
+    KD.M.rowById[id] = row; return row;
+  };
+  /* histórico inteiro (importador, mescla, CSV): liga o modo completo nesta sessão e recarrega */
+  KD.tudo = () => { if (!KD.leve()) return Promise.resolve(KD.M.rows); if (!KD._tudoP) KD._tudoP = (async () => { KD._tudo = true; if (KD.refresh && KD.comp) await KD.refresh(KD.comp); else { await KD.load(KD.sb, KD.user); KD._ver = (KD._ver || 0) + 1; } return KD.M.rows; })(); return KD._tudoP; };
+  /* últimos lançamentos de um estabelecimento (vista expandida). Devolve o que já tem e redesenha quando chega. */
+  const estCache = {};
+  KD.estRows = nome => {
+    if (!KD.leve()) return KD.M.rows.filter(r => r.e === nome);
+    const k = nome + '|' + (KD._ver || 0), c = estCache[k]; if (c) return c.rows;
+    estCache[k] = { rows: [] };
+    KD.sb.rpc('kontar_estab_lanc', { p_nome: nome, p_lim: 10 }).then(r => { if (r.error) throw r.error;
+      estCache[k].rows = (r.data || []).map(d => { const row = mkRow(d.l, d.t || {}, d.parts, d.items, d.nota); aplicaEstorno(row); KD.M.rowById[row.id] = KD.M.rowById[row.id] || row; return row; });
+      if (KD.comp) KD.comp.setState({}); }).catch(e => console.error(e));
+    return estCache[k].rows;
   };
 
   /* um lançamento no formato do app, a partir da linha de v_lancamento (l), das colunas de transactions (t) e de partes/itens/nota */
@@ -249,11 +292,12 @@
     M.profile = R.prof[0] || null;
     KD._mc = {};
   }
-  KD.saldoAtual = a => balAt(a, KD.today);
+  /* saldo de hoje: no modo leve vem do resumo do mês atual calculado no servidor (contas[id][0], referência = hoje) */
+  KD.saldoAtual = a => { if (KD.leve()) { const S = KD.srv.mes[KD.M.CUR], b = S && S.contas && S.contas[a.id]; if (b) return Number(b[0]) || 0; } return balAt(a, KD.today); };
   KD.rebuild = () => build();
   /* pool de investimentos: tudo que está em investimento (de todos os bancos) é uma reserva só. As metas "enxergam" o total; o que o usuário
      já separou para cada meta (goals.guardado) sai do que está livre para a próxima. Investimento não entra no saldo do dia a dia. */
-  KD.pool = () => { const M = KD.M, por = {}; let total = 0; M.accs.filter(a => a.tipo === 'investimento').forEach(a => { const v = balAt(a, KD.today); total += v; const k = a.bank || a.inst || a.nome; por[k] = (por[k] || 0) + v; });
+  KD.pool = () => { const M = KD.M, por = {}; let total = 0; M.accs.filter(a => a.tipo === 'investimento').forEach(a => { const v = KD.saldoAtual(a); total += v; const k = a.bank || a.inst || a.nome; por[k] = (por[k] || 0) + v; });
     const alocado = (M.goals || []).reduce((s, g) => s + (Number(g.guardado) || 0), 0); return { total: Math.round(total * 100) / 100, alocado: Math.round(alocado * 100) / 100, disp: Math.round((total - alocado) * 100) / 100, por }; };
 
   /* saldo de cada conta no fim do dia `d`, reconstruído a partir do saldo informado */
@@ -279,11 +323,12 @@
       e => { delete pedindo[mi]; console.error(e); }));
   };
   KD.month = function (mi) {
-    if (KD._mc[mi]) return KD._mc[mi];
+    if (KD._mc[mi]) return (KD._ultimo = KD._mc[mi]);
     if (KD.calcSrv()) {
       const S = KD.srv.mes[mi]; KD.srv_pede(mi - 1); KD.srv_pede(mi + 1);
-      if (S && KD.srv.geral) return (KD._mc[mi] = KD.monthSrv(mi, S, KD.srv.geral));
-      KD.srv_pede(mi);   // ainda não chegou: por enquanto vale o cálculo do navegador; redesenha quando chegar
+      if (S && KD.srv.geral) return (KD._ultimo = KD._mc[mi] = KD.monthSrv(mi, S, KD.srv.geral));
+      KD.srv_pede(mi);   // ainda não chegou: redesenha quando chegar
+      if (KD.leve() && KD._ultimo) return KD._ultimo;   // sem a lista no navegador: fica o mês que já estava na tela por um instante
     }
     return KD.monthJs(mi);
   };
@@ -545,18 +590,19 @@
       N.unshift({ id: 'fechar:' + lem.nome, g: 'pend', kind: 'block', bg: '#E5484D', ink: '#FFFFFF', tagBd: 'rgba(255,255,255,.7)', btnBg: '#FFFFFF', btnInk: '#B3261E', dotBg: '#FFFFFF', i: 'cal', ic: '#E5484D', tag: 'Fechamento do mês', t: '', title: 'Hora de fechar ' + lem.nome.charAt(0).toUpperCase() + lem.nome.slice(1), body: fm.length + (fm.length === 1 ? ' fonte ' : ' fontes ') + doc + ': ' + (fm.length > 3 ? fm.slice(0, 3).join(', ') + ' e mais ' + (fm.length - 3) : names(fm)) + '.', act: 'Fechar o mês', fechar: true }); }
     const at = cur.atyp;
     if (at) N.push({ id: 'atyp:' + at.id, g: 'pend', kind: 'block', home: 'a2', bg: 'linear-gradient(100deg,#FF9A3D 0%,#FF5A1F 45%,#F2301F 100%)', ink: '#140600', i: 'bolt', ic: '#FF7A2A', tag: 'Gasto fora do comum', t: when(at.dt), title: at.e, body: brl2(at.out) + ' — bem acima do que você costuma gastar em ' + at.c + ' num mês.', act: 'Ver no extrato', e: at.e });
-    const pend = M.rows.filter(r => r.pend);
+    const G = KD.leve() ? (KD.srv.geral || {}) : null, pr = a => a && { id: a[0], e: a[1], out: Number(a[2]) || 0, inn: Number(a[3]) || 0, k: a[4], dt: pd(a[5]) };
+    const pend = G ? Object.assign([], { length: Number((G.pend || [])[0]) || 0, 0: pr((G.pend || [])[1]) }) : M.rows.filter(r => r.pend);
     if (pend.length) { const p = pend[0]; N.push({ id: 'rev:' + pend.length + ':' + p.id, g: 'hoje', c: '#5B3DF5', i: 'inbox', ic: '#FFFFFF', t: when(p.dt), title: pend.length + (pend.length === 1 ? ' lançamento pra revisar' : ' lançamentos pra revisar'), body: p.e + ' · ' + brl2(p.out || p.inn) + ' no ' + p.k + '.' + (M.estByName[p.e] && M.estByName[p.e].alterna ? ' Esse lugar está marcado como sempre alterna.' : ''), act: 'Revisar' }); }
     /* fatura que fecha nos próximos 5 dias */
     M.cards.forEach(c => { if (!c.fe || !c.ve || !c.lim) return; let close = new Date(T.getFullYear(), T.getMonth(), c.fe); if (close < T) close = new Date(T.getFullYear(), T.getMonth() + 1, c.fe); const dd = daysBetween(T, close); if (dd > 5) return;
-      const due = new Date(close.getFullYear(), close.getMonth() + (c.fe >= c.ve ? 1 : 0), c.ve), v = M.cash.filter(e => e.card === c.n && e.mi === mIdx(due)).reduce((a, e) => a + e.out, 0);
+      const due = new Date(close.getFullYear(), close.getMonth() + (c.fe >= c.ve ? 1 : 0), c.ve), v = G ? (G.fatMes || []).filter(f => f[0] === c.n && f[1] === mIdx(due)).reduce((a, f) => a + (Number(f[2]) || 0), 0) : M.cash.filter(e => e.card === c.n && e.mi === mIdx(due)).reduce((a, e) => a + e.out, 0);
       if (!v) return; N.push({ id: 'fat:' + c.id + ':' + iso(close), g: 'hoje', c: c.cor, i: 'card', ic: c.ink, t: '', title: 'Fatura do ' + (c.nick || c.n) + ' fecha ' + (dd === 0 ? 'hoje' : dd === 1 ? 'amanhã' : 'em ' + dd + ' dias'), body: 'Vence ' + dmes(due) + '.', val: brl0(v), valInk: '#FFFFFF' }); });
     /* tetos ≥ 80% no mês atual */
     cur.TET.filter(t => t.v / t.t >= 0.8).forEach(t => { const nd = daysIn(M.CUR) - T.getDate(); N.push({ id: 'teto:' + t.n + ':' + M.CUR, g: 'antes', c: (M.catByName[t.n] || {}).cor || CAT_DEF[t.n] || '#78788A', i: 'gauge', ic: '#000000', t: '', title: t.n + ' passou de ' + (t.v >= t.t ? '100%' : '80%') + ' do teto', body: brl0(t.v) + ' de ' + brl0(t.t) + ' · faltam ' + nd + (nd === 1 ? ' dia' : ' dias') + ' no mês.', w: Math.min(100, Math.round(t.v / t.t * 100)) + '%' }); });
     /* última entrada e última assinatura */
-    const inn = M.rows.find(r => r.inn && !KD.isTransf(r) && r.dt <= T);
+    const inn = G ? (G.ent && { id: G.ent[0], e: G.ent[1], k: G.ent[2], inn: Number(G.ent[3]) || 0, dt: pd(G.ent[4]) }) : M.rows.find(r => r.inn && !KD.isTransf(r) && r.dt <= T);
     if (inn) N.push({ id: 'ent:' + inn.id, g: daysBetween(inn.dt, T) < 1 ? 'hoje' : 'antes', c: '#6AFF2A', i: 'entrada', ic: '#000000', t: when(inn.dt), title: 'Entrou dinheiro', body: inn.e + ' · ' + inn.k, val: '+ ' + brl0(inn.inn), valInk: '#6AFF2A', dt: inn.dt });
-    const sub = M.rows.find(r => r.sub && r.out && r.dt <= T);
+    const sub = G ? (G.assin && { id: G.assin[0], e: G.assin[1], k: G.assin[2], out: Number(G.assin[3]) || 0, dt: pd(G.assin[4]) }) : M.rows.find(r => r.sub && r.out && r.dt <= T);
     if (sub) N.push({ id: 'assin:' + sub.id, g: daysBetween(sub.dt, T) < 1 ? 'hoje' : 'antes', c: '#FF3D8B', i: 'repeat', ic: '#000000', t: when(sub.dt), title: 'Assinatura renovada', body: sub.e + ' · ' + sub.k, val: '– ' + brl2(sub.out), valInk: '#FFFFFF', dt: sub.dt });
     return N;
   };

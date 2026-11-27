@@ -251,7 +251,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   KD.isDemo = () => !!(KD.user && KD.user.email === 'teste@kontar.app');
   const DEMO_MSG = 'Esta é a conta de demonstração: isso fica travado para todo mundo poder testar.';
   KD.since = () => new Date((KD.user && KD.user.created_at) || Date.now());
-  KD.kList = () => { const o = KD.xt && KD.xt.on() && KD.xt.opts(); return o ? o.k.slice() : [...new Set(KD.M.rows.map(r => r.k))].filter(k => k && k !== '—'); };
+  KD.kList = () => { const o = KD.xt && KD.xt.on() && KD.xt.opts(); if (o) return o.k.slice(); if (KD.leve && KD.leve()) return ((KD.srv.geral || {}).kl || []).slice(); return [...new Set(KD.M.rows.map(r => r.k))].filter(k => k && k !== '—'); };
   KD.lastAte = P => { let best = null, bi = -1; P.forEach(p => { const q = p.ate.split('/'), i = (2000 + +q[1]) * 12 + MES.indexOf(q[0]); if (i > bi) { bi = i; best = p.ate; } }); return best || '—'; };
   KD.noFat = mi => ({ n: '—', v: '0', sub: 'nenhuma fatura vence em ' + mShort(mi), cor: '#1C1C20', ink: '#FFFFFF' });
   KD.cardMap = key => { const o = {}; KD.M.cards.forEach(c => { const n = c.nick || c.n; o[n] = key === 'code' ? KD.CODE(c.n) : c[key]; if (n !== c.n) o[c.n] = o[n]; }); return o; };
@@ -468,14 +468,14 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const lst = a => a.length === 1 ? a[0] : a.slice(0, -1).join(', ') + ' e ' + a[a.length - 1];
     o.cicloTxt = (reais.length ? lst(reais) + (reais.length === 1 ? ' foi lido da fatura de verdade.' : ' foram lidos das faturas de verdade.') : '') + (chut.length ? (reais.length ? ' ' : '') + lst(chut) + (chut.length === 1 ? ' ainda está com um dia chutado.' : ' ainda estão com um dia chutado.') : '');
     /* Alertas */
-    const used = n => M.rows.some(r => r.card === n);
+    const used = n => KD.leve() ? ((KD.srv.geral || {}).cardsUsados || []).includes(n) : M.rows.some(r => r.card === n);
     const nl = noL.map(c => c.nick || c.n), ng = L.filter(c => c.orig === 'chute').map(c => c.nick || c.n);
     o.a1Lim = nl.length > 0; o.a1LimN = String(nl.length); o.a1LimTxt = (nl.length === 1 ? 'cartão sem limite cadastrado.' : 'cartões sem limite cadastrado.') + ' O módulo de limite não fecha sem isso.';
     o.a1Fech = ng.length > 0; o.a1FechN = String(ng.length); o.a1FechTxt = (ng.length === 1 ? 'cartão ainda com o dia de fechamento chutado — ' : 'cartões ainda com o dia de fechamento chutado — ') + lst(ng) + '.' + (ng.every(n => !used(n)) ? ' Sem uso, não afetam os números.' : '');
     o.showAlerts = st.alerts && (o.a1Lim || o.a1Fech);
     const a2 = KD.alert('a2');
     o.showAtyp = st.atyp && !!a2.title; o.a2Title = a2.title || ''; o.a2Body = a2.body || '';
-    const a2c = (M.rows.find(r => r.e === a2.e && r.atyp) || {}).c || 'Outros'; o.a2Cat = a2c; o.atypIc = 'url("' + C.uri(comp.icSvg(a2c), comp.cor(a2c)) + '")';
+    const a2r = KD.leve() ? (x => x && x.e === a2.e ? x : null)(KD.month(M.CUR).atyp) : M.rows.find(r => r.e === a2.e && r.atyp), a2c = (a2r || {}).c || 'Outros'; o.a2Cat = a2c; o.atypIc = 'url("' + C.uri(comp.icSvg(a2c), comp.cor(a2c)) + '")';
     /* Seletor de mês, conta, conexões */
     o.hojeLbl = 'Ir pra hoje · ' + mShort(C.CUR); o.desdeLbl = 'Dados desde ' + mShort(C.MIN); o.ac_since = 'Desde ' + mShort(mIdx(KD.since()));
     o.ac_ses = (o.ac_ses || []).map(x => Object.assign(x, { meta: x.meta.replace(/^ · /, '') }));
@@ -730,7 +730,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   KD.signOutOthers = () => sb().auth.signOut({ scope: 'others' });
   KD.relogin = () => location.reload();
   KD.deleteAccount = async () => { try { ck(await sb().rpc('kontar_excluir_conta')); await sb().auth.signOut(); setTimeout(() => location.reload(), 1600); } catch (e) { console.error('[kontar] excluir', e); } };
-  KD.exportCsv = () => {
+  KD.exportCsv = async () => {
+    await KD.tudo();   // o CSV leva o histórico inteiro
     const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
     const lines = [['data', 'estabelecimento', 'valor', 'meio', 'categoria', 'cartao_ou_conta', 'parcelas', 'trabalho', 'observacao'].join(',')]
       .concat(KD.M.rows.map(r => [KD.iso(r.dt), q(r.e), r.amt.toFixed(2), r.meio, q(r.c), q(r.k), r.x, r.trab ? 1 : 0, q(r.obs)].join(',')));
@@ -758,7 +759,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     await KD.refresh(comp);
   };
   KD.txSave = async (comp, d) => {
-    const c = sb(); let id = d.id, r = id ? KD.M.rowById[id] : null;
+    const c = sb(); let id = d.id, r = id ? (KD.M.rowById[id] || (KD.xt && KD.xt.porId(id)) || await KD.buscaLinha(id)) : null;
     if (d.isNew) {
       const nm = (d.nome || '').trim();
       // chave é coluna gerada pelo banco a partir de estabelecimento; nunca enviar aqui.
@@ -789,6 +790,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       ck(await c.rpc('kontar_dividir', { p_tx: id, p_partes: (d.partes || []).map(x => ({ category_id: x.catId || null, valor: Math.round(x.valor * 100) / 100, rotulo: x.rotulo || null, itens: (x.itens || []).map(k => ids[k]).filter(Boolean) })) }));
     }
     await KD.refresh(comp);
+    if (KD.leve()) { try { await KD.buscaLinha(id); } catch (e) { console.error(e); } }   // sem a lista inteira: traz a versão nova deste lançamento
   };
 })();
 
@@ -809,6 +811,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const linha = (d, flags) => {
     const r = KD.mkRow(d.l, d.t || {}, d.parts, d.items, d.nota); KD.aplicaEstorno(r);
     const f = flags && flags[r.id]; if (f) { r.atyp = !!f[0]; r.interna = !!f[1]; }
+    if (KD.M && KD.M.rowById) KD.M.rowById[r.id] = r;   // o painel da transação procura por aqui
     return r;
   };
   const rpc = (f, offset, lim) => KD.sb.rpc('kontar_extrato', { p_f: f, p_hoje: KD.iso(KD.today), p_offset: offset, p_lim: lim })
@@ -1165,6 +1168,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     }, 520);
   };
   TX.openNew = function (c) {
+    if (KD.leve && KD.leve()) KD.tudo().catch(e => console.error(e));   // aviso de duplicata ao ler nota compara com o histórico inteiro
     if (!document.querySelector('[data-tx-host]')) {   // o painel mora na página Extrato: de outra página, vai até lá e abre
       if (c && c.goPage) { if (c.state.page !== 'extrato') c.goPage('extrato'); let n = 0; (function espera() { if (document.querySelector('[data-tx-host]')) return TX.openNew(c); if (++n < 30) setTimeout(espera, 150); })(); }
       return;
@@ -1822,6 +1826,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
 
   MS.abrir = row => {
     if (layer || !row || !row.id) return;
+    if (KD.leve && KD.leve()) { KD.tudo().then(() => MS.abrir(KD.M.rowById[row.id] || row)).catch(e => console.error(e)); return; }   // os candidatos vêm do histórico inteiro
     S = { row, lista: candidatos(row), sel: null, busy: false, msg: '' };
     layer = document.createElement('div');
     layer.style.cssText = 'position:fixed;inset:0;z-index:99990;background:rgba(0,0,0,.72);display:flex;align-items:flex-start;justify-content:center;overflow:auto;opacity:0;transition:opacity .3s ease;font-family:Helvetica,Arial,sans-serif;color:' + FG;
@@ -2905,7 +2910,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   }
   IMP.history = historico; IMP.toast = mostraToast;
   IMP.pick = tk => { presetTk = tk; const inp = getInput(); inp.click(); };
-  IMP.open = abrir;
+  /* o importador compara com o histórico inteiro (duplicatas, transferências, categoria pelo nome): busca enquanto a pessoa escolhe o arquivo */
+  IMP.open = (...a) => { const p = KD.tudo && KD.tudo(); if (p) p.then(() => { if (S && S.rows && S.rows.length) { classificar(S); render(); } }).catch(e => console.error(e)); return abrir(...a); };
 
   /* ---------- botão "Importar" na barra de cima, ao lado de "Nova" ---------- */
   function getInput() {
@@ -3602,7 +3608,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   function estado() {
     const M = KD.M, c = KD.comp;
     if (!M || !c || !c.state || c.state.page !== 'home' || !M.rows) return null;
-    if (M.rows.length === 0) return { tipo: 'novo' };
+    if (KD.nLanc() === 0) return { tipo: 'novo' };
     const mi = c.state.mes, m = KD.month(mi);
     if (m && m.LANC && m.LANC.length === 0) return { tipo: 'mes', mi, nome: cap(MESES[((mi % 12) + 12) % 12]) };
     return null;
@@ -4319,6 +4325,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const M = KD.M, T = KD.today, T0 = new Date(T.getFullYear(), T.getMonth(), T.getDate()), fe = Number(c.fe) || 1, ve = Number(c.ve) || fe;
     const close = new Date(T0.getFullYear(), T0.getMonth() - (T0.getDate() >= fe ? 0 : 1), fe), prox = new Date(close.getFullYear(), close.getMonth() + 1, fe);
     const due = new Date(prox.getFullYear(), prox.getMonth() + (ve > fe ? 0 : 1), ve), ym = due.getFullYear() * 12 + due.getMonth();
+    if (KD.leve()) return Math.round(((KD.srv.geral || {}).fatMes || []).filter(f => f[0] === c.n && f[1] === ym).reduce((a, f) => a + (Number(f[2]) || 0), 0) * 100) / 100;   // somado no servidor (kontar_geral)
     return Math.round((M.cash || []).filter(e => e.card === c.n && e.dt && e.dt.getFullYear() * 12 + e.dt.getMonth() === ym).reduce((a, e) => a + e.out, 0) * 100) / 100;
   }
   const preso = c => { const C = KD._C; return Math.round(((C && C.PARC) || []).filter(x => x.k === c.n).reduce((a, x) => a + (Number(x.r) || 0), 0) * 100) / 100; };

@@ -793,7 +793,7 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
   });
   /* primeiro acesso = conta nova: sem lançamentos, sem a marca "onboarded" (guardada em user_prefs.prefs) e que não seja a conta demo */
   const prevOnb = () => new URLSearchParams(location.search).get('onb') === '1';   /* ?onb=1 mostra o onboarding sem salvar nada (vale em qualquer endereço) */
-  const needsOnboarding = () => { const KD = window.KD; if (prevOnb()) return true; return !KD.isDemo() && !(KD.M.prefs && KD.M.prefs.onboarded) && !(KD.M.rows && KD.M.rows.length); };
+  const needsOnboarding = () => { const KD = window.KD; if (prevOnb()) return true; return !KD.isDemo() && !(KD.M.prefs && KD.M.prefs.onboarded) && !KD.nLanc(); };
   async function saveOnboarding(sb, user, a) {
     const KD = window.KD, P = Object.assign({}, KD.M.prefs, { onboarded: true, inicio: a.how });
     if (a.rd != null) P.renda = a.rd; if (a.dia) P.diaFech = a.dia;            /* renda em centavos (inteiro), como o resto do banco */
