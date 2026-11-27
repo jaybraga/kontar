@@ -4498,4 +4498,6 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   window.addEventListener('resize', agenda);
   document.addEventListener('wheel', agenda, { passive: true, capture: true });   // segurança: confere de novo a cada giro da roda
   agenda();
+  // a barra de cima fica parada: a rodinha (ou o gesto do trackpad) em cima dela não rola nada
+  document.addEventListener('wheel', e => { if (e.target.closest && e.target.closest('[data-nav-wrap]')) e.preventDefault(); }, { passive: false, capture: true });
 })();
