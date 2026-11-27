@@ -1943,7 +1943,7 @@ class Component extends DCLogic {
   // Indicador único da navegação (substitui a borda por botão)
   _navInd() {
     const w = document.querySelector('[data-nav-wrap]'), ind = w && w.querySelector('[data-nav-ind]'); if (!ind) return false;
-    const on = w.querySelector('[data-nav][data-nav-on="1"]'); if (!on) { ind.style.opacity = '0'; return false; }
+    const on = w.querySelector('[data-nav][data-nav-on="1"]'); if (!on) { ind.style.opacity = '0'; ind.style.width = '0px'; ind.style.transform = 'translateX(0px)'; if (this._ni) this._ni.init = false; return false; }
     const tx = on.offsetLeft, tw = on.offsetWidth, S = this._ni || (this._ni = { x: tx, w: tw, init: false });
     if (!S.init) { S.x = tx; S.w = tw; S.init = true; } else { S.x += (tx - S.x) * 0.22; S.w += (tw - S.w) * 0.22; }
     const done = Math.abs(tx - S.x) < .4 && Math.abs(tw - S.w) < .4; if (done) { S.x = tx; S.w = tw; }
