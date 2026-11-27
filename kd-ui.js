@@ -683,6 +683,12 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       else if (mode === 'cor') { if (inf && inf.ok) { size = '100%'; bg = inf.col; sh = inf.dark ? 'inset 0 0 0 1px rgba(255,255,255,.22)' : 'none'; } else if (inf) size = '136%'; }
       if (el.style.backgroundSize !== size) el.style.backgroundSize = size; if (el.style.backgroundColor !== bg) el.style.backgroundColor = bg; if (el.style.boxShadow !== sh) el.style.boxShadow = sh; }); };
   KD.imgFromUrl = u => new Promise(res => { fetch(u, { mode: 'cors' }).then(r => r.ok ? r.blob() : Promise.reject()).then(b => /^image\//.test(b.type) ? res(URL.createObjectURL(b)) : res(null)).catch(() => { const im = new Image(); im.onload = () => res(u); im.onerror = () => res(null); im.src = u; }); });
+  /* imagem embutida (data:...;base64,...) → endereço blob: sem ";" (o motor das telas corta estilos no ";"). Mesma imagem, mesmo endereço. */
+  const SAFE = new Map();
+  KD.safeImg = u => { if (!u || typeof u !== 'string' || !/^data:/.test(u)) return u; let b = SAFE.get(u); if (b) return b;
+    try { const i = u.indexOf(','), h = u.slice(0, i), d = u.slice(i + 1), mime = (h.match(/^data:([^;,]+)/) || [])[1] || 'image/png', bin = /;base64/i.test(h) ? atob(d) : decodeURIComponent(d), a = new Uint8Array(bin.length);
+      for (let k = 0; k < bin.length; k++) a[k] = bin.charCodeAt(k); b = URL.createObjectURL(new Blob([a], { type: mime })); } catch (e) { return u; }
+    SAFE.set(u, b); return b; };
   KD.smallImage = src => new Promise(res => { if (/^data:/.test(src) || /^https?:/.test(src)) return res(src); const im = new Image(); im.onload = () => { const s = 128, cv = document.createElement('canvas'); cv.width = cv.height = s; const g = cv.getContext('2d'), k = Math.min(s / im.width, s / im.height); g.drawImage(im, (s - im.width * k) / 2, (s - im.height * k) / 2, im.width * k, im.height * k); res(cv.toDataURL('image/png')); }; im.onerror = () => res(null); im.src = src; });
   /* força da senha + dicas curtas: UMA função, usada na Conta e na tela Nova senha (boot.js) */
   KD.pwCheck = (pw, c) => {
