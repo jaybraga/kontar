@@ -758,12 +758,18 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (!q.data || !q.data.length) throw new Error('transação não encontrada');
     await KD.refresh(comp);
   };
+  /* marca/desmarca "é trabalho" direto (etiqueta da linha do Extrato). Não mexe na categoria. */
+  KD.trabalho = async (comp, id, v) => {
+    if (KD.isDemo && KD.isDemo()) return;
+    try { ck(await sb().from('transactions').update({ trabalho: !!v }).eq('id', id)); const r = KD.M.rowById[id]; if (r) r.trab = !!v; await KD.refresh(comp); }
+    catch (e) { console.error('[kontar] trabalho', e); }
+  };
   KD.txSave = async (comp, d) => {
     const c = sb(); let id = d.id, r = id ? (KD.M.rowById[id] || (KD.xt && KD.xt.porId(id)) || await KD.buscaLinha(id)) : null;
     if (d.isNew) {
       const nm = (d.nome || '').trim();
       // chave é coluna gerada pelo banco a partir de estabelecimento; nunca enviar aqui.
-      const ins = { user_id: uid(), estabelecimento: nm, valor_total: Math.round(d.totalV * 100) / 100, direcao: d.dir, meio: d.cardId ? 'cartao' : d.meio, data_compra: d.iso, card_id: d.cardId || null, account_id: d.cardId ? null : (d.accId || null), category_id: d.catId || null, observacao: d.obs || null, parcelas_total: d.cardId ? Math.max(1, d.parc || 1) : 1, origem: 'manual', status: d.catId ? 'confirmado' : 'pendente_revisao', categoria_origem: d.catId ? 'usuario' : null };
+      const ins = { user_id: uid(), estabelecimento: nm, valor_total: Math.round(d.totalV * 100) / 100, direcao: d.dir, meio: d.cardId ? 'cartao' : d.meio, data_compra: d.iso, card_id: d.cardId || null, account_id: d.cardId ? null : (d.accId || null), category_id: d.catId || null, observacao: d.obs || null, parcelas_total: d.cardId ? Math.max(1, d.parc || 1) : 1, origem: 'manual', status: d.catId ? 'confirmado' : 'pendente_revisao', categoria_origem: d.catId ? 'usuario' : null, trabalho: !!d.trab };
       const q = ck(await c.from('transactions').insert(ins).select('id').single());
       id = Array.isArray(q.data) ? q.data[0].id : q.data.id; r = { items: [], e: nm, obs: '', iso: d.iso };
     } else {
@@ -773,6 +779,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (d.iso && d.iso !== r.iso) p.data_compra = d.iso;
     if (d.cardId !== (r.cardId || null) || d.accId !== (r.accId || null)) { p.card_id = d.cardId || null; p.account_id = d.cardId ? null : (d.accId || null); }
     if (d.catId && d.catId !== r.catId) { p.category_id = d.catId; p.status = 'confirmado'; p.categoria_origem = 'usuario'; }
+    if (d.trab != null && !!d.trab !== !!r.trab) p.trabalho = !!d.trab;   // é trabalho: não mexe na categoria
     // valor e direção só são editáveis (no painel) pra lançamento manual; mesmo assim confere de novo aqui.
     if (r.origem === 'manual') {
       const dirAtual = (r.amt < 0 || r.out > 0) ? 'saida' : 'entrada';
@@ -780,6 +787,11 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       if (d.dir && d.dir !== dirAtual) p.direcao = d.dir;
     }
     if (Object.keys(p).length) ck(await c.from('transactions').update(p).eq('id', id));
+    }
+    /* "sempre que vier deste lugar, é trabalho" (merchant_aliases.sempre_trabalho, em todas as chaves do estabelecimento) */
+    if (d.sempre != null && !!d.sempre !== !!d.sempre0) {
+      const nm0 = (d.nome || r.e || '').trim(), ks = (d.chaves && d.chaves.length ? d.chaves : [nm0.replace(/\s+/g, '').toUpperCase()]).filter(Boolean);
+      if (ks.length) ck(await c.from('merchant_aliases').upsert(ks.map(k => ({ user_id: uid(), chave: k, amostra: (KD.M.maByChave[k] || {}).amostra || nm0 || k, sempre_trabalho: !!d.sempre })), { onConflict: 'user_id,chave' }));
     }
     let ids = (r.items || []).map(i => i.id);
     if (d.notaDirty) {
@@ -879,6 +891,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   // crescer/encolher o card do reduzido usamos um ease-in-out de verdade, que também começa e termina suave.
   const EH = 'cubic-bezier(.65,0,.35,1)';
   const I = {
+    mala: '<rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/>',
     home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-5h4v5"/>',
     lines: '<path d="M4 6h16M4 12h16M4 18h10"/>',
     cal: '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>',
@@ -1036,7 +1049,10 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     stagger(bl, b, 45); rollValue(pn, b + 60);
     if (bar) anim(bar, [{ opacity: 0, clipPath: 'inset(0 100% 0 0 round 9999px)' }, { opacity: 1, clipPath: 'inset(0 0 0 0 round 9999px)' }], { delay: b, duration: 1500, easing: LONG });
   }
-  const dirtyKey = () => JSON.stringify([S.nome, S.obs, S.iso, S.cardId, S.accId, S.catId, S.totalV, S.dir, S.meio, S.parc || 1, S.itens, S.partes, S.nota && S.nota.url]);
+  const dirtyKey = () => JSON.stringify([S.nome, S.obs, S.iso, S.cardId, S.accId, S.catId, S.totalV, S.dir, S.meio, S.parc || 1, S.itens, S.partes, S.nota && S.nota.url, !!S.trab, !!S.sempre]);
+  /* "sempre que vier deste lugar, é trabalho": vale pra todas as chaves do estabelecimento (merchant_aliases.sempre_trabalho) */
+  const chavesDe = row => { const e = row && KD.M.estByName && KD.M.estByName[row.e]; return [...new Set([].concat(e && e.chaves || [], row && row.chave ? [row.chave] : []).filter(Boolean))]; };
+  const sempreDe = row => chavesDe(row).some(k => (KD.M.maByChave[k] || {}).sempre_trabalho);
   const isDirty = () => !!S && S.base !== undefined && dirtyKey() !== S.base;
   function init(row) {
     const S = { row, mode: 'dados', nome: row.e, obs: row.obs || '', iso: row.iso, cardId: row.cardId, accId: row.accId, catId: row.catId || catId(row.c), pop: null,
@@ -1047,6 +1063,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     // valor/direção de um lançamento existente: totalV é sempre o módulo (valor_total), dir vem do sinal
     S.totalV = row.total || 0;
     S.dir = (row.amt < 0 || row.out > 0) ? 'saida' : 'entrada';
+    S.trab = !!row.trab; S.sempre = S.sempre0 = sempreDe(row);   // é trabalho (não muda a categoria) e o "sempre" do lugar
     return S;
   }
 
@@ -1302,11 +1319,27 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   }
   const origemInfo = (o) => o === 'open_finance' ? { t: 'Open Finance', ic: 'link' } : o === 'importacao' ? { t: 'Importação', ic: 'copy' } : { t: 'Manual', ic: 'pencil' };
 
+  /* faixa "É trabalho" (mockups/trabalho.png): rótulo · interruptor | caixinha "Sempre que vier de <lugar>" (apagada com o interruptor desligado) */
+  function faixaTrab() {
+    const on = !!S.trab, sem = on && !!S.sempre, ROXO = '#6A4BFF', lugar = (S.nome || (S.row && S.row.e) || 'deste lugar').trim();
+    const knob = on ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>'
+      : '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5E5E66" stroke-width="2.8" stroke-linecap="round" style="display:block"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
+    const box = '<span style="width:20px;height:20px;border-radius:6px;flex:none;display:grid;place-items:center;box-sizing:border-box;transition:background .25s ease,border-color .25s ease;' + (sem ? 'background:#F2F0EB;border:2px solid #F2F0EB' : 'border:2px solid #4A4A52') + '">'
+      + (sem ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>' : '') + '</span>';
+    return '<div style="display:flex;align-items:center;gap:18px;height:62px;flex:none;padding:0 18px;box-sizing:border-box;border-radius:9999px;border:2px solid ' + (on ? ROXO : '#2A2A2F') + ';background:' + (on ? 'color-mix(in srgb,' + ROXO + ' 12%,#000)' : '#000') + ';transition:border-color .3s ease,background .3s ease">'
+      + '<span style="display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700;white-space:nowrap;color:#F2F0EB"><span style="color:' + (on ? '#B9A8FF' : '#9A9AA3') + ';display:flex;transition:color .3s ease">' + svg('mala', 20, 2) + '</span>É trabalho</span>'
+      + '<span data-a="trab" role="switch" aria-checked="' + on + '" title="' + (on ? 'Desmarcar trabalho' : 'Marcar como trabalho') + '" style="position:relative;width:64px;height:36px;flex:none;border-radius:9999px;background:' + (on ? ROXO : '#2A2A2F') + ';cursor:pointer;transition:background .3s ease">'
+      + '<span style="position:absolute;top:4px;left:' + (on ? 32 : 4) + 'px;width:28px;height:28px;border-radius:50%;background:' + (on ? '#000' : '#fff') + ';display:grid;place-items:center;transition:left .3s cubic-bezier(.2,.7,.2,1),background .3s ease">' + knob + '</span></span>'
+      + '<span data-a="sempre" role="checkbox" aria-checked="' + sem + '" aria-disabled="' + !on + '" style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;height:36px;padding-left:18px;border-left:1px solid #3A3A40;cursor:' + (on ? 'pointer' : 'default') + ';opacity:' + (on ? 1 : .38) + ';transition:opacity .3s ease">' + box
+      + '<span style="min-width:0;line-height:1.3"><b style="display:block;font-size:13.5px;color:#F2F0EB;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Sempre que vier de ' + esc(lugar) + '</b><span style="display:block;font-size:12.5px;color:#8A8A93;white-space:nowrap">as próximas já chegam marcadas</span></span></span></div>';
+  }
+
   function viewDados() {
     const cn = catAtual(), cor = catCor(cn);
     const meioObj = S.cardId ? KD.M.cardById[S.cardId] : S.accId ? KD.M.accs.find(a => a.id === S.accId) : null;
     const meio = meioObj ? (meioObj.nick || meioObj.n || meioObj.nome) : '—';
     const left = '<div style="display:flex;flex-direction:column;gap:10px"><div>' + lb('home', 'Estabelecimento') + '</div><div style="display:flex;gap:10px;align-items:stretch"><div style="position:relative;flex:1;min-width:0">' + estField() + '</div>' + (!S.isNew ? '<span data-a="goest" title="Ver o estabelecimento" style="width:54px;flex:none;border-radius:9999px;border:2px solid #2A2A2F;background:#000;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#F2F0EB;transition:border-color .25s ease,background .25s ease" onmouseover="this.style.borderColor=\'#51515C\';this.style.background=\'#151518\'" onmouseout="this.style.borderColor=\'#2A2A2F\';this.style.background=\'#000\'">' + svg('home', 20, 1.9) + '</span>' : '') + '</div></div>'
+      + faixaTrab()
       + '<div style="display:flex;flex-direction:column;gap:10px;flex:1;min-height:0">' + lb('lines', 'Observação') + '<textarea data-in="obs" placeholder="Adicionar observação" style="' + fieldCss + 'flex:1;resize:none;font-family:inherit"></textarea></div>';
     const mid = '<div style="display:flex;flex-direction:column;gap:10px">' + lb('cal', 'Data') + '<label style="position:relative;display:block">' + pill(dfmt(S.iso), 'pointer-events:none') + '<input data-in="iso" type="date" value="' + esc(S.iso) + '" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%"></label></div>'
       + '<div style="display:flex;flex-direction:column;gap:10px">' + lb('card', 'Cartão / Conta') + '<div style="display:flex;gap:8px;align-items:flex-start"><div style="position:relative;flex:1;min-width:0"><div data-a="pop" data-v="card" data-alert-target="card" style="' + fieldCss + 'border-radius:' + PR + 'px;flex:1;min-width:0;display:flex;align-items:center;gap:10px;cursor:pointer" class="' + (S.alertField === 'card' ? 'txalert-box' : '') + '">' + bankChip(meioObj && meioObj.bank, (meioObj || {}).cor || '#3A3A40') + '<span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700">' + esc(meio) + '</span></div>' + (S.pop === 'card' ? popCard() : '') + '</div>' + (S.isNew && S.cardId ? '<div data-a="parc" title="Parcelas" style="flex:none;width:74px">' + pill((S.parc || 1) + 'x') + '</div>' : '') + '</div></div>'
@@ -1638,7 +1671,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     }
     S.busy = true; S.msg = ''; render();
     S.partes = S.partes.filter(p => p.valor > 0);
-    const d = { parc: S.parc || 1, isNew: !!S.isNew, totalV: S.totalV, dir: S.dir, meio: S.meio, id: S.row.id, nome: S.nome, obs: S.obs, iso: S.iso, cardId: S.cardId, accId: S.accId, catId: S.catId, notaDirty: S.notaDirty, partesDirty: S.partesDirty, nota: S.nota, itens: S.itens, partes: S.partes };
+    const d = { parc: S.parc || 1, isNew: !!S.isNew, totalV: S.totalV, dir: S.dir, meio: S.meio, id: S.row.id, nome: S.nome, obs: S.obs, iso: S.iso, cardId: S.cardId, accId: S.accId, catId: S.catId, notaDirty: S.notaDirty, partesDirty: S.partesDirty, nota: S.nota, itens: S.itens, partes: S.partes, trab: !!S.trab, sempre: !!S.sempre, sempre0: !!S.sempre0, chaves: chavesDe(S.row) };
     try { await KD.txSave(comp, d); if (stay && S) { const r = KD.M.rowById[S.row.id]; if (r) { const inl = S.inline; S = init(r); S.inline = inl; S.mode = 'dados'; S.base = dirtyKey(); render(); } else TX.close(); } else TX.close(); }
     catch (e) { console.error('[kontar] salvar transação', e); S.busy = false; S.msg = 'Não consegui salvar: ' + ((e && e.message) || 'erro'); render(); }
   }
@@ -1727,6 +1760,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       else if (a === 'goest') { const n = S.row.e; TX.close(true); comp.goEst(n); }
       else if (a === 'full') { const r = S.row; TX.openFull(comp, r); }
       else if (a === 'parc') { S.parc = (S.parc || 1) % 12 + 1; render(); }
+      else if (a === 'trab') { S.trab = !S.trab; if (!S.trab) S.sempre = false; render(); }
+      else if (a === 'sempre') { if (S.trab) { S.sempre = !S.sempre; render(); } }
       else if (a === 'dir') { S.dir = v; render(); if (S.inline) salvarReduzido(); }
       else if (a === 'forma') { ev.stopPropagation(); S.meio = v; S.cardId = null; render(); }
       else if (a === 'cat') { S.catId = catId(v); S.pop = null; render(); if (S.inline) salvarReduzido(); }
