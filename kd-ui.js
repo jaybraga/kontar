@@ -456,7 +456,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     o.hmOnde = C.ONDE.map((t, i, a) => ({ n: t.n, cor: comp.cor(t.n), img: 'url("' + C.uri(comp.icSvg(t.n), '#000') + '")', w: (t.v / omx * 100).toFixed(1) + '%', tip: t.n + '|' + brl0(t.v), v: brl0(t.v), p: (otot ? t.v / otot * 100 : 0).toFixed(1).replace('.', ',') + '%', sub: t.c === 1 ? '1 compra · ' + t.top : t.c + ' compras · maior: ' + t.top, bd: last(a, i) }));
     /* Lançamentos do mês */
     o.lancSub = 'Por data de compra. ' + C.LANC.length + ' neste mês.';
-    o.lancRows = (o.lancRows || []).map((r, i) => Object.assign(r, { kc: C.KC[r.k] || r.kc }));
+    o.lancRows = (o.lancRows || []).map((r, i) => Object.assign(r, { kc: C.KC[r.k] || r.kc, vc: String(r.v).trim().charAt(0) === '+' ? '#6AFF2A' : '#FF6B5A' }));
     /* Parcelamentos (home) */
     o.hmParc = C.PARC.map((p, i, a) => { const pagas = p.x - p.f, cor = C.KC[p.k] || '#78788A', cat = p.c || 'Outros';
       return Object.assign(comp.av(p.n, cat), { n: p.n, k: p.k, cor, sub: p.tot + ' · até ' + p.ate, rest: brl0(p.r), falta: 'faltam ' + p.f + ' de ' + p.x, bd: last(a, i),
