@@ -1888,6 +1888,25 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     return (cache[k] = hit ? { url: 'https://cdn.brandfetch.io/domain/' + hit.domain + '/w/128/h/128/icon?c=' + CID, dom: hit.domain } : null);
   };
 
+  /* até 6 opções de ícone pra pessoa escolher (menu do logo → "Buscar ícone de novo"):
+     1) marcas da busca que batem com o nome inteiro; 2) sites prováveis montados do nome (drogaraia.com.br, drogaraia.com, raia.com.br…),
+     só os que existem de verdade; 3) o resto da busca. "Existe" = o Google tem favicon próprio do site (o genérico tem 16px). */
+  const favOk = d => new Promise(res => { const i = new Image(); let ok = false; const fim = v => { if (!ok) { ok = true; res(v); } };
+    i.onload = () => fim(i.naturalWidth > 16); i.onerror = () => fim(false); setTimeout(() => fim(false), 4000); i.src = 'https://www.google.com/s2/favicons?domain=' + d + '&sz=64'; });
+  const opCache = {};
+  KD.estIcones = async nome => {
+    const q = String(nome || '').replace(/[*#].*$/, '').replace(/\d+/g, ' ').replace(/\s+/g, ' ').trim(), k = nz(q);
+    if (k.length < 2) return []; if (opCache[k]) return opCache[k];
+    const nq = k.replace(/ /g, ''), tk = k.split(' ').filter(t => t.length >= 4);
+    const palpites = [...new Set([nq + '.com.br', nq + '.com'].concat(tk.length > 1 ? tk.map(t => t + '.com.br') : []))];
+    const [res, vivos] = await Promise.all([busca(q), Promise.all(palpites.map(favOk))]);
+    const doms = [], add = d => { d = String(d || '').toLowerCase(); if (d && !doms.includes(d)) doms.push(d); };
+    (res || []).map(b => ({ b, v: bate(b, q) })).filter(x => x.v).sort((a, b) => b.v - a.v).forEach(x => add(x.b.domain));
+    palpites.forEach((d, i) => { if (vivos[i]) add(d); });
+    (res || []).forEach(b => add(b && b.domain));
+    return (opCache[k] = doms.slice(0, 6).map(d => ({ dom: d, url: 'https://cdn.brandfetch.io/domain/' + d + '/w/128/h/128/icon?c=' + CID })));
+  };
+
   /* ---------- gravação do merge ---------- */
   KD.estMerge = async (orig, nomes, id) => {
     const M = KD.M, sb = KD.sb, A = M.estByName[orig]; if (!A) throw new Error('estabelecimento sumiu');
