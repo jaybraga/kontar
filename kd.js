@@ -399,6 +399,112 @@
     KD._mc[mi] = out; return out;
   };
 
+  /* -------- o mesmo resumo do mês, a partir dos números que o servidor calcula (kontar_mes / kontar_geral) --------
+     O servidor faz as contas sobre os lançamentos; aqui só se formata (arredonda, R$, textos) e se aplicam as regras que dependem
+     só do cadastro de cartões/contas (fatura informada pelo banco, próximo fechamento). Mesma saída de KD.month, campo a campo. */
+  KD.srv = { mes: {}, geral: null };
+  KD.monthSrv = function (mi, S, G) {
+    const M = KD.M, T = KD.today, isCur = mi === M.CUR, start = mStart(mi), end = mEnd(mi), ref = isCur ? T : end, nd = daysIn(mi), td = isCur ? T.getDate() : nd;
+    const out = { mi, isCur }, n = v => Number(v) || 0;
+    const fmtD = d => d === 0 ? 'hoje' : d === 1 ? 'amanhã' : 'em ' + d + ' dias';
+    const cxOut = n(S.cx[0]), cxCard = n(S.cx[1]), cxCash = cxOut - cxCard, compOut = n(S.comp[0]), compParc = n(S.comp[1]), compIn = n(S.compIn);
+    out.cx = { out: cxOut, card: cxCard, cash: cxCash }; out.comp = { out: compOut, parc: compParc, in: compIn };
+    let next = null;
+    M.cards.forEach(c => {
+      if (!c.fe || !c.lim) return; const y = ref.getFullYear(), m = ref.getMonth();
+      let nx = new Date(y, m, Math.min(c.fe, daysIn(mIdx(ref)))); if (nx <= ref) nx = new Date(y, m + 1, Math.min(c.fe, new Date(y, m + 2, 0).getDate()));
+      const dd = daysBetween(ref, nx); if (!next || dd < next.d) next = { n: c.nick || c.n, d: dd };
+    });
+    const cyc = { card: n(S.ciclo), cash: cxCash, next };
+    out.G = {
+      mes: { v: int(cxOut), hint: 'Tudo que saiu da conta em ' + MESL[mi % 12].toLowerCase(), a: brl0(cxCard), b: brl0(cxCash), c: isCur ? td + ' de ' + nd + ' dias' : 'mês fechado' },
+      ciclo: { v: int(cyc.card + cyc.cash), hint: 'Desde o último fechamento de cada cartão', a: brl0(cyc.card), b: brl0(cyc.cash), c: cyc.next ? cyc.next.n + ' fecha ' + fmtD(cyc.next.d) : '—' },
+      comp: { v: int(compOut), hint: 'Compras que você decidiu fazer em ' + MESL[mi % 12].toLowerCase() + ', pelo valor cheio', a: brl0(compParc) + ' parcelado', b: brl0(compOut - compParc) + ' à vista', c: 'valor cheio' }
+    };
+    const scoped = g => { const co = n(g[0]), cc = n(g[1]), crO = n(g[2]), crP = n(g[3]);
+      return { mes: { v: int(co), a: brl0(cc), b: brl0(co - cc) }, ciclo: { v: int(co), a: brl0(cc), b: brl0(co - cc) }, comp: { v: int(crO), a: brl0(crP) + ' parcelado', b: brl0(crO - crP) + ' à vista' }, tot: crO }; };
+    out.GS = { pessoal: scoped(S.gs.pessoal), trabalho: scoped(S.gs.trabalho) };
+    const daySum = S.day.map(n), mx = Math.max(1, ...daySum);
+    out.bars = daySum.map((v, i) => { const fut = isCur && i + 1 > td; return { tip: (i + 1) + ' ' + MES[mi % 12] + '|' + (fut ? 'ainda não chegou' : v ? brl0(v) : 'sem gastos'), h: !fut && v ? Math.max(2, Math.round(v / mx * 100)) + '%' : '4px', bg: !fut && v ? '#fff' : 'rgba(255,255,255,.3)' }; });
+    out.gL = ['1 ' + MES[mi % 12], isCur ? 'hoje · ' + td + ' ' + MES[mi % 12] : '15 ' + MES[mi % 12], nd + ' ' + MES[mi % 12]];
+    out.rg = { n: nd, today: td, cnt: S.rgc.map(n), sum: S.rgs.map(n), wd0: (start.getDay() + 6) % 7 };
+    out.CONTAS = M.accs.map(a => { const b = S.contas[a.id] || [a.saldo, a.saldo], v = n(b[0]), v0 = n(b[1]); return { nome: a.nome, v: Math.round(v * 100) / 100, d: Math.round(v - v0), cor: a.cor, tipo: a.tipo, funcao: a.funcao }; });
+    const corr = out.CONTAS.filter(c => c.tipo !== 'investimento'), res = out.CONTAS.filter(c => c.tipo === 'investimento');
+    out.SVAL = { sobra: Math.round(compIn - compOut), saldo: Math.round(corr.reduce((a, c) => a + c.v, 0)) };
+    const resAcc = M.accs.find(a => a.tipo === 'investimento');
+    out.reserva = { v: res.reduce((a, c) => a + c.v, 0), desde: resAcc ? ddmm(resAcc.em) : '' };
+    out.sSub = { sobra: 'entrou ' + brl0(compIn) + ' · saiu ' + brl0(compOut), saldo: '+ ' + brl0(out.reserva.v) + ' em reserva' + (out.reserva.desde ? ' · desde ' + out.reserva.desde : '') };
+    const ev6 = f => Array.from({ length: 6 }, (_, k) => { const m = mi - 5 + k; return [MES[m % 12], f(m, k)]; });
+    out.SOBEV = ev6((m, k) => Math.round(n(S.sob[k])));
+    out.PATEV = ev6((m, k) => m < S.accStart ? 0 : Math.round(n(S.pat[k])));
+    const usedOf = c => G && G.used && G.used[c.id] != null ? Math.min(c.lim, Math.round(n(G.used[c.id]) * 100) / 100) : c.used;
+    out.LIM = M.cards.map(c => { const u = usedOf(c); return { n: c.n, nick: c.nick, fin: c.fin, cor: c.cor, dst: c.destaque, ink: c.ink, lim: c.lim, u, p: c.lim ? Math.round(u / c.lim * 100) : 0, ciclo: 'fecha ' + (c.fe || '—') + ' · vence ' + (c.ve || '—'), orig: c.orig, id: c.id, since: c.since }; });
+    const W = out.LIM.filter(c => c.lim > 0), lt = W.reduce((a, c) => a + c.lim, 0), lu = W.reduce((a, c) => a + c.u, 0);
+    out.lim = { tot: lt, used: lu, disp: lt - lu, pct: lt ? lu / lt * 100 : 0 };
+    const fat = {}; S.fat.forEach(f => { fat[f[0] + '|' + f[1]] = [n(f[2]), n(f[3])]; });
+    const fatOf0 = (c, m) => (fat[c.n + '|' + m] || [0, 0])[0], nFat = (c, m) => (fat[c.n + '|' + m] || [0, 0])[1];
+    const abVe = c => c.fatAbVe || (c.ve ? new Date(T.getFullYear(), T.getMonth() + (T.getDate() < c.ve ? 0 : 1), c.ve) : null);
+    const fatOf = (c, m) => {
+      if (c.fatInf != null) { const a = abVe(c);
+        if (c.fatFechVe && m === mIdx(c.fatFechVe)) return c.fatFech;
+        if (a && m === mIdx(a)) return Math.max(0, c.fatInf);
+        const h = c.histOf && a && m < mIdx(a) && c.histOf.find(x => mIdx(pd(x.vence)) === m);
+        if (h) return Math.max(0, Number(h.total) || 0);
+      }
+      return Math.max(0, fatOf0(c, m));
+    };
+    out.FATS = M.cards.map(c => {
+      if (isCur && c.fatInf != null) {
+        const conf = c.conferir ? (c.fatDif > 0 ? ' · + ' + int(c.fatDif) + ' no limite, ainda sem detalhe' : ' · conferir no banco') : '';
+        if (c.fatFech > 0 && c.fatFechVe) return { n: c.nick || c.n, v: int(c.fatFech), sub: 'vence ' + dmes(c.fatFechVe) + ' · fechada' + (c.fatInf > 0 ? ' · próxima ' + int(c.fatInf) : '') + conf, cor: c.cor, ink: c.ink };
+        if (!c.fatInf) return null; const due = abVe(c), fe = c.fatAbFe && c.fatAbFe >= T ? daysBetween(T, c.fatAbFe) : null;
+        return { n: c.nick || c.n, v: int(c.fatInf), sub: (due ? 'vence ' + dmes(due) + ' · ' : '') + (c.fatInf < 0 ? 'crédito no banco, conta como 0' : fe != null ? 'aberta, fecha ' + fmtD(fe) : 'aberta, pelo banco') + conf, cor: c.cor, ink: c.ink };
+      }
+      const v = fatOf(c, mi); if (!v) return null;
+      const due = c.ve ? new Date(Math.floor(mi / 12), mi % 12, Math.min(c.ve, nd)) : null;
+      let close = null; if (c.fe && c.ve) { close = new Date(due.getFullYear(), due.getMonth() - (c.fe >= c.ve ? 1 : 0), c.fe); }
+      const open = close && close > T, dd = close ? daysBetween(T, close) : 0;
+      const sub = (due ? (due < T ? 'venceu ' : 'vence ') + dmes(due) : 'vence em ' + mShort(mi)) + ' · ' + (open ? 'fecha ' + fmtD(dd) : nFat(c, mi) + (nFat(c, mi) === 1 ? ' lançamento' : ' lançamentos'));
+      return { n: c.nick || c.n, v: int(v), sub, cor: c.cor, ink: c.ink };
+    }).filter(Boolean);
+    out.FUT = Array.from({ length: 12 }, (_, k) => { const m = mi + 1 + k, s = {}; M.cards.forEach(c => { const v = fatOf(c, m); if (v) s[c.nick || c.n] = Math.round(v * 100) / 100; }); return { m: mShort(m), s }; });
+    while (out.FUT.length > 6 && !Object.keys(out.FUT[out.FUT.length - 1].s).length) out.FUT.pop();
+    out.PARC = S.parc.map(p => { const [c, e, card, k, o, x, f, ateMi, rest] = p;
+      return { c, n: e, k: card ? (M.cards.find(cc => cc.n === card) || {}).nick || card : k, tot: brl0(n(o)) + ' em ' + x + 'x', x, f, ate: mShort(ateMi), r: Math.round(n(rest) * 100) / 100 }; });
+    const serieCat = (c, e) => { const s = G && G.serie && G.serie.find(x => x[0] === c.id && x[1] === e); return s ? s[2] : 'Outros'; };
+    if (isCur) M.cards.forEach(c => (c.parcOf || []).forEach(sr => { const f = sr.N - sr.n; if (f <= 0) return;
+      const k = c.nick || c.n; out.PARC = out.PARC.filter(x => !(x.k === k && KD.norm(x.n).slice(0, 12) === KD.norm(sr.e).slice(0, 12)));
+      out.PARC.push({ c: serieCat(c, sr.e), n: sr.e, k, tot: brl0(sr.v * sr.N) + ' em ' + sr.N + 'x', x: sr.N, f, ate: mShort(mIdx(pd(sr.ate))), r: Math.round(sr.v * f * 100) / 100 }); }));
+    out.PARC.sort((a, b) => b.r - a.r);
+    out.ONDE = S.onde.map(g => ({ n: g[0], v: Math.round(n(g[1])), c: g[2], top: g[3] }));
+    out.spent = Object.fromEntries(S.onde.map(g => [g[0], n(g[1])]));
+    out.TET = Object.values(M.catById).filter(c => Number(c.teto_mensal) > 0).map(c => ({ n: c.nome, v: Math.round(out.spent[c.nome] || 0), t: Number(c.teto_mensal) }));
+    out.LANC = S.lanc.map(l => { const dt = pd(l[1]); return [ddmm(dt), METH[l[2]] || 'Pix', l[3], l[4], l[5], signed(n(l[6])), l[7] ? 1 : 0, l[8] ? 1 : 0, l[0]]; });
+    out.ASSIN = S.assin.map(a => ({ n: a[0], d: ddmm(pd(a[1])), k: a[2], v: brl2(n(a[3])), c: a[4] }));
+    out.assinTot = S.assin.reduce((a, x) => a + n(x[3]), 0);
+    out.tp = { pessoal: out.GS.pessoal.tot, trabalho: out.GS.trabalho.tot };
+    out.atyp = S.atyp ? ((M.rowById && M.rowById[S.atyp[0]]) || { id: S.atyp[0], e: S.atyp[1], dt: pd(S.atyp[2]), out: n(S.atyp[3]), c: S.atyp[4], atyp: true }) : null;
+    return out;
+  };
+  KD.srv.buscaMes = async mi => { const r = await KD.sb.rpc('kontar_mes', { p_mi: mi, p_hoje: iso(KD.today) }); if (r.error) throw new Error('kontar_mes: ' + r.error.message); return (KD.srv.mes[mi] = r.data); };
+  KD.srv.buscaGeral = async () => { const r = await KD.sb.rpc('kontar_geral', { p_hoje: iso(KD.today) }); if (r.error) throw new Error('kontar_geral: ' + r.error.message); return (KD.srv.geral = r.data); };
+
+  /* conferência: o resumo do servidor tem que bater com o do navegador em todos os meses (abre com ?paridade=1). Só leitura. */
+  KD.paridade = async function (de, ate) {
+    const M = KD.M; de = de == null ? M.MIN : de; ate = ate == null ? M.CUR : ate;
+    const G = await KD.srv.buscaGeral(), dif = [], t0 = performance.now();
+    const norm = o => JSON.parse(JSON.stringify(o, (k, v) => k === 'atyp' && v && typeof v === 'object' && v.id ? v.id : v));
+    const cmp = (a, b, path, mi) => {
+      if (typeof a === 'number' && typeof b === 'number') { if (Math.abs(a - b) > 0.005) dif.push({ mi, path, js: a, srv: b }); return; }
+      if (a && b && typeof a === 'object' && typeof b === 'object') { const ks = new Set([...Object.keys(a), ...Object.keys(b)]); ks.forEach(k => cmp(a[k], b[k], path + '.' + k, mi)); return; }
+      if (a !== b) dif.push({ mi, path, js: a, srv: b });
+    };
+    const ms = []; for (let mi = de; mi <= ate; mi++) ms.push(mi);
+    const S = await Promise.all(ms.map(mi => KD.srv.buscaMes(mi)));
+    ms.forEach((mi, i) => cmp(norm(KD.month(mi)), norm(KD.monthSrv(mi, S[i], G)), mShort(mi), mi));
+    return { meses: ms.length, ms: Math.round(performance.now() - t0), dif };
+  };
+
   /* -------- notificações e alertas (derivadas dos dados) -------- */
   KD.notifs = function () {
     const M = KD.M, T = KD.today, cur = KD.month(M.CUR), N = [];

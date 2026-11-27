@@ -875,6 +875,18 @@ h1{margin:0;font-size:clamp(40px,5.3vw,76px);letter-spacing:-.06em;line-height:.
     }
     await mountApp(); performance.mark('kontar:app'); dismissRoot(); await L.finish(); performance.mark('kontar:pronto');
     syncSeVelho(sb, user);
+    if (/[?&]paridade=1\b/.test(location.search)) paridade();
+  }
+  /* ?paridade=1: confere o resumo calculado no servidor contra o do navegador, mês a mês (só leitura) e mostra o resultado num quadro */
+  async function paridade() {
+    const box = document.createElement('pre');
+    box.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:99999;max-width:min(720px,calc(100vw - 32px));max-height:60vh;overflow:auto;margin:0;padding:14px 16px;background:#0A0A0A;color:#F2F0EB;border:1px solid #3A3A40;border-radius:12px;font:12px/1.45 ui-monospace,Menlo,monospace;white-space:pre-wrap';
+    box.textContent = 'Conferindo servidor × navegador…'; document.body.appendChild(box);
+    try {
+      const r = await window.KD.paridade(); window.KD._paridade = r;
+      box.textContent = (r.dif.length ? '✕ ' + r.dif.length + ' diferenças' : '✓ Zero diferenças') + ' · ' + r.meses + ' meses · ' + r.ms + ' ms\n\n' +
+        r.dif.slice(0, 200).map(d => d.path + '\n   navegador: ' + JSON.stringify(d.js) + '\n   servidor:  ' + JSON.stringify(d.srv)).join('\n');
+    } catch (e) { box.textContent = 'Erro: ' + e.message; }
   }
   /* Open Finance: ao abrir o app, se a última atualização tem mais de 12h, busca do banco em segundo plano e redesenha quando chegar */
   async function syncSeVelho(sb, user) {
