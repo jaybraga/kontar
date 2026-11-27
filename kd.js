@@ -263,7 +263,7 @@
 
   /* -------- tudo que depende do mês selecionado -------- */
   /* cálculo no servidor: ligado por padrão quando KD.CALC_SRV = true; localStorage 'kontar:calc' = 'js' força o cálculo antigo, 'srv' força o novo */
-  KD.CALC_SRV = false;
+  KD.CALC_SRV = true;
   KD.calcSrv = () => { let v = null; try { v = localStorage.getItem('kontar:calc'); } catch (e) {} return v === 'js' ? false : v === 'srv' ? true : KD.CALC_SRV; };
   const pedindo = {};
   KD.srv_pede = mi => {
