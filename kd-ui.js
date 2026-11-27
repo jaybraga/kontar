@@ -510,7 +510,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     o.ac_save = ((orig) => () => { orig(); setTimeout(() => KD.saveAccount(comp.state.ac), 0); })(o.ac_save);
     o.ac_delGo = ((orig) => () => { if (KD.isDemo()) return comp.setState(x => ({ ac: Object.assign({}, x.ac, { delTxt: '', pwMsg: DEMO_MSG, pwErr: true }) })); const ok = comp.state.ac.delTxt.trim().toUpperCase() === 'EXCLUIR'; orig(); if (ok) KD.deleteAccount(); })(o.ac_delGo);
     /* Extrato: busca */
-    o.xtMais = !!(KD.xt && st.page === 'extrato' && KD.xt.temMais());
+    o.xtMais = !!(KD.xt && st.page === 'extrato' && KD.xt.carregando());
     o.xfQ = st.xf.q || ''; o.xfSetQ = e => { const v = e.target.value; comp.setState(x => ({ xf: Object.assign({}, x.xf, { q: v }) })); };
     o.xfAny = o.xfAny || !!st.xf.q; o.xfClear = ((orig) => () => { orig(); comp.setState(x => ({ xf: Object.assign({}, x.xf, { q: '' }) })); })(o.xfClear);
     /* listas longas: 50 por vez; as próximas entram em cascata quando o fim da lista é alcançado */
@@ -520,7 +520,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     if (Array.isArray(o.days)) {
       const L = lim('extrato', JSON.stringify([st.mes, st.xf])); let c = 0, tot = 0; o.days.forEach(d => { tot += (d.rows || []).length; });
       o.days = o.days.map(d => { const rows = (d.rows || []).slice(0, Math.max(0, L.n - c)).map((r, i) => Object.assign({}, r, { an: AN(c + i, L) })); c += rows.length; return rows.length ? Object.assign({}, d, { rows }) : null; }).filter(Boolean);
-      KD._more.extrato = tot > L.n;
+      KD._more.extrato = tot > L.n || !!(KD.xt && KD.xt.on() && KD.xt.dados && !KD.xt.fim);   // no servidor: ainda há páginas pra buscar
+      if (KD.xt && KD.xt.on()) KD.xt.garante(L.n);
     }
     if (Array.isArray(o.estRowsF)) {
       const L = lim('estab', JSON.stringify([st.ef, st.eq, st.mes])); KD._more.estab = o.estRowsF.length > L.n;
@@ -812,7 +813,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   };
   const rpc = (f, offset, lim) => KD.sb.rpc('kontar_extrato', { p_f: f, p_hoje: KD.iso(KD.today), p_offset: offset, p_lim: lim })
     .then(r => { if (r.error) throw new Error('kontar_extrato: ' + r.error.message); return r.data; });
-  const redesenha = () => { const c = KD.comp; if (c) c.setState({}); requestAnimationFrame(X.vigia); };
+  const redesenha = () => { const c = KD.comp; if (c) c.setState({}); };
 
   /* chamado a cada desenho: se os filtros (ou os dados, KD._ver) mudaram, busca de novo. Enquanto não chega, fica o que já estava. */
   X.atual = comp => {
@@ -853,17 +854,10 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   X.vazio = () => !!X.dados && !X.dados.n;
   X.opts = () => X.dados && X.dados.opts;
   X.porId = id => (id && X.byId[id]) || null;
-  X.temMais = () => X.on() && (!X.dados || !X.fim);
+  X.carregando = () => X.on() && (!X.dados || (X.busy && (X.mostra || 0) >= X.rows.length));
 
-  /* o fim da lista perto da tela → mais 50 (vale pra qualquer área que role) */
-  X.vigia = () => {
-    if (X.fim || X.busy || !X.dados) return;
-    const el = document.querySelector('[data-xt-fim]'); if (!el) return;
-    const r = el.getBoundingClientRect(); if (r.top < window.innerHeight + 900 && r.bottom > -200) X.mais();
-  };
-  let pend = 0;
-  document.addEventListener('scroll', () => { if (!pend) pend = requestAnimationFrame(() => { pend = 0; X.vigia(); }); }, true);
-  window.addEventListener('resize', () => X.vigia());
+  /* a tela mostra 50 por vez e pede mais ao rolar (KD.loadMore em kd-ui.js); aqui só garante que o servidor já mandou o bastante (com uma página de folga) */
+  X.garante = n => { X.mostra = n; if (X.on() && X.dados && !X.fim && X.rows.length < n + PAG) X.mais(); };
 })();
 
 /* Kontar · painel de edição da transação (Dados · Ler nota · Dividir)
