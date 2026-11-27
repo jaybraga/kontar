@@ -439,9 +439,10 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     /* Gastos */
     o.gBars = S.bars; o.gL1 = S.gL[0]; o.gL2 = S.gL[1]; o.gL3 = S.gL[2];
     /* Faturas futuras */
-    const F9 = S.FUT.slice(0, 9);
-    o.hmFut = F9.map((f, i) => { const tot = Object.values(f.s).reduce((a, b) => a + b, 0);
-      return { lc: i === 0 ? '#fff' : '#8A8A93', xm: i >= 6 ? 'w' : null, v: tot ? brl0(tot) : '—', h: Math.min(100, tot / 1000 * 100).toFixed(1) + '%', m: f.m, segs: Object.keys(f.s).map(k => ({ tip: k + ' · ' + f.m + '|' + brl0(f.s[k]), flex: f.s[k].toFixed(2), cor: C.KC[k] || '#78788A' })) }; });
+    const F9 = S.FUT.slice(0, 9), fTot = f => Object.values(f.s).reduce((a, b) => a + b, 0), fMax = Math.max(1, ...F9.map(fTot));
+    o.hmFutEsc = brl0(fMax);
+    o.hmFut = F9.map((f, i) => { const tot = fTot(f);
+      return { lc: i === 0 ? '#fff' : '#8A8A93', xm: i >= 6 ? 'w' : null, v: tot ? brl0(tot) : '—', h: (tot / fMax * 100).toFixed(1) + '%', m: f.m, segs: Object.keys(f.s).map(k => ({ tip: k + ' · ' + f.m + '|' + brl0(f.s[k]), flex: f.s[k].toFixed(2), cor: C.KC[k] || '#78788A' })) }; });
     const legN = [...new Set(F9.flatMap(f => Object.keys(f.s)))];
     o.hmFutLeg = M.cards.filter(c => legN.includes(c.nick || c.n)).map(c => ({ n: c.nick || c.n, cor: c.destaque || c.cor }));
     /* Tetos (home): os 5 mais perto do teto */
