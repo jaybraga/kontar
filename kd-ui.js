@@ -3264,6 +3264,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       + '<div data-ft-a style="font-size:96px;font-weight:700;letter-spacing:-.065em;line-height:.9">Fontes</div>'
       + '<div data-ft-a style="font-size:13px;color:' + MU + ';margin-top:12px;max-width:600px;line-height:1.45">Como cada conta e cartão chega no Kontar. Escolha o modo de cada uma; o Kontar mostra o que falta para fechar o mês.</div>'
       + (ofAtivo ? '<div data-ft-a style="margin-top:18px"><span data-ft-conectar role="button" style="display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 20px;border:1.5px solid #55555C;border-radius:99px;font-size:11px;font-weight:900;letter-spacing:.12em;cursor:pointer;color:' + FG + ';transition:background .25s ease" onmouseover="this.style.background=\'#1C1C20\'" onmouseout="this.style.background=\'transparent\'">+ CONECTAR BANCO</span></div>' : '')
+      + (ofAtivo && KD.ofAt ? KD.ofAt.faixa() : '')   // faixa "Open Finance" com o Atualizar agora (src/atualizar.js)
       + '<div data-ft-a style="display:flex;justify-content:space-between;align-items:baseline;margin-top:24px;padding-bottom:10px"><span style="font-size:10.5px;font-weight:700;letter-spacing:.14em;color:' + MU + '">↘ ' + m.toUpperCase() + ' · ESTADO DE CADA FONTE</span><span style="font-size:12px;font-weight:800;letter-spacing:.1em;color:' + (ok === R.length ? GR : AMB) + '">' + ok + ' DE ' + R.length + ' EM DIA</span></div>'
       + (rows ? R.map(linha).join('') : '<div style="padding:30px 0;color:' + MU + '">Carregando…</div>') + '<div style="border-top:1px solid #2A2A2F"></div>'
       + '<div data-ft-a style="margin-top:22px;display:flex;align-items:center;gap:14px"><span style="font-size:10.5px;font-weight:700;letter-spacing:.14em;color:' + MU + '">↘ LEMBRETE DE FECHAMENTO</span><span style="font-size:12.5px;color:#B4B4BA">Avisar a partir do dia</span><span style="display:inline-flex;align-items:center;border:1.5px solid #3A3A40;border-radius:99px;height:34px"><span data-ft-dia="-1" style="width:34px;text-align:center;font-size:16px;font-weight:800;cursor:pointer;user-select:none">−</span><b data-ft-dia-n style="min-width:26px;text-align:center;font-size:14px">' + FT.dia() + '</b><span data-ft-dia="1" style="width:34px;text-align:center;font-size:16px;font-weight:800;cursor:pointer;user-select:none">+</span></span></div>'
@@ -3300,6 +3301,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
       naPagina = false; const l = layer; if (l) { l.style.opacity = '0'; setTimeout(() => { if (!naPagina) l.style.display = 'none'; }, 360); }
     }
   }
+  window.addEventListener('kd:fontes-redesenha', () => { const host = layer && naPagina && layer.firstElementChild; if (host) pagina(host, false); });
   window.addEventListener('kd:fontes', () => { const host = layer && naPagina && layer.firstElementChild; if (host) { const s = JSON.stringify(rows); if (s !== host.__sig) { const prim = host.__sig === 'null'; host.__sig = s; pagina(host, prim); } } sincCartoes(true); });
 
   /* ---------- status e botão nos cards de Cartões ---------- */
@@ -3332,6 +3334,159 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
 
   let raf = 0;
   new MutationObserver(() => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; try { if (!KD.M || !KD.sb) return; if (!rows && !carregando && ((KD.comp && KD.comp.state && KD.comp.state.page === 'fontes') || document.querySelector('[data-k="mes"]') || document.querySelector('[data-ce-pen]'))) FT.carregar(); montaPagina(); if ((KD.comp && KD.comp.state && KD.comp.state.page) === 'cartoes') sincCartoes(false); } catch (e) {} }); }).observe(document.documentElement, { childList: true, subtree: true });
+})();
+
+/* Kontar · "Atualizar agora" do Open Finance (página Fontes) + seção da extensão na Ajuda (mockup atualizar-B2 / atualizar-ajuda)
+   O Pluggy não deixa o Kontar pedir atualização de conexões do MeuPluggy (MEU_PLUGGY_ITEM_UPDATE_NOT_ALLOWED). Então:
+   - sem a extensão: o botão abre meu.pluggy.ai/connections numa janela; a pessoa clica em Atualizar em cada banco;
+   - com a extensão (pasta extensao/): o botão pede à extensão, que faz esses cliques numa aba escondida.
+   Nos dois casos o Kontar acompanha fonte_conexoes.ultima_sync (o aviso do Pluggy chega e o sync roda no servidor):
+   cada conexão que sincroniza depois do clique vira chip verde e os dados são recarregados. */
+(function () {
+  'use strict';
+  const KD = window.KD, AT = (KD.ofAt = {});
+  const FG = '#F2F0EB', MU = '#8A8A90', GR = '#6AFF2A', EE = 'cubic-bezier(.65,0,.35,1)';
+  const MP = 'https://meu.pluggy.ai/connections';
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const REF = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" style="display:block;flex:none"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>';
+  const SAI = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex:none"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>';
+  let cx = null, carregando = null, esp = null, poll = 0, recarga = 0;
+
+  AT.ext = () => document.documentElement.getAttribute('data-kontar-ext');
+
+  /* ---------- dados: conexões do Pluggy e os bancos ligados a cada uma ---------- */
+  AT.carregar = async () => {
+    if (carregando) return carregando;
+    carregando = (async () => {
+      try {
+        const sb = KD.sb, [c, a, k] = await Promise.all([
+          sb.from('fonte_conexoes').select('id,ultima_sync,status').eq('provedor', 'pluggy').neq('status', 'desconectado'),
+          sb.from('accounts').select('id,conexao_id').not('conexao_id', 'is', null),
+          sb.from('cards').select('id,conexao_id').not('conexao_id', 'is', null),
+        ]);
+        const M = KD.M || { accs: [], cards: [] }, porCx = {};
+        (a.data || []).forEach(r => { const o = M.accs.find(x => x.id === r.id); if (o) (porCx[r.conexao_id] = porCx[r.conexao_id] || []).push({ n: o.bank || o.nome, cor: o.destaque || o.cor }); });
+        (k.data || []).forEach(r => { const o = M.cards.find(x => x.id === r.id); if (o) (porCx[r.conexao_id] = porCx[r.conexao_id] || []).push({ n: o.bank || o.n, cor: o.destaque || o.cor }); });
+        cx = (c.data || []).map(r => { const b = porCx[r.id] || [], n = b.length ? b[0].n : 'Banco'; return { id: r.id, ultima: r.ultima_sync, n, cor: b.length ? b[0].cor : '#55555C' }; })
+          .sort((x, y) => String(x.n).localeCompare(String(y.n), 'pt-BR'));
+      } catch (e) { console.error('[kontar] conexões', e); cx = cx || []; }
+      carregando = null; desenha();
+    })();
+    return carregando;
+  };
+
+  /* ---------- faixa "Open Finance" ---------- */
+  const hora = iso => { if (!iso) return '—'; const d = new Date(iso), T = new Date(), h = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    const dia = d.toDateString() === T.toDateString() ? 'hoje' : d.toDateString() === new Date(T.getTime() - 864e5).toDateString() ? 'ontem' : String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+    return dia + ' às ' + h; };
+  const pill = (attr, txt, branco) => '<span ' + attr + ' role="button" style="display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 20px;border-radius:99px;font-size:11px;font-weight:900;letter-spacing:.12em;cursor:pointer;white-space:nowrap;transition:opacity .25s ease;'
+    + (branco ? 'background:' + FG + ';color:#000' : 'border:1.5px solid #55555C;color:' + FG) + '" onmouseover="this.style.opacity=.85" onmouseout="this.style.opacity=1">' + txt + '</span>';
+  function chips() {
+    return '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">' + cx.map(c => {
+      const ok = esp && esp.feitos.has(c.id), cur = esp && !ok;
+      return '<span style="height:30px;padding:0 12px;border-radius:99px;font-size:11px;font-weight:800;letter-spacing:.04em;display:inline-flex;align-items:center;gap:7px;white-space:nowrap;transition:background .35s ease,color .35s ease,border-color .35s ease;'
+        + (ok ? 'background:#16240F;color:' + GR + ';border:1.5px solid transparent' : cur ? 'border:1.5px solid #3A3A40;color:' + FG : 'border:1.5px solid #3A3A40;color:#9A9AA3') + '">'
+        + (ok ? '✓' : cur ? '<span data-of-spin style="width:10px;height:10px;border-radius:50%;border:2px solid #3A3A40;border-top-color:' + FG + ';display:block;flex:none"></span>' : '<i style="width:8px;height:8px;border-radius:50%;background:' + esc(c.cor) + ';display:block;flex:none"></i>')
+        + esc(c.n) + '</span>';
+    }).join('') + '</div>';
+  }
+  function miolo() {
+    const ext = AT.ext(), n = cx.length, ult = cx.reduce((a, c) => (!a || (c.ultima && c.ultima > a) ? c.ultima : a), null);
+    const feitos = esp ? esp.feitos.size : 0;
+    let tit, sub, dir;
+    if (esp && esp.modo === 'janela') {
+      tit = 'O MeuPluggy abriu em outra janela · ' + feitos + ' de ' + n + ' chegaram';
+      sub = 'Lá, entre em cada banco e clique em <b style="color:#C9C9D1">Atualizar</b>. Cada banco fica verde aqui assim que os dados chegam.';
+      dir = pill('data-of-abrir', SAI + 'VOLTAR PRO MEUPLUGGY', false);
+    } else if (esp) {
+      tit = 'Atualizando… ' + feitos + ' de ' + n;
+      sub = 'A extensão está clicando em Atualizar no MeuPluggy, numa aba escondida. Pode continuar usando o Kontar.';
+      dir = '';
+    } else {
+      tit = 'Open Finance · ' + n + (n === 1 ? ' banco' : ' bancos') + ' pelo MeuPluggy';
+      sub = 'O MeuPluggy busca no banco sozinho 1x por dia. Última: ' + hora(ult) + '.';
+      dir = ext ? '<div style="display:flex;align-items:center;gap:14px"><span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;letter-spacing:.1em;color:' + GR + ';white-space:nowrap">✓ EXTENSÃO ATIVA</span>' + pill('data-of-atualizar', REF + 'ATUALIZAR TUDO', true) + '</div>'
+        : pill('data-of-atualizar', REF + 'ATUALIZAR AGORA' + SAI, true);
+    }
+    const cta = ext ? '' : '<div style="margin-top:14px;padding-top:12px;border-top:1px dashed #2B2B30;display:flex;align-items:center;gap:10px;font-size:12.5px;color:#9A9AA3">'
+      + '<span style="width:22px;height:22px;border-radius:50%;background:#5B3DF5;color:#fff;display:grid;place-items:center;font-size:11px;flex:none">⚡</span>'
+      + '<span>Cansou de clicar banco por banco? Com a <b style="color:#C9C9D1">extensão do Kontar</b>, este botão atualiza todos sozinho, sem sair daqui.</span>'
+      + '<span data-of-ajuda role="button" style="color:' + FG + ';font-weight:700;white-space:nowrap;border-bottom:1px solid #55555C;padding-bottom:1px;cursor:pointer;transition:border-color .25s ease" onmouseover="this.style.borderColor=\'' + FG + '\'" onmouseout="this.style.borderColor=\'#55555C\'">Como instalar →</span></div>';
+    return '<div style="display:flex;align-items:center;gap:16px"><div style="flex:1;min-width:0"><b style="font-size:15px">' + tit + '</b><div style="color:' + MU + ';font-size:12.5px;margin-top:3px">' + sub + '</div>' + chips() + '</div>' + dir + '</div>' + cta;
+  }
+  // a página Fontes chama isto ao se desenhar; depois a faixa se redesenha sozinha (data-of-strip)
+  AT.faixa = () => {
+    if (!cx) { AT.carregar(); return ''; }
+    if (!cx.length) return '';
+    return '<div data-ft-a data-of-strip style="margin-top:18px;border:1px solid #2A2A2F;border-radius:24px;padding:16px 18px;background:#0E0E10">' + miolo() + '</div>';
+  };
+  function desenha() {
+    const el = document.querySelector('[data-of-strip]');
+    if (el && cx && cx.length) { el.innerHTML = miolo(); return; }
+    if (!el && cx && cx.length) window.dispatchEvent(new Event('kd:fontes-redesenha'));
+  }
+  // o giro do chip "buscando": um só timer pra todos
+  setInterval(() => { if (!esp) return; const g = (Date.now() / 2.2) % 360; document.querySelectorAll('[data-of-spin]').forEach(s => { s.style.transform = 'rotate(' + g + 'deg)'; }); }, 50);
+
+  /* ---------- acompanhar a chegada (ultima_sync depois do clique) ---------- */
+  function espera(modo) {
+    esp = { modo, t0: new Date(Date.now() - 5000).toISOString(), feitos: new Set(), fim: Date.now() + 15 * 6e4 };
+    desenha(); clearInterval(poll); poll = setInterval(checa, 5000);
+  }
+  async function checa() {
+    if (!esp) return;
+    const q = await KD.sb.from('fonte_conexoes').select('id,ultima_sync').eq('provedor', 'pluggy').neq('status', 'desconectado');
+    let novo = false;
+    (q.data || []).forEach(r => { if (r.ultima_sync && r.ultima_sync > esp.t0 && !esp.feitos.has(r.id)) { esp.feitos.add(r.id); novo = true; const c = cx && cx.find(x => x.id === r.id); if (c) c.ultima = r.ultima_sync; } });
+    if (novo) { clearTimeout(recarga); recarga = setTimeout(() => { if (KD.comp) KD.refresh(KD.comp); if (KD.fontes) KD.fontes.carregar(); }, 2500); }
+    const todos = cx && cx.length && cx.every(c => esp.feitos.has(c.id));
+    if (todos || Date.now() > esp.fim) {
+      const n = esp.feitos.size; esp = null; clearInterval(poll); AT.carregar();
+      if (KD.fontes && KD.fontes.aviso) KD.fontes.aviso(todos ? 'Pronto: todos os bancos atualizados.' : n ? n + ' de ' + (cx ? cx.length : n) + ' bancos atualizados.' : 'Nenhum banco atualizou ainda. Os dados chegam quando o MeuPluggy terminar.');
+    } else desenha();
+  }
+
+  /* ---------- botão ---------- */
+  function atualizar() {
+    if (KD.isDemo && KD.isDemo()) { KD.fontes && KD.fontes.aviso('Conta de demonstração: o Open Finance aqui é simulado.'); return; }
+    if (AT.ext()) { window.postMessage({ kontar: 'atualizar' }, location.origin); espera('ext'); return; }
+    window.open(MP, 'kontar-meupluggy'); espera('janela');
+  }
+  window.addEventListener('message', ev => {
+    const m = ev.data; if (ev.source !== window || !m || !m.kontarExt) return;
+    const av = t => KD.fontes && KD.fontes.aviso && KD.fontes.aviso(t);
+    if (m.estado === 'login') { av('Entre no MeuPluggy na aba que abriu e clique em Atualizar de novo.'); esp = null; clearInterval(poll); desenha(); }
+    else if (m.estado === 'erro') { av('A extensão não conseguiu atualizar: ' + (m.msg || 'erro')); }
+    else if (m.estado === 'ocupado') av('A extensão já está atualizando.');
+    else if (m.estado === 'fim' && m.falha && m.falha.length) av('Não deu pra atualizar: ' + m.falha.join(', ') + '.');
+  });
+
+  /* ---------- Ajuda: seção da extensão ---------- */
+  function vaiPraAjuda() {
+    const c = KD.comp; if (!c) return;
+    if (c.state.page !== 'ajuda') c.toggleHelp();
+    let t = 0; const iv = setInterval(() => { const el = document.querySelector('[data-hp-ext]'); if (el && c.state.page === 'ajuda') { clearInterval(iv); setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300); } else if ((t += 100) > 4000) clearInterval(iv); }, 100);
+  }
+  function copia(el) {
+    const txt = el.getAttribute('data-ext-copiar'), lbl = el.querySelector('[data-ext-lbl]');
+    const ok = () => { if (lbl) { lbl.textContent = 'Copiado ✓'; setTimeout(() => { lbl.textContent = 'Copiar'; }, 1800); } };
+    if (navigator.clipboard) navigator.clipboard.writeText(txt).then(ok, () => {}); else { const t = document.createElement('textarea'); t.value = txt; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); ok(); }
+  }
+  function testa() {
+    const r = document.querySelector('[data-ext-res]'); if (!r) return; const v = AT.ext();
+    r.style.opacity = '0'; setTimeout(() => { r.textContent = v ? '✓ Extensão ativa (versão ' + v + ')' : 'Ainda não encontrei. Confira os passos 3 e 4 e recarregue esta página.'; r.style.color = v ? GR : '#FFC24A'; r.style.opacity = '1'; }, 180);
+  }
+
+  document.addEventListener('click', e => {
+    const t = e.target.closest ? e.target : null; if (!t) return;
+    if (t.closest('[data-of-atualizar]')) { e.stopPropagation(); atualizar(); return; }
+    if (t.closest('[data-of-abrir]')) { e.stopPropagation(); window.open(MP, 'kontar-meupluggy'); return; }
+    if (t.closest('[data-of-ajuda]')) { e.stopPropagation(); vaiPraAjuda(); return; }
+    const cp = t.closest('[data-ext-copiar]'); if (cp) { copia(cp); return; }
+    if (t.closest('[data-ext-testar]')) { testa(); }
+  }, true);
+  // a extensão marca o <html> logo ao carregar; se ela aparecer depois (instalou agora), a faixa se atualiza
+  new MutationObserver(() => desenha()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-kontar-ext'] });
 })();
 
 /* Kontar · estados vazios da Home (mockup vazios-B, aprovado em 22/11)
