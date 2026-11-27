@@ -128,19 +128,22 @@
     const N = 20, T = 650, SPREAD = 380, HOLD = 300, TOTAL = T + SPREAD + 80, J = [.31, .82, .12, .67, .45, .93, .05, .58, .24, .76, .39, .88, .17, .63, .5, .97, .09, .71, .28, .84];
     for (let i = 0; i < N; i++) { const c = document.createElement('div'); c.className = 'col'; c.innerHTML = '<i class="t"></i><i class="b"></i>'; cols.appendChild(c); }
     const each = fn => [...cols.children].forEach((c, i) => c.style.setProperty('--d', Math.round(fn(i)) + 'ms')), edge = i => 1 - Math.abs(i - (N - 1) / 2) / ((N - 1) / 2);
-    const toLight = () => { each(i => edge(i) * SPREAD * .8 + J[i] * SPREAD * .2); ld.classList.add('light'); return wait(TOTAL); };
-    const toDark = () => { each(i => (1 - i / (N - 1)) * SPREAD * .55 + edge(i) * SPREAD * .3 + J[i] * SPREAD * .15); ld.classList.remove('light'); return wait(TOTAL); };
+    /* espera que acaba antes se o app ficar pronto: a abertura sai na hora, sem terminar a fase em que está */
+    const waitOr = ms => new Promise(r => { const t0 = Date.now(), iv = setInterval(() => { if (ready || dead || Date.now() - t0 >= ms) { clearInterval(iv); r(); } }, 30); });
+    let claro = false;
+    const toLight = () => { each(i => edge(i) * SPREAD * .8 + J[i] * SPREAD * .2); ld.classList.add('light'); claro = true; return waitOr(TOTAL); };
+    const toDark = () => { each(i => (1 - i / (N - 1)) * SPREAD * .55 + edge(i) * SPREAD * .3 + J[i] * SPREAD * .15); ld.classList.remove('light'); claro = false; return waitOr(TOTAL); };
     let ready = false, dead = false, resolveGone; const gone = new Promise(r => { resolveGone = r; });
     const end = () => { if (dead) return; dead = true; ld.classList.add('gone'); setTimeout(() => { el.remove(); st.remove(); resolveGone(); if (LOADER === ctl) LOADER = null; }, 650); };
     const ctl = { finish: () => { ready = true; return gone; }, abort: (now) => { if (now) { dead = true; el.remove(); st.remove(); resolveGone(); LOADER = null; } else end(); return gone; } };
     LOADER = ctl; window.KontarLoader = ctl;
     (async () => { await wait(250);
       if (reduce()) { while (!ready && !dead) await wait(120); end(); return; }
-      let escuro = false;   // pronto com a tela já escura: sai dali mesmo (antes rodava mais um claro → escuro inteiro, até ~2,2s a mais)
-      for (;;) { if (dead) return; await toLight(); if (ready) break; await wait(HOLD); if (ready) break; if (dead) return; await toDark(); if (ready) { escuro = true; break; } await wait(HOLD); if (ready) { escuro = true; break; } }
+      for (;;) { if (dead || ready) break; await toLight(); if (ready) break; await waitOr(HOLD); if (ready || dead) break; await toDark(); if (ready) break; await waitOr(HOLD); }
       if (dead) return;
-      if (escuro) { ld.classList.add('fin'); await wait(700); end(); return; }
-      await wait(100); ld.classList.add('fin'); await toDark(); await wait(80); end(); })();
+      /* saída: o último gatilho é sempre claro → escuro; as colunas fecham enquanto o texto sobe e a tela toda faz fade */
+      if (claro) { each(i => (1 - i / (N - 1)) * SPREAD * .55 + edge(i) * SPREAD * .3 + J[i] * SPREAD * .15); ld.classList.remove('light'); claro = false; await wait(420); }
+      ld.classList.add('fin'); await wait(260); end(); })();
     return ctl;
   }
 
