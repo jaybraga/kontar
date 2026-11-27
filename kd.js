@@ -100,7 +100,9 @@
   }
 
   KD.load = async function (sb, user) {
-    KD.sb = sb; KD.user = user;
+    KD.sb = sb; KD.user = user; KD.srv.mes = {};
+    /* resumo do mês atual calculado no servidor: vem junto com as tabelas */
+    const pS = KD.calcSrv() ? Promise.all([KD.srv.buscaGeral(), KD.srv.buscaMes(mIdx(KD.today))]).catch(e => console.error(e)) : null;
     const [lanc, tx, inst, cards, cyc, accs, cats, ma, goals, prefs, prof, parts, items, notas] = await Promise.all([
       all(sb, 'v_lancamento'), all(sb, 'transactions', 'id,card_id,account_id,category_id,categoria_origem,fora_do_comum,chave,created_at,transfer_id,mesclada_em,mescla_origem,of_status'),
       all(sb, 'installments', 'transaction_id,numero,valor,data_caixa'), all(sb, 'cards'), all(sb, 'card_cycles'), all(sb, 'accounts'),
@@ -109,6 +111,7 @@
     ]);
     KD.raw = { lanc, tx, inst, cards, cyc, accs, cats, ma, goals, prefs, prof, parts, items, notas };
     build();
+    if (pS) await pS;
   };
 
   function build() {
@@ -259,8 +262,25 @@
   }
 
   /* -------- tudo que depende do mês selecionado -------- */
+  /* cálculo no servidor: ligado por padrão quando KD.CALC_SRV = true; localStorage 'kontar:calc' = 'js' força o cálculo antigo, 'srv' força o novo */
+  KD.CALC_SRV = false;
+  KD.calcSrv = () => { let v = null; try { v = localStorage.getItem('kontar:calc'); } catch (e) {} return v === 'js' ? false : v === 'srv' ? true : KD.CALC_SRV; };
+  const pedindo = {};
+  KD.srv_pede = mi => {
+    if (KD.srv.mes[mi] || pedindo[mi] || mi > KD.M.CUR + 12 || mi < KD.M.MIN - 1) return pedindo[mi];
+    return (pedindo[mi] = KD.srv.buscaMes(mi).then(d => { delete pedindo[mi]; delete KD._mc[mi]; KD._ver = (KD._ver || 0) + 1; const c = KD.comp; if (c && c.state && c.state.mes === mi) c.setState({}); return d; },
+      e => { delete pedindo[mi]; console.error(e); }));
+  };
   KD.month = function (mi) {
     if (KD._mc[mi]) return KD._mc[mi];
+    if (KD.calcSrv()) {
+      const S = KD.srv.mes[mi]; KD.srv_pede(mi - 1); KD.srv_pede(mi + 1);
+      if (S && KD.srv.geral) return (KD._mc[mi] = KD.monthSrv(mi, S, KD.srv.geral));
+      KD.srv_pede(mi);   // ainda não chegou: por enquanto vale o cálculo do navegador; redesenha quando chegar
+    }
+    return KD.monthJs(mi);
+  };
+  KD.monthJs = function (mi) {
     const M = KD.M, T = KD.today, isCur = mi === M.CUR, start = mStart(mi), end = mEnd(mi), ref = isCur ? T : end, nd = daysIn(mi), td = isCur ? T.getDate() : nd;
     const inMi = r => r.mi === mi, isTransf = KD.isTransf;
     const rowsMi = M.rows.filter(inMi);
@@ -396,7 +416,7 @@
     /* fora do comum do mês (o mais recente) */
     out.atyp = rowsMi.filter(r => r.atyp && r.out).sort((a, b) => b.dt - a.dt)[0] || null;
 
-    KD._mc[mi] = out; return out;
+    if (!KD.calcSrv()) KD._mc[mi] = out; return out;
   };
 
   /* -------- o mesmo resumo do mês, a partir dos números que o servidor calcula (kontar_mes / kontar_geral) --------
@@ -501,7 +521,7 @@
     };
     const ms = []; for (let mi = de; mi <= ate; mi++) ms.push(mi);
     const S = await Promise.all(ms.map(mi => KD.srv.buscaMes(mi)));
-    ms.forEach((mi, i) => cmp(norm(KD.month(mi)), norm(KD.monthSrv(mi, S[i], G)), mShort(mi), mi));
+    ms.forEach((mi, i) => cmp(norm(KD.monthJs(mi)), norm(KD.monthSrv(mi, S[i], G)), mShort(mi), mi));
     return { meses: ms.length, ms: Math.round(performance.now() - t0), dif };
   };
 
