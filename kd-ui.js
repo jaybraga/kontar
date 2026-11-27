@@ -1902,7 +1902,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const [res, vivos] = await Promise.all([busca(q), Promise.all(palpites.map(favOk))]);
     const doms = [], add = d => { d = String(d || '').toLowerCase(); if (d && !doms.includes(d)) doms.push(d); };
     (res || []).map(b => ({ b, v: bate(b, q) })).filter(x => x.v).sort((a, b) => b.v - a.v).forEach(x => add(x.b.domain));
-    palpites.forEach((d, i) => { if (vivos[i]) add(d); });
+    palpites.forEach((d, i) => { if (vivos[i] && !(i === 1 && vivos[0])) add(d); });   // nome.com só se não houver nome.com.br (costuma só redirecionar e o ícone vem em branco)
     (res || []).forEach(b => add(b && b.domain));
     return (opCache[k] = doms.slice(0, 6).map(d => ({ dom: d, url: 'https://cdn.brandfetch.io/domain/' + d + '/w/128/h/128/icon?c=' + CID })));
   };
