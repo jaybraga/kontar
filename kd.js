@@ -114,6 +114,22 @@
     if (pS) await pS;
   };
 
+  /* um lançamento no formato do app, a partir da linha de v_lancamento (l), das colunas de transactions (t) e de partes/itens/nota */
+  const mkRow = KD.mkRow = (l, t, parts, items, nota) => {
+    const M = KD.M;
+    const dt = pd(l.data_compra), amt = (l.direcao === 'entrada' ? 1 : -1) * Number(l.valor_total);
+    const card = l.cartao || null, k = l.cartao || l.conta || '—';
+    return { id: l.id, dt, d: ddmm(dt), y: dt.getFullYear(), mi: mIdx(dt), t: METH[l.meio] || 'Pix', meio: l.meio, e: l.nome || l.apelido_global || l.nome_fatura || '—', chave: l.chave,
+      sub: !!l.assinatura, atyp: !!t.fora_do_comum, c: (t.category_id && M.catById[t.category_id] ? M.catById[t.category_id].nome : l.categoria) || 'Outros', catId: t.category_id || null, k, card, cardId: t.card_id || null, accId: t.account_id || null,
+      v: signed(amt), amt, out: amt < 0 ? -amt : 0, inn: amt > 0 ? amt : 0, pend: l.status === 'pendente_revisao', proc: t.of_status === 'PENDING', trab: !!l.trabalho, x: Number(l.parcelas_total) || 1,
+      obs: l.observacao || '', dom: l.dominio || null, logo: l.logo_url || null, created: t.created_at || '', iso: String(l.data_compra).slice(0, 10), xfer: t.transfer_id || null, total: Number(l.valor_total), origem: l.origem || '', mescla: t.mesclada_em && t.mescla_origem ? t.mescla_origem : null,
+      parts: (parts || []).sort((a, b) => a.ordem - b.ordem).map(p => ({ id: p.id, catId: p.category_id, valor: Number(p.valor), auto: !!p.automatica, rotulo: p.rotulo || '' })),
+      items: (items || []).sort((a, b) => a.ordem - b.ordem).map(i => ({ id: i.id, nome: i.nome, qtd: Number(i.quantidade) || 1, un: i.unidade || '', valor: Number(i.valor), catId: i.category_id, partId: i.part_id })),
+      nota: nota || null };
+  };
+  /* estorno no cartão: crédito que não é pagamento de fatura abate o gasto (fica como saída negativa na categoria da compra), não é ganho */
+  const aplicaEstorno = KD.aplicaEstorno = r => { if (r.card && r.inn > 0 && !KD.isTransf(r) && !/pagamento|inclus[aã]o de pagamento|^ajuste a d[eé]bito|^estorno saldo/i.test(r.e)) { r.out = -r.inn; r.inn = 0; r.estorno = true; } };
+
   function build() {
     const R = KD.raw, T = KD.today, M = (KD.M = {});
     M.CUR = mIdx(T);
@@ -153,17 +169,7 @@
     /* lançamentos */
     const grp = (a, k) => a.reduce((o, x) => ((o[x[k]] = o[x[k]] || []).push(x), o), {});
     const partsBy = grp(R.parts || [], 'transaction_id'), itemsBy = grp(R.items || [], 'transaction_id'), notaBy = Object.fromEntries((R.notas || []).map(n => [n.transaction_id, n]));
-    M.rows = R.lanc.map(l => {
-      const t = txById[l.id] || {}, dt = pd(l.data_compra), amt = (l.direcao === 'entrada' ? 1 : -1) * Number(l.valor_total);
-      const card = l.cartao || null, k = l.cartao || l.conta || '—';
-      return { id: l.id, dt, d: ddmm(dt), y: dt.getFullYear(), mi: mIdx(dt), t: METH[l.meio] || 'Pix', meio: l.meio, e: l.nome || l.apelido_global || l.nome_fatura || '—', chave: l.chave,
-        sub: !!l.assinatura, atyp: !!t.fora_do_comum, c: (t.category_id && M.catById[t.category_id] ? M.catById[t.category_id].nome : l.categoria) || 'Outros', catId: t.category_id || null, k, card, cardId: t.card_id || null, accId: t.account_id || null,
-        v: signed(amt), amt, out: amt < 0 ? -amt : 0, inn: amt > 0 ? amt : 0, pend: l.status === 'pendente_revisao', proc: t.of_status === 'PENDING', trab: !!l.trabalho, x: Number(l.parcelas_total) || 1,
-        obs: l.observacao || '', dom: l.dominio || null, logo: l.logo_url || null, created: t.created_at || '', iso: String(l.data_compra).slice(0, 10), xfer: t.transfer_id || null, total: Number(l.valor_total), origem: l.origem || '', mescla: t.mesclada_em && t.mescla_origem ? t.mescla_origem : null,
-        parts: (partsBy[l.id] || []).sort((a, b) => a.ordem - b.ordem).map(p => ({ id: p.id, catId: p.category_id, valor: Number(p.valor), auto: !!p.automatica, rotulo: p.rotulo || '' })),
-        items: (itemsBy[l.id] || []).sort((a, b) => a.ordem - b.ordem).map(i => ({ id: i.id, nome: i.nome, qtd: Number(i.quantidade) || 1, un: i.unidade || '', valor: Number(i.valor), catId: i.category_id, partId: i.part_id })),
-        nota: notaBy[l.id] || null };
-    }).sort((a, b) => b.dt - a.dt || (b.created < a.created ? -1 : b.created > a.created ? 1 : 0));
+    M.rows = R.lanc.map(l => mkRow(l, txById[l.id] || {}, partsBy[l.id], itemsBy[l.id], notaBy[l.id])).sort((a, b) => b.dt - a.dt || (b.created < a.created ? -1 : b.created > a.created ? 1 : 0));
     /* rendimentos do banco (ex.: Mercado Pago credita centavos todo dia, 2x): não são lançamentos para o usuário. Saem de todas as telas e totais,
        mas ficam em M.rowsAll para o saldo dos cofrinhos. */
     KD.isRendimento = r => r.origem === 'open_finance' && /^rendimentos?$/i.test(String(r.e || '').trim());
@@ -172,11 +178,12 @@
     // regra única (igual às visões do banco): meio transferência, vínculo de transferência ou categoria Transferência
     const isTransf = (KD.isTransf = r => r.c === 'Transferência' || r.meio === 'transferencia' || !!r.xfer);
     /* estorno no cartão: crédito que não é pagamento de fatura abate o gasto (fica como saída negativa na categoria da compra), não é ganho */
-    M.rowsAll.forEach(r => { if (r.card && r.inn > 0 && !isTransf(r) && !/pagamento|inclus[aã]o de pagamento|^ajuste a d[eé]bito|^estorno saldo/i.test(r.e)) { r.out = -r.inn; r.inn = 0; r.estorno = true; } });
+    M.rowsAll.forEach(aplicaEstorno);
     /* movimentação INTERNA: transferência entre as contas do próprio usuário (vínculo de transferência, ou Pix/transferência cujo nome é um dos "nomes nas transferências" do titular).
        Não conta como gasto nem como ganho nos resumos do Extrato. Transferência para outra pessoa continua contando. */
     const toksI = s => KD.norm(s).replace(/[^a-z0-9]+/g, ' ').split(' ').filter(w => w.length >= 3);
     KD.isInterna = r => {
+      if (r.interna != null) return r.interna;   // linha que veio do servidor já traz a regra aplicada
       if (r.xfer) return true;
       if (/^dinheiro (reservado|retirado)\b/i.test(r.e || '')) return true;   // guardar/resgatar no cofrinho é o mesmo dinheiro mudando de lugar
       if (!(r.c === 'Transferência' || r.meio === 'transferencia' || r.meio === 'pix')) return false;

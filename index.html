@@ -569,6 +569,8 @@ a{color:#1a1a1a}a:hover{color:#5B3DF5}
     </div>
     </div>
     </sc-for>
+    <div data-xt-fim="1" style="height:1px"></div>
+    <sc-if value="{{ xtMais }}" hint-placeholder-val="{{ false }}"><div style="padding:18px 0 6px;text-align:center;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#6A6A72">Carregando mais lançamentos…</div></sc-if>
   </div>
   </div>
   <sc-if value="{{ editing }}" hint-placeholder-val="{{ false }}">
@@ -1998,7 +2000,7 @@ class Component extends DCLogic {
   catOf(r) { return this.state.cats[r.id] || r.c; }
   openEdit(r, queue) { this.setState({ edit: r.id, pick: queue ? null : this.catOf(r), flag: !!this.state.alt[r.e] }); }
   saveEdit() {
-    const st = this.state; const r = Component.ROWS.find(x => x.id === st.edit); if (!r || !st.pick) return;
+    const st = this.state; const r = (KD.xt && KD.xt.porId(st.edit)) || Component.ROWS.find(x => x.id === st.edit); if (!r || !st.pick) return;
     const queue = !!st.alt[r.e] && !st.cats[r.id];
     const showFlag = queue || st.pick !== r.c;
     this.setState(s => ({ edit: null, cats: Object.assign({}, s.cats, { [r.id]: s.pick }), alt: showFlag ? Object.assign({}, s.alt, { [r.e]: s.flag }) : s.alt }));
@@ -2060,7 +2062,7 @@ class Component extends DCLogic {
     const WD = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'], MO = { '08': 'ago', '09': 'set' }, MOF = { '08': 'Agosto', '09': 'Setembro' };
     const pendRaw = [], groups = [];
     const rgX = st.rg && st.rg.mi === st.mes ? st.rg : null;
-    C.ROWS.forEach(r => {
+    (KD.xt && KD.xt.on() ? KD.xt.lista(this) : C.ROWS).forEach(r => {
       if (!this.xRowOk(r)) return;
       const isPend = r.pend && !st.cats[r.id];
       if (isPend) { pendRaw.push(r); return; }
@@ -2072,9 +2074,9 @@ class Component extends DCLogic {
     const pend = pendRaw.map((r, k) => Object.assign(this.av(r.e, 'Outros', '#000', '#FFC24A'), { id: r.id, t: r.t, e: r.e, d: r.d, k: r.k, kc: kc(r.k), v: r.v, bd: k === pendRaw.length - 1 ? '0' : '1px dashed rgba(0,0,0,.3)', open: () => this.openEdit(r, true) }));
     const days = groups.map((g, gi) => {
       const p = g.d.split('/'), dt = g.dt;
-      const tot = g.rows.reduce((a, r) => a + (KD.isInterna && KD.isInterna(r) ? 0 : C.num(r.v)), 0);
+      const xd = KD.xt && KD.xt.on() ? KD.xt.dia(g.rows[0]) : null, tot = xd ? xd[1] : g.rows.reduce((a, r) => a + (KD.isInterna && KD.isInterna(r) ? 0 : C.num(r.v)), 0), nDia = xd ? xd[0] : g.rows.length;
       return {
-        dd: p[0], lbl: WD[dt.getDay()], mo: C.MESL[dt.getMonth()] + (dt.getFullYear() !== KD.today.getFullYear() ? ' ' + dt.getFullYear() : ''), moShow: gi === 0 || groups[gi - 1].dt.getMonth() !== dt.getMonth() || groups[gi - 1].y !== g.y, cnt: g.rows.length + (g.rows.length === 1 ? ' lançamento' : ' lançamentos'),
+        dd: p[0], lbl: WD[dt.getDay()], mo: C.MESL[dt.getMonth()] + (dt.getFullYear() !== KD.today.getFullYear() ? ' ' + dt.getFullYear() : ''), moShow: gi === 0 || groups[gi - 1].dt.getMonth() !== dt.getMonth() || groups[gi - 1].y !== g.y, cnt: nDia + (nDia === 1 ? ' lançamento' : ' lançamentos'),
         tot: C.brl(tot), tc: tot > 0 ? '#6AFF2A' : tot < 0 ? '#FF6B5A' : '#FFFFFF',
         rows: g.rows.map((r, k) => {
           const cat = this.catOf(r), cc = this.cor(cat);
@@ -2086,7 +2088,7 @@ class Component extends DCLogic {
       };
     });
 
-    const er = st.edit ? C.ROWS.find(x => x.id === st.edit) : null;
+    const er = st.edit ? ((KD.xt && KD.xt.porId(st.edit)) || C.ROWS.find(x => x.id === st.edit)) : null;
     let ed = { e: '', meta: '', showFlag: false, flagTitle: '', flagHelp: '', saveOp: 1, saveLbl: '' };
     if (er) {
       const queue = !!st.alt[er.e] && !st.cats[er.id];
@@ -2413,7 +2415,7 @@ class Component extends DCLogic {
       ...(() => {
         const C = Component, xf = st.xf, upX = p => this.setState(x => ({ xf: Object.assign({}, x.xf, p) }));
         const P = [['3m', 'Últimos 3 meses'], ['mes', 'Este mês'], ['ant', 'Mês passado'], ['7d', 'Últimos 7 dias']];
-        const Kk = KD.kList(), Cc = [...new Set(C.ROWS.map(r => this.catOf(r)))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+        const Kk = KD.kList(), Cc = [...new Set(((KD.xt && KD.xt.on() && KD.xt.opts()) ? KD.xt.opts().c : []).concat(C.ROWS.map(r => this.catOf(r))))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
         const opt = (lbl, sel, dot, pick) => ({ lbl: lbl, w: sel ? '700' : '500', ink: sel ? '#fff' : '#D8D6E4', bg: sel ? '#17171B' : 'transparent', dd: dot ? 'block' : 'none', dot: dot || 'transparent', chk: sel ? 1 : 0, pick: pick });
         const pill = (id, lbl, on, opts) => { const o = xf.open === id; return { lbl: lbl, open: o, opts: opts, tog: (e) => { if (e && e.stopPropagation) e.stopPropagation(); upX({ open: o ? null : id }); }, bg: on ? '#F2F0EB' : '#000', ink: on ? '#000' : '#fff', bd: o ? '#fff' : on ? '#F2F0EB' : '#3A3A40', chev: on ? '#000' : '#9A9AA3', rot: o ? '180deg' : '0deg' }; };
         const pOn = xf.p !== '3m';
@@ -2421,14 +2423,14 @@ class Component extends DCLogic {
           pill('p', P.find(x => x[0] === xf.p)[1], pOn, P.map(x => opt(x[1], xf.p === x[0], '', () => upX({ p: x[0], open: null })))),
           pill('k', xf.k || 'Todos os cartões e contas', !!xf.k, [opt('Todos os cartões e contas', !xf.k, '', () => upX({ k: null, open: null }))].concat(Kk.map(k => opt(k, xf.k === k, C.KC[k], () => upX({ k: k, open: null }))))),
           pill('c', xf.c || 'Todas as categorias', !!xf.c, [opt('Todas as categorias', !xf.c, '', () => upX({ c: null, open: null }))].concat(Cc.map(c => opt(c, xf.c === c, this.cor(c), () => upX({ c: c, open: null }))))) ],
-          xfAny: pOn || !!xf.k || !!xf.c, xfClear: () => upX({ p: '3m', k: null, c: null, open: null }), xfEmpty: !C.ROWS.some(r => this.xRowOk(r)) };
+          xfAny: pOn || !!xf.k || !!xf.c, xfClear: () => upX({ p: '3m', k: null, c: null, open: null }), xfEmpty: KD.xt && KD.xt.on() ? KD.xt.vazio() : !C.ROWS.some(r => this.xRowOk(r)) };
       })(),
       ...(() => {
         const C = Component, xf = st.xf, rows = C.ROWS.filter(r => this.xRowOk(r)), out = rows.filter(r => C.num(r.v) < 0 && !(KD.isInterna && KD.isInterna(r)));
-        const tot = out.reduce((a, r) => a + -C.num(r.v), 0), g = {}; out.forEach(r => { const c = this.catOf(r); g[c] = (g[c] || 0) + -C.num(r.v); });
-        const top = Object.entries(g).sort((a, b) => b[1] - a[1])[0], at = rows.filter(r => r.atyp);
+        const xr = KD.xt && KD.xt.on() ? KD.xt.resumo() : null, tot = xr ? xr.tot : out.reduce((a, r) => a + -C.num(r.v), 0), g = {}; if (!xr) out.forEach(r => { const c = this.catOf(r); g[c] = (g[c] || 0) + -C.num(r.v); });
+        const top = xr ? xr.top : Object.entries(g).sort((a, b) => b[1] - a[1])[0], at = xr ? xr.at : rows.filter(r => r.atyp);
         const L = { '3m': 'Saiu nos últimos 3 meses', mes: 'Saiu este mês', ant: 'Saiu no mês passado', '7d': 'Saiu nos últimos 7 dias' }[xf.p];
-        return { xsLbl: L, xsTot: Math.round(tot).toLocaleString('pt-BR'), xsN: rows.length, xsA: at.length, xsAShow: at.length > 0,
+        return { xsLbl: L, xsTot: Math.round(tot).toLocaleString('pt-BR'), xsN: xr ? xr.n : rows.length, xsA: at.length, xsAShow: at.length > 0,
           xsAName: at.length ? at[0].e : '', xsCat: top ? top[0] : '—', xsCc: top ? this.cor(top[0]) : '#9A9AA3',
           xsCi: top ? 'url("' + C.uri(this.icSvg(top[0]), '#000') + '")' : 'none', xsPct: top && tot ? Math.round(top[1] / tot * 100) + '% de tudo que saiu' : 'nada saiu nesse recorte' };
       })(),

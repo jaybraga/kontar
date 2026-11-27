@@ -251,7 +251,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   KD.isDemo = () => !!(KD.user && KD.user.email === 'teste@kontar.app');
   const DEMO_MSG = 'Esta é a conta de demonstração: isso fica travado para todo mundo poder testar.';
   KD.since = () => new Date((KD.user && KD.user.created_at) || Date.now());
-  KD.kList = () => [...new Set(KD.M.rows.map(r => r.k))].filter(k => k && k !== '—');
+  KD.kList = () => { const o = KD.xt && KD.xt.on() && KD.xt.opts(); return o ? o.k.slice() : [...new Set(KD.M.rows.map(r => r.k))].filter(k => k && k !== '—'); };
   KD.lastAte = P => { let best = null, bi = -1; P.forEach(p => { const q = p.ate.split('/'), i = (2000 + +q[1]) * 12 + MES.indexOf(q[0]); if (i > bi) { bi = i; best = p.ate; } }); return best || '—'; };
   KD.noFat = mi => ({ n: '—', v: '0', sub: 'nenhuma fatura vence em ' + mShort(mi), cor: '#1C1C20', ink: '#FFFFFF' });
   KD.cardMap = key => { const o = {}; KD.M.cards.forEach(c => { const n = c.nick || c.n; o[n] = key === 'code' ? KD.CODE(c.n) : c[key]; if (n !== c.n) o[c.n] = o[n]; }); return o; };
@@ -510,6 +510,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     o.ac_save = ((orig) => () => { orig(); setTimeout(() => KD.saveAccount(comp.state.ac), 0); })(o.ac_save);
     o.ac_delGo = ((orig) => () => { if (KD.isDemo()) return comp.setState(x => ({ ac: Object.assign({}, x.ac, { delTxt: '', pwMsg: DEMO_MSG, pwErr: true }) })); const ok = comp.state.ac.delTxt.trim().toUpperCase() === 'EXCLUIR'; orig(); if (ok) KD.deleteAccount(); })(o.ac_delGo);
     /* Extrato: busca */
+    o.xtMais = !!(KD.xt && st.page === 'extrato' && KD.xt.temMais());
     o.xfQ = st.xf.q || ''; o.xfSetQ = e => { const v = e.target.value; comp.setState(x => ({ xf: Object.assign({}, x.xf, { q: v }) })); };
     o.xfAny = o.xfAny || !!st.xf.q; o.xfClear = ((orig) => () => { orig(); comp.setState(x => ({ xf: Object.assign({}, x.xf, { q: '' }) })); })(o.xfClear);
     /* listas longas: 50 por vez; as próximas entram em cascata quando o fim da lista é alcançado */
@@ -788,6 +789,81 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     }
     await KD.refresh(comp);
   };
+})();
+
+/* Kontar · Extrato em páginas.
+   O servidor aplica os filtros do Extrato (kontar_extrato: período, cartão/conta, categoria, busca e faixa de dias, igual ao xRowOk)
+   e devolve 50 lançamentos por vez, mais o resumo ("Saiu…", "Onde mais foi", fora do comum), o total de cada dia e o "Pra revisar".
+   Quando o fim da lista chega perto da tela, busca mais 50. Vale quando o cálculo no servidor está ligado (KD.calcSrv). */
+(function () {
+  const KD = window.KD;
+  const X = (KD.xt = { sig: null, fsig: null, dados: null, rows: [], pend: [], porDia: {}, byId: {}, fim: true, busy: false, seq: 0 });
+  const PAG = 50;
+
+  X.on = () => !!(KD.calcSrv && KD.calcSrv());
+  const filtros = st => {
+    const xf = st.xf || {}, rgX = st.rg && st.rg.mi === st.mes ? st.rg : null;
+    return { p: xf.p || '3m', k: xf.k || null, c: xf.c || null, q: xf.q || null, rg: rgX ? { mi: rgX.mi, a: rgX.a, b: rgX.b } : null };
+  };
+  const linha = (d, flags) => {
+    const r = KD.mkRow(d.l, d.t || {}, d.parts, d.items, d.nota); KD.aplicaEstorno(r);
+    const f = flags && flags[r.id]; if (f) { r.atyp = !!f[0]; r.interna = !!f[1]; }
+    return r;
+  };
+  const rpc = (f, offset, lim) => KD.sb.rpc('kontar_extrato', { p_f: f, p_hoje: KD.iso(KD.today), p_offset: offset, p_lim: lim })
+    .then(r => { if (r.error) throw new Error('kontar_extrato: ' + r.error.message); return r.data; });
+  const redesenha = () => { const c = KD.comp; if (c) c.setState({}); requestAnimationFrame(X.vigia); };
+
+  /* chamado a cada desenho: se os filtros (ou os dados, KD._ver) mudaram, busca de novo. Enquanto não chega, fica o que já estava. */
+  X.atual = comp => {
+    const st = comp.state; if (st.page !== 'extrato') return;
+    const f = filtros(st), fsig = JSON.stringify(f), sig = fsig + '|' + (KD._ver || 0);
+    if (sig === X.sig) return;
+    const soDados = fsig === X.fsig;   // mesmos filtros, dados novos (editou algo): recarrega sem perder o que já rolou
+    X.sig = sig; X.fsig = fsig; clearTimeout(X._t);
+    const my = ++X.seq, lim = soDados ? Math.max(PAG, X.rows.length) : PAG;
+    X._t = setTimeout(async () => {
+      try {
+        const d = await rpc(f, 0, lim); if (my !== X.seq) return;
+        X.dados = d; X.rows = (d.rows || []).map(x => linha(x, d.flags)); X.pend = (d.pend || []).map(x => linha(x, d.flags));
+        X.porDia = {}; (d.dias || []).forEach(x => { X.porDia[String(x[0]).slice(0, 10)] = [Number(x[1]) || 0, Number(x[2]) || 0]; });
+        X.byId = {}; X.rows.concat(X.pend).forEach(r => { X.byId[r.id] = r; });
+        X.fim = X.rows.length >= (d.nLista || 0);
+        redesenha();
+      } catch (e) { console.error(e); }
+    }, f.q && !soDados ? 220 : 0);
+  };
+
+  X.mais = async () => {
+    if (X.fim || X.busy || !X.dados || !X.fsig) return;
+    X.busy = true; const my = X.seq; redesenha();
+    try {
+      const d = await rpc(JSON.parse(X.fsig), X.rows.length, PAG); if (my !== X.seq) return;
+      const novas = (d.rows || []).map(x => linha(x, d.flags)).filter(r => !X.byId[r.id]);
+      novas.forEach(r => { X.byId[r.id] = r; }); X.rows = X.rows.concat(novas);
+      X.fim = !novas.length || X.rows.length >= (X.dados.nLista || 0);
+    } catch (e) { console.error(e); } finally { X.busy = false; redesenha(); }
+  };
+
+  /* o que a tela do Extrato lê */
+  X.lista = comp => { X.atual(comp); const cats = comp.state.cats || {}; return X.pend.filter(r => !cats[r.id]).concat(X.rows); };
+  X.dia = r => r && X.porDia[r.iso];
+  X.resumo = () => { const d = X.dados; if (!d) return { tot: 0, top: null, n: 0, at: [] };
+    return { tot: Number(d.tot) || 0, top: d.top ? [d.top[0], Number(d.top[1]) || 0] : null, n: d.n || 0, at: Array.from({ length: d.a || 0 }, (_, i) => i ? {} : { e: d.aName || '' }) }; };
+  X.vazio = () => !!X.dados && !X.dados.n;
+  X.opts = () => X.dados && X.dados.opts;
+  X.porId = id => (id && X.byId[id]) || null;
+  X.temMais = () => X.on() && (!X.dados || !X.fim);
+
+  /* o fim da lista perto da tela → mais 50 (vale pra qualquer área que role) */
+  X.vigia = () => {
+    if (X.fim || X.busy || !X.dados) return;
+    const el = document.querySelector('[data-xt-fim]'); if (!el) return;
+    const r = el.getBoundingClientRect(); if (r.top < window.innerHeight + 900 && r.bottom > -200) X.mais();
+  };
+  let pend = 0;
+  document.addEventListener('scroll', () => { if (!pend) pend = requestAnimationFrame(() => { pend = 0; X.vigia(); }); }, true);
+  window.addEventListener('resize', () => X.vigia());
 })();
 
 /* Kontar · painel de edição da transação (Dados · Ler nota · Dividir)
