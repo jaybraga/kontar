@@ -1875,15 +1875,16 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   /* ---------- ícone pelo nome ---------- */
   const cache = {};
   const busca = async q => { try { const r = await fetch('https://api.brandfetch.io/v2/search/' + encodeURIComponent(q) + '?c=' + CID); return r.ok ? await r.json() : []; } catch (e) { return []; } };
-  // a marca achada precisa "parecer" com o nome digitado (nome da marca ou domínio contêm uma palavra dele, ou vice-versa)
-  const bate = (b, q) => { if (!b || !b.domain) return false; const nb = nz(b.name).replace(/ /g, ''), nd = nz(b.domain.split('.')[0]).replace(/ /g, ''), nq = nz(q).replace(/ /g, ''), tk = nz(q).split(' ').filter(t => t.length >= 3);
-    return !!nb && (nb.includes(nq) || nq.includes(nb) || nd === nq || tk.some(t => nb.includes(t) || nd.includes(t))); };
+  // a marca achada precisa bater com o NOME INTEIRO digitado: todas as palavras dele (3+ letras) aparecem no nome da marca ou no domínio.
+  // Antes bastava uma palavra (e ainda se buscava só pela primeira): "Droga Raia" pegava "droga-run.pl". Sem marca que bata, fica sem ícone.
+  const bate = (b, q) => { if (!b || !b.domain) return 0; const nb = nz(b.name).replace(/ /g, ''), nd = nz(b.domain.split('.')[0]).replace(/[^a-z0-9]/g, ''), nq = nz(q).replace(/ /g, ''), tk = nz(q).split(' ').filter(t => t.length >= 3);
+    if (!nq) return 0; if (nd === nq || nb === nq) return 2;   // igual: melhor resultado
+    const alvo = nb + '|' + nd; return (tk.length ? tk : [nq]).every(t => alvo.includes(t)) ? 1 : 0; };
   KD.estIcon = async nome => {
     const q = String(nome || '').replace(/[*#].*$/, '').replace(/\d+/g, ' ').replace(/\s+/g, ' ').trim(), k = nz(q);
     if (k.length < 2) return null; if (k in cache) return cache[k];
-    let hit = (await busca(q)).find(b => bate(b, q));
-    const t0 = k.split(' ')[0];
-    if (!hit && t0 !== k && t0.length >= 4) hit = (await busca(t0)).find(b => bate(b, t0));
+    const res = await busca(q); let hit = null, best = 0;
+    res.forEach(b => { const v = bate(b, q); if (v > best) { best = v; hit = b; } });
     return (cache[k] = hit ? { url: 'https://cdn.brandfetch.io/domain/' + hit.domain + '/w/128/h/128/icon?c=' + CID, dom: hit.domain } : null);
   };
 
