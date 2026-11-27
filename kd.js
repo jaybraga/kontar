@@ -103,7 +103,7 @@
      e o que o servidor já calculou: resumo do mês atual, números gerais e Estabelecimentos. O Extrato busca 50 por vez (src/extrato.js).
      Importador, mescla e exportar CSV precisam do histórico inteiro: pedem KD.tudo(), que liga o modo completo nesta sessão. */
   KD.srv = { mes: {}, geral: null, est: null };   // o que o servidor calculou (kontar_mes por mês, kontar_geral, kontar_estabs)
-  KD.LEVE = false;   // liga depois da conferência; localStorage 'kontar:leve' = '1' liga, '0' desliga neste navegador
+  KD.LEVE = true;   // conferido nas contas Jay e Teste (27/11); localStorage 'kontar:leve' = '1' liga, '0' desliga neste navegador
   KD.leve = () => { let v = null; try { v = localStorage.getItem('kontar:leve'); } catch (e) {} return KD.calcSrv() && !KD._tudo && (v === '1' ? true : v === '0' ? false : KD.LEVE); };
   KD.load = async function (sb, user) {
     KD.sb = sb; KD.user = user; KD.srv.mes = {};
