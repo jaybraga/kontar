@@ -102,6 +102,7 @@
   /* modo leve (cálculo no servidor): ao abrir, NÃO baixa a lista de lançamentos. Vêm só os cadastros (contas, cartões, categorias...)
      e o que o servidor já calculou: resumo do mês atual, números gerais e Estabelecimentos. O Extrato busca 50 por vez (src/extrato.js).
      Importador, mescla e exportar CSV precisam do histórico inteiro: pedem KD.tudo(), que liga o modo completo nesta sessão. */
+  KD.srv = { mes: {}, geral: null, est: null };   // o que o servidor calculou (kontar_mes por mês, kontar_geral, kontar_estabs)
   KD.LEVE = false;   // liga depois da conferência; localStorage 'kontar:leve' = '1' liga, '0' desliga neste navegador
   KD.leve = () => { let v = null; try { v = localStorage.getItem('kontar:leve'); } catch (e) {} return KD.calcSrv() && !KD._tudo && (v === '1' ? true : v === '0' ? false : KD.LEVE); };
   KD.load = async function (sb, user) {
@@ -474,7 +475,6 @@
   /* -------- o mesmo resumo do mês, a partir dos números que o servidor calcula (kontar_mes / kontar_geral) --------
      O servidor faz as contas sobre os lançamentos; aqui só se formata (arredonda, R$, textos) e se aplicam as regras que dependem
      só do cadastro de cartões/contas (fatura informada pelo banco, próximo fechamento). Mesma saída de KD.month, campo a campo. */
-  KD.srv = { mes: {}, geral: null };
   KD.monthSrv = function (mi, S, G) {
     const M = KD.M, T = KD.today, isCur = mi === M.CUR, start = mStart(mi), end = mEnd(mi), ref = isCur ? T : end, nd = daysIn(mi), td = isCur ? T.getDate() : nd;
     const out = { mi, isCur }, n = v => Number(v) || 0;
