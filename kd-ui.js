@@ -1877,11 +1877,17 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
   const busca = async q => { try { const r = await fetch('https://api.brandfetch.io/v2/search/' + encodeURIComponent(q) + '?c=' + CID); return r.ok ? await r.json() : []; } catch (e) { return []; } };
   // a marca achada precisa bater com o NOME INTEIRO digitado: todas as palavras dele (3+ letras) aparecem no nome da marca ou no domínio.
   // Antes bastava uma palavra (e ainda se buscava só pela primeira): "Droga Raia" pegava "droga-run.pl". Sem marca que bata, fica sem ícone.
-  const bate = (b, q) => { if (!b || !b.domain) return 0; const nb = nz(b.name).replace(/ /g, ''), nd = nz(b.domain.split('.')[0]).replace(/[^a-z0-9]/g, ''), nq = nz(q).replace(/ /g, ''), tk = nz(q).split(' ').filter(t => t.length >= 3);
+  const bate = (b, q) => { if (!b || !b.domain) return 0; const nb = nz(b.name).replace(/ /g, ''), nd = nz(b.domain.split('.')[0]).replace(/[^a-z0-9]/g, ''), nq = nz(q).replace(/ /g, ''), tk = nz(q).split(' ').filter(t => t.length >= 3 || /\d/.test(t));   // "c6" conta como palavra
     if (!nq) return 0; if (nd === nq || nb === nq) return 2;   // igual: melhor resultado
     const alvo = nb + '|' + nd; return (tk.length ? tk : [nq]).every(t => alvo.includes(t)) ? 1 : 0; };
+  /* nome → termo de busca. Tira o que vem depois de * ou #, números soltos de 3+ dígitos (nº da loja: "SAO PAULO 2231") e dígitos colados
+     no fim de uma palavra (RAIA1822 → RAIA). Números que fazem parte da marca ficam: "C6 Bank", "99", "7-Eleven".
+     (Antes todo número sumia: "C6 BANK" virava "C BANK" e a busca trazia C&A.) */
+  const limpa = nome => String(nome || '').replace(/[*#].*$/, '').replace(/\b\d{3,}\b/g, ' ').replace(/\b([a-zA-ZÀ-ú]{3,})\d{2,}\b/g, '$1').replace(/\s+/g, ' ').trim();
+  /* palavras genéricas não identificam a marca (banco, mercado, posto...): pra completar a lista, o resultado precisa ter a palavra que identifica */
+  const GEN = new Set(['bank', 'banco', 'supermercado', 'supermercados', 'mercado', 'loja', 'lojas', 'posto', 'drogaria', 'farmacia', 'padaria', 'restaurante', 'bar', 'atacadista', 'atacado', 'comercio', 'servicos', 'pagamentos', 'brasil', 'ltda', 'sao', 'paulo', 'bra']);
   KD.estIcon = async nome => {
-    const q = String(nome || '').replace(/[*#].*$/, '').replace(/\d+/g, ' ').replace(/\s+/g, ' ').trim(), k = nz(q);
+    const q = limpa(nome), k = nz(q);
     if (k.length < 2) return null; if (k in cache) return cache[k];
     const res = await busca(q); let hit = null, best = 0;
     res.forEach(b => { const v = bate(b, q); if (v > best) { best = v; hit = b; } });
@@ -1895,7 +1901,7 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     i.onload = () => fim(i.naturalWidth > 16); i.onerror = () => fim(false); setTimeout(() => fim(false), 4000); i.src = 'https://www.google.com/s2/favicons?domain=' + d + '&sz=64'; });
   const opCache = {};
   KD.estIcones = async nome => {
-    const q = String(nome || '').replace(/[*#].*$/, '').replace(/\d+/g, ' ').replace(/\s+/g, ' ').trim(), k = nz(q);
+    const q = limpa(nome), k = nz(q);
     if (k.length < 2) return []; if (opCache[k]) return opCache[k];
     const nq = k.replace(/ /g, ''), tk = k.split(' ').filter(t => t.length >= 4);
     const palpites = [...new Set([nq + '.com.br', nq + '.com'].concat(tk.length > 1 ? tk.map(t => t + '.com.br') : []))];
@@ -1903,7 +1909,8 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     const doms = [], add = d => { d = String(d || '').toLowerCase(); if (d && !doms.includes(d)) doms.push(d); };
     (res || []).map(b => ({ b, v: bate(b, q) })).filter(x => x.v).sort((a, b) => b.v - a.v).forEach(x => add(x.b.domain));
     palpites.forEach((d, i) => { if (vivos[i] && !(i === 1 && vivos[0])) add(d); });   // nome.com só se não houver nome.com.br (costuma só redirecionar e o ícone vem em branco)
-    (res || []).forEach(b => add(b && b.domain));
+    const chave = nz(q).split(' ').filter(t => t.length >= 2 && !GEN.has(t))[0];   // a palavra que identifica a marca ("c6", "droga", "spani")
+    if (chave) (res || []).forEach(b => { if (b && b.domain && (nz(b.name).replace(/ /g, '') + '|' + nz(b.domain.split('.')[0]).replace(/[^a-z0-9]/g, '')).includes(chave)) add(b.domain); });
     return (opCache[k] = doms.slice(0, 6).map(d => ({ dom: d, url: 'https://cdn.brandfetch.io/domain/' + d + '/w/128/h/128/icon?c=' + CID })));
   };
 
