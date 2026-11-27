@@ -89,7 +89,7 @@
 
   /* ================= 7. CARREGANDO (09e) ================= */
   const CSS_LOAD = `
-:root{--roxo:#5B3DF5;--claro:#F4F3F1;--E:cubic-bezier(.65,0,.35,1);--T:650ms}
+:root{--roxo:#5B3DF5;--claro:#F4F3F1;--E:cubic-bezier(.65,0,.35,1);--T:585ms}
 *{box-sizing:border-box}
 .ld{position:fixed;inset:0;z-index:10;background:var(--claro);isolation:isolate;transition:opacity .55s ease;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;color:#fff}
 .ld.gone{opacity:0;pointer-events:none}
@@ -117,7 +117,7 @@
 .ld.fin .cc h1{transition-delay:.35s}.ld.fin .cc .ln{transition-delay:.45s}.ld.fin .cc .wm,.ld.fin .mk .wm svg{transition-delay:.55s}
 @media (prefers-reduced-motion:reduce){.col i::before{transition:none}.ld{transition:opacity .3s ease}}`;
   /* Roteiro (cada gatilho move as colunas UMA vez): abre no preto → claro → (não carregou) preto → claro … ; a conclusão entra na fila e o ÚLTIMO gatilho é sempre claro → preto.
-     Tempo encurtado a pedido do Jay (≈2,7s numa carga rápida; o canvas tinha ≈4,2s). */
+     Cada fase (claro ou escuro) dura 1s (T 585 + espalhamento 335 + 80), a pedido do Jay em 27/11; o canvas tinha ≈4,2s no total. */
   let LOADER = null;
   window.KontarLoaderNovo = () => loader();   // pra conferir a animação quadro a quadro com o app aberto
   function loader() {
@@ -126,7 +126,7 @@
     const el = document.createElement('div'); el.id = 'kload';
     el.innerHTML = '<div class="ld" role="status" aria-live="polite" aria-label="Carregando"><div class="cols" aria-hidden="true"></div><div class="cc"><h1>Organizando<br>suas finanças</h1><span class="ln"></span><span class="wm">' + LOGO(28, '#FFFFFF', 'transparent') + '</span></div><div class="mk" aria-hidden="true"><h1>Organizando<br>suas finanças</h1><span class="ln"></span><span class="wm">' + LOGO(28, 'transparent', '#5B3DF5') + '</span></div></div>';
     document.body.appendChild(el); const ld = el.firstChild, cols = ld.firstChild; el.style.cssText = 'position:fixed;inset:0;z-index:2147483600';
-    const N = 20, T = 650, SPREAD = 380, HOLD = 300, TOTAL = T + SPREAD + 80, J = [.31, .82, .12, .67, .45, .93, .05, .58, .24, .76, .39, .88, .17, .63, .5, .97, .09, .71, .28, .84];
+    const N = 20, T = 585, SPREAD = 335, HOLD = 300, TOTAL = T + SPREAD + 80, J = [.31, .82, .12, .67, .45, .93, .05, .58, .24, .76, .39, .88, .17, .63, .5, .97, .09, .71, .28, .84];
     for (let i = 0; i < N; i++) { const c = document.createElement('div'); c.className = 'col'; c.innerHTML = '<i class="t"></i><i class="b"></i>'; cols.appendChild(c); }
     const each = fn => [...cols.children].forEach((c, i) => c.style.setProperty('--d', Math.round(fn(i)) + 'ms')), edge = i => 1 - Math.abs(i - (N - 1) / 2) / ((N - 1) / 2);
     /* espera que acaba antes se o app ficar pronto: a abertura sai na hora, sem terminar a fase em que está */
