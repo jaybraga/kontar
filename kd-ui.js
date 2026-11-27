@@ -441,8 +441,12 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     /* Faturas futuras */
     const F9 = S.FUT.slice(0, 9), fTot = f => Object.values(f.s).reduce((a, b) => a + b, 0), fMax = Math.max(1, ...F9.map(fTot));
     o.hmFutEsc = brl0(fMax);
-    o.hmFut = F9.map((f, i) => { const tot = fTot(f);
-      return { lc: i === 0 ? '#fff' : '#8A8A93', xm: i >= 6 ? 'w' : null, v: tot ? brl0(tot) : '—', h: (tot / fMax * 100).toFixed(1) + '%', m: f.m, segs: Object.keys(f.s).map(k => ({ tip: k + ' · ' + f.m + '|' + brl0(f.s[k]), flex: f.s[k].toFixed(2), cor: C.KC[k] || '#78788A' })) }; });
+    // barra pequena demais pra separar os bancos: fica com um tamanho mínimo e o balão do mês lista todos os bancos
+    o.hmFut = F9.map((f, i) => { const tot = fTot(f), pct = tot / fMax * 100, mini = tot > 0 && pct < 4, ks = Object.keys(f.s);
+      return { lc: i === 0 ? '#fff' : '#8A8A93', xm: i >= 6 ? 'w' : null, v: tot ? brl0(tot) : '—', h: mini ? '4px' : pct.toFixed(1) + '%', m: f.m,
+        tip: mini ? f.m + '|' + brl0(tot) : null, tipc: mini ? '1' : null, cur: mini ? 'default' : 'auto',
+        rows: mini ? ks.map(k => k.replace(/[|;]/g, ' ') + '|' + brl0(f.s[k]) + '|' + (C.KC[k] || '#78788A')).join(';') : null,
+        segs: ks.map(k => ({ tip: mini ? null : k + ' · ' + f.m + '|' + brl0(f.s[k]), flex: f.s[k].toFixed(2), cor: C.KC[k] || '#78788A' })) }; });
     const legN = [...new Set(F9.flatMap(f => Object.keys(f.s)))];
     o.hmFutLeg = M.cards.filter(c => legN.includes(c.nick || c.n)).map(c => ({ n: c.nick || c.n, cor: c.destaque || c.cor }));
     /* Tetos (home): os 5 mais perto do teto */
