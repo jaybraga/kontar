@@ -673,16 +673,16 @@ var KDMorph=(()=>{var Ot=Object.defineProperty;var te=Object.getOwnPropertyDescr
     probe(u) { if (u in KD.lg.info) return KD.lg.info[u]; KD.lg.info[u] = null; const im = new Image(); im.crossOrigin = 'anonymous';
       im.onload = () => { try { const n = 24, cv = document.createElement('canvas'); cv.width = cv.height = n; const g = cv.getContext('2d', { willReadFrequently: true }); g.drawImage(im, 0, 0, n, n); const d = g.getImageData(0, 0, n, n).data; let r = 0, gg = 0, b = 0, a = 0, c = 0;
           for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { if (y > 1 && y < n - 2 && x > 1 && x < n - 2) continue; const i = (y * n + x) * 4; r += d[i]; gg += d[i + 1]; b += d[i + 2]; a += d[i + 3]; c++; }
-          a /= c; const col = a < 128 ? '#ffffff' : 'rgb(' + Math.round(r / c) + ',' + Math.round(gg / c) + ',' + Math.round(b / c) + ')'; const lum = a < 128 ? 1 : (0.2126 * r + 0.7152 * gg + 0.0722 * b) / c / 255;
+          a /= c; const col = a < 128 ? '#000000' : 'rgb(' + Math.round(r / c) + ',' + Math.round(gg / c) + ',' + Math.round(b / c) + ')'; const lum = a < 128 ? 0 : (0.2126 * r + 0.7152 * gg + 0.0722 * b) / c / 255;
           KD.lg.info[u] = { ok: true, col: col, dark: lum < 0.16 }; } catch (e) { KD.lg.info[u] = { ok: false }; } KD.lgPass(); };
       im.onerror = () => { KD.lg.info[u] = { ok: false }; KD.lgPass(); }; im.src = u; return null; } };
   KD.lgPass = function () {
     document.querySelectorAll('[data-lg]').forEach(el => { const m = /url\(["']?(.*?)["']?\)/.exec(el.style.backgroundImage || ''); if (!m) return; const u = m[1].replace(/&amp;/g, '&');
       if (!el.dataset.lgS) el.dataset.lgS = el.style.backgroundSize || '';
       const mode = KD.lg.fit(u), inf = mode === 'cor' ? KD.lg.probe(u) : null, base = el.dataset.lgS;
-      let size = base, bg = '#fff', sh = 'none';
+      let size = base, bg = '#000', sh = 'none';   // fundo padrão do logo: preto
       if (mode === 'preencher') size = '136%';
-      else if (mode === 'cor') { if (inf && inf.ok) { size = '100%'; bg = inf.col; sh = inf.dark ? 'inset 0 0 0 1px rgba(255,255,255,.22)' : 'none'; } else if (inf) size = '136%'; }
+      else if (mode === 'cor') { if (inf && inf.ok) { size = '104%'; bg = inf.col; } else if (inf) size = '136%'; }   // 104%: a imagem passa um pouco da borda do círculo (com 100% a borda dela aparecia nos 4 lados)
       if (el.style.backgroundSize !== size) el.style.backgroundSize = size; if (el.style.backgroundColor !== bg) el.style.backgroundColor = bg; if (el.style.boxShadow !== sh) el.style.boxShadow = sh; }); };
   KD.imgFromUrl = u => new Promise(res => { fetch(u, { mode: 'cors' }).then(r => r.ok ? r.blob() : Promise.reject()).then(b => /^image\//.test(b.type) ? res(URL.createObjectURL(b)) : res(null)).catch(() => { const im = new Image(); im.onload = () => res(u); im.onerror = () => res(null); im.src = u; }); });
   /* imagem embutida (data:...;base64,...) → endereço blob: sem ";" (o motor das telas corta estilos no ";"). Mesma imagem, mesmo endereço. */
